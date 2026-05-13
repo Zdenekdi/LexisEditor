@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LexisEditor v1.1 ULTIMATE - Legal Powerhouse</title>
+    
+    <!-- Libraries -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,700;1,400&family=Roboto+Slab&display=swap');
+
+        :root {
+            --word-blue: #2b579a;
+            --ribbon-bg: #f3f3f3;
+            --border: #d1d1d1;
+            --bg-workspace: #e6e6e6;
+            --accent: #3b82f6;
+            --ai-color: #8b5cf6;
+            --sidebar-bg: #ffffff;
+        }
+
+        body.dark-mode {
+            --word-blue: #1e293b;
+            --ribbon-bg: #334155;
+            --border: #475569;
+            --bg-workspace: #0f172a;
+            --sidebar-bg: #1e293b;
+            color: #f1f5f9;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-workspace);
+            color: #333;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background 0.3s;
+        }
+
+        /* Ribbon UI */
+        .ribbon { background: var(--ribbon-bg); border-bottom: 1px solid var(--border); user-select: none; z-index: 1000; }
+        
+        .ribbon-tabs {
+            display: flex;
+            padding: 5px 20px 0;
+            gap: 2px;
+            background: var(--word-blue);
+            color: white;
+            font-size: 13px;
+        }
+
+        .tab { padding: 8px 18px; cursor: pointer; border-radius: 4px 4px 0 0; transition: background 0.2s; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: var(--ribbon-bg); color: var(--word-blue); font-weight: 600; }
+
+        .tool-groups-container {
+            background: var(--sidebar-bg);
+            height: 105px;
+            border-bottom: 1px solid var(--border);
+            display: none;
+            padding: 10px 20px;
+            gap: 20px;
+        }
+        .tool-groups-container.active { display: flex; animation: fadeIn 0.2s; }
+
+        .tool-group { display: flex; flex-direction: column; align-items: center; border-right: 1px solid #eee; padding-right: 20px; justify-content: space-between; }
+        .group-label { font-size: 10px; color: #888; margin-top: 5px; text-transform: uppercase; }
+        .icons { display: flex; gap: 8px; align-items: center; flex-grow: 1; }
+
+        .btn-icon {
+            display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font-size: 11px; color: inherit; min-width: 45px;
+        }
+        .icon-sq {
+            width: 32px; height: 32px; background: rgba(0,0,0,0.03); border: 1px solid var(--border); border-radius: 6px;
+            display: flex; align-items: center; justify-content: center; font-size: 16px;
+        }
+        .btn-icon:hover .icon-sq { background: rgba(59, 130, 246, 0.1); border-color: var(--accent); }
+
+        /* Typography Controls */
+        .combo-box {
+            padding: 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; background: white;
+        }
+
+        /* Sidebar Panels */
+        .side-panels {
+            display: flex; flex-direction: column; width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
+            transition: width 0.3s;
+        }
+        .panel-section { padding: 15px; border-bottom: 1px solid var(--border); }
+        .panel-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 10px; }
+
+        /* Clause Library */
+        .clause-item {
+            padding: 8px; border: 1px solid #eee; border-radius: 4px; font-size: 12px; margin-bottom: 5px; cursor: grab; background: #fafafa;
+        }
+        .clause-item:hover { background: #eff6ff; border-color: var(--accent); }
+
+        /* Workspace */
+        .workspace { flex-grow: 1; display: flex; overflow: hidden; position: relative; }
+        .editor-scroll { flex-grow: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; align-items: center; background: var(--bg-workspace); }
+        #editor-wrapper { 
+            width: 816px; background: white; box-shadow: 0 0 30px rgba(0,0,0,0.15); min-height: 1100px; color: #1e293b;
+            transition: width 0.3s;
+        }
+        
+        /* Split View Mode */
+        body.split-view #editor-wrapper { width: 600px; margin-right: 20px; }
+        #reference-panel { width: 0; background: #f8fafc; border-left: 1px solid var(--border); transition: width 0.3s; overflow: hidden; }
+        body.split-view #reference-panel { width: 500px; display: block; padding: 20px; }
+
+        .ql-editor { padding: 90px !important; min-height: 1100px; outline: none; }
+        .ql-toolbar.ql-snow { display: none; }
+
+        /* Floating AI Panel */
+        .ai-panel {
+            position: absolute; right: 30px; top: 30px; width: 300px; background: white; border: 1px solid var(--border);
+            border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; z-index: 500;
+        }
+        .ai-header { padding: 12px; background: var(--ai-color); color: white; border-radius: 12px 12px 0 0; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
+        .ai-body { padding: 15px; font-size: 13px; color: #475569; }
+
+        .status-bar { height: 28px; background: var(--word-blue); color: white; font-size: 11px; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
+    </style>
+</head>
+<body id="main-body">
+
+    <div class="ribbon">
+        <div class="ribbon-tabs">
+            <div class="tab" onclick="switchTab('tab-file')">Soubor</div>
+            <div class="tab active" onclick="switchTab('tab-home')">Domů</div>
+            <div class="tab" onclick="switchTab('tab-insert')">Vložit</div>
+            <div class="tab" onclick="switchTab('tab-legal')">Právní nástroje</div>
+            <div class="tab" onclick="switchTab('tab-ai')">✨ LexisAI</div>
+            <div class="tab" onclick="switchTab('tab-view')">Zobrazení</div>
+        </div>
+
+        <!-- TAB: HOME (Rich Typography) -->
+        <div id="tab-home" class="tool-groups-container active">
+            <div class="tool-group">
+                <div class="icons">
+                    <select id="font-family" class="combo-box" onchange="applyFont(this.value)">
+                        <option value="Lora">Lora (Serif)</option>
+                        <option value="Inter">Inter (Sans)</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Roboto Slab">Roboto Slab</option>
+                    </select>
+                    <select id="font-size" class="combo-box" onchange="applySize(this.value)">
+                        <option value="12px">12</option>
+                        <option value="14px">14</option>
+                        <option value="16px" selected>16</option>
+                        <option value="18px">18</option>
+                        <option value="24px">24</option>
+                    </select>
+                </div>
+                <div class="group-label">Písmo & Velikost</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="exec('bold')"><div class="icon-sq"><b>B</b></div></div>
+                    <div class="btn-icon" onclick="exec('italic')"><div class="icon-sq"><i>I</i></div></div>
+                    <div class="btn-icon" onclick="exec('underline')"><div class="icon-sq"><u>U</u></div></div>
+                    <div class="btn-icon" onclick="exec('strike')"><div class="icon-sq">S</div></div>
+                </div>
+                <div class="group-label">Styl</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="exec('align', '')"><div class="icon-sq">≡</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'center')"><div class="icon-sq">≣</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'right')"><div class="icon-sq">≡</div></div>
+                    <div class="btn-icon" onclick="setLineSpacing(1.5)"><div class="icon-sq">↕</div></div>
+                </div>
+                <div class="group-label">Odstavec & Řádkování</div>
+            </div>
+        </div>
+
+        <!-- TAB: LEGAL (Advanced) -->
+        <div id="tab-legal" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertCite()"><div class="icon-sq">⚖️</div>Citace</div>
+                    <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anon</div>
+                    <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Paragraf</div>
+                </div>
+                <div class="group-label">Legal</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Pošta</div>
+                    <div class="btn-icon" onclick="simulateLustrace()"><div class="icon-sq">🔍</div>Lustrace</div>
+                </div>
+                <div class="group-label">Integrace</div>
+            </div>
+        </div>
+
+        <!-- TAB: VIEW (Layout) -->
+        <div id="tab-view" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleSplitView()"><div class="icon-sq">📖</div>Split</div>
+                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Tmavý</div>
+                </div>
+                <div class="group-label">Režimy</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <!-- Sidebar Panels -->
+        <div class="side-panels" id="sidebar">
+            <div class="panel-section">
+                <div class="panel-title">Knihovna doložek</div>
+                <div class="clause-item" onclick="insertClause('arbitration')">⚖️ Rozhodčí doložka</div>
+                <div class="clause-item" onclick="insertClause('gdpr')">🛡️ GDPR ustanovení</div>
+                <div class="clause-item" onclick="insertClause('prorogation')">🏛️ Prorogační doložka</div>
+            </div>
+            <div class="panel-section">
+                <div class="panel-title">Informace o spisu</div>
+                <div style="font-size: 12px; color: #64748b;">
+                    Spis: 2024/005/ZD<br>Klient: ALFA s.r.o.
+                </div>
+            </div>
+        </div>
+
+        <!-- Editor -->
+        <div class="editor-scroll">
+            <div id="editor-wrapper">
+                <div id="editor">
+                    <h1 style="text-align: center; font-family: 'Outfit';">SMLOUVA O DÍLO</h1>
+                    <p><br></p>
+                    <p><strong>I. Smluvní strany</strong></p>
+                    <p>Zhotovitel: [JMÉNO], IČO: [IČO]</p>
+                    <p>Objednatel: [JMÉNO], IČO: [IČO]</p>
+                    <p><br></p>
+                    <p><strong>II. Předmět smlouvy</strong></p>
+                    <p>Předmětem této smlouvy je závazek zhotovitele provést pro objednatele dílo spočívající v...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reference Panel (Split View) -->
+        <div id="reference-panel">
+            <div class="panel-title" style="margin-bottom: 20px;">Referenční materiály</div>
+            <div style="background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; font-size: 12px;">
+                <p><strong>Předchozí judikatura k tématu:</strong></p>
+                <hr style="margin: 10px 0;">
+                <p>NS 23 Cdo 456/2021: "Zhotovitel odpovídá za vady díla i v případě, že objednatel nepřevzal dílo protokolárně..."</p>
+                <br>
+                <button style="padding: 4px 8px; background: #eee; border: 1px solid #ccc; cursor: pointer;">Kopírovat do textu</button>
+            </div>
+        </div>
+
+        <!-- AI Panel -->
+        <div class="ai-panel" id="ai-panel">
+            <div class="ai-header"><span>✨ LexisAI</span><span style="cursor:pointer" onclick="this.parentElement.parentElement.style.display='none'">✕</span></div>
+            <div class="ai-body" id="ai-output">Připraven k analýze...</div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span>Strana 1 z 1</span>
+        <span id="word-count">0 slov</span>
+        <div style="flex-grow:1"></div>
+        <span>🤖 AI: Aktivní</span>
+        <span>✔️ Uloženo</span>
+    </div>
+
+    <script>
+        var quill = new Quill('#editor', { theme: 'snow', modules: { toolbar: false } });
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.querySelectorAll('.tool-groups-container').forEach(c => c.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // Typography Logic
+        function applyFont(font) {
+            quill.format('font', font);
+            document.getElementById('editor').style.fontFamily = font;
+        }
+
+        function applySize(size) {
+            quill.format('size', size);
+        }
+
+        function exec(format, value = true) {
+            const current = quill.getFormat();
+            quill.format(format, current[format] ? false : value);
+        }
+
+        function setLineSpacing(val) {
+            const editor = document.querySelector('.ql-editor');
+            editor.style.lineHeight = val;
+        }
+
+        // Legal Tools
+        function insertPara() { quill.insertText(quill.getSelection()?.index || 0, "§ "); }
+        function insertCite() { quill.insertText(quill.getSelection()?.index || 0, "[Citace: č. 89/2012 Sb.]", { color: '#2b579a', italic: true }); }
+        function anonymize() { quill.setText(quill.getText().replace(/Jan Novák/g, "J. N.")); }
+
+        function insertClause(type) {
+            const clauses = {
+                'arbitration': "\n\nSmluvní strany se dohodly, že veškeré spory budou rozhodovány v rozhodčím řízení před Rozhodčím soudem při HK ČR a AK ČR.\n",
+                'gdpr': "\n\nSmluvní strany berou na vědomí, že dochází ke zpracování osobních údajů v souladu s Nařízením GDPR.\n",
+                'prorogation': "\n\nPro veškeré spory je místně příslušným soudem obecný soud zhotovitele.\n"
+            };
+            quill.insertText(quill.getSelection()?.index || 0, clauses[type]);
+        }
+
+        // View Logic
+        function toggleSplitView() {
+            document.body.classList.toggle('split-view');
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+        }
+
+        function openPostDialog() {
+            document.getElementById('ai-panel').style.display = 'flex';
+            document.getElementById('ai-output').innerHTML = "<b>Hybridní pošta:</b><br>Příjemce: Jan Novák<br><br><button onclick='this.innerText=\"Odesláno!\"' style='padding:8px; width:100%;'>Odeslat doporučeně</button>";
+        }
+
+        function simulateLustrace() {
+            document.getElementById('ai-panel').style.display = 'flex';
+            document.getElementById('ai-output').innerHTML = "<b>Lustrace ARES:</b><br>Subjekt aktivní.<br>Bezdlužnost potvrzena.";
+        }
+
+        // Persistence
+        quill.on('text-change', () => {
+            const text = quill.getText();
+            document.getElementById('word-count').innerText = (text.trim().split(/\s+/).length - 1) + " slov";
+        });
+    </script>
+</body>
+</html>
