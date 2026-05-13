@@ -127,6 +127,42 @@
         .ai-body { padding: 15px; font-size: 13px; color: #475569; }
 
         .status-bar { height: 28px; background: var(--word-blue); color: white; font-size: 11px; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
+
+        /* Právnické číslování (Stabilní) */
+        .ql-editor ol {
+            list-style-type: none;
+            counter-reset: item;
+        }
+
+        .ql-editor ol > li {
+            display: block;
+            counter-increment: item;
+            position: relative;
+            padding-left: 3.5em;
+            margin-bottom: 0.5em;
+        }
+
+        .ql-editor ol > li::before {
+            content: counters(item, ".") ". ";
+            position: absolute;
+            left: 0;
+            font-weight: 600;
+            color: var(--word-blue);
+            width: 3em;
+            text-align: right;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Odsazení pro více úrovní - simulace hierarchie v plochém Quillu */
+        .ql-editor ol li.ql-indent-1 { padding-left: 5.5em; counter-increment: item1; }
+        .ql-editor ol li.ql-indent-1::before { content: counter(item) "." counter(item1) ". "; left: 2em; }
+        .ql-editor ol { counter-reset: item1; }
+
+        .ql-editor ol li.ql-indent-2 { padding-left: 7.5em; counter-increment: item2; }
+        .ql-editor ol li.ql-indent-2::before { content: counter(item) "." counter(item1) "." counter(item2) ". "; left: 4em; }
+        .ql-editor ol { counter-reset: item2; }
+
+        body.dark-mode .ql-editor ol > li::before { color: #60a5fa; }
     </style>
 </head>
 <body id="main-body">
@@ -172,10 +208,9 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="exec('align', '')"><div class="icon-sq">≡</div></div>
-                    <div class="btn-icon" onclick="exec('align', 'center')"><div class="icon-sq">≣</div></div>
-                    <div class="btn-icon" onclick="exec('align', 'right')"><div class="icon-sq">≡</div></div>
-                    <div class="btn-icon" onclick="setLineSpacing(1.5)"><div class="icon-sq">↕</div></div>
+                    <div class="btn-icon" onclick="exec('list', 'ordered')"><div class="icon-sq">1.</div>Číslování</div>
+                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">→</div>Vpravo</div>
+                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">←</div>Vlevo</div>
                 </div>
                 <div class="group-label">Odstavec & Řádkování</div>
             </div>
@@ -294,8 +329,44 @@
 
         function exec(format, value = true) {
             const current = quill.getFormat();
-            quill.format(format, current[format] ? false : value);
+            if (current[format] === value) {
+                quill.format(format, false);
+            } else {
+                quill.format(format, value);
+            }
         }
+
+        function indent(val) {
+            const range = quill.getSelection();
+            if (range) {
+                const currentIndent = quill.getFormat(range).indent || 0;
+                const newIndent = Math.max(0, currentIndent + val);
+                quill.format('indent', newIndent === 0 ? false : newIndent);
+            }
+        }
+
+        // Klávesové zkratky pro Tab
+        quill.keyboard.addBinding({
+            key: 9, // Tab
+            handler: function(range, context) {
+                if (context.format.list) {
+                    indent(1);
+                    return false;
+                }
+                return true;
+            }
+        });
+        quill.keyboard.addBinding({
+            key: 9, // Tab
+            shiftKey: true,
+            handler: function(range, context) {
+                if (context.format.list) {
+                    indent(-1);
+                    return false;
+                }
+                return true;
+            }
+        });
 
         function setLineSpacing(val) {
             const editor = document.querySelector('.ql-editor');
