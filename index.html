@@ -1027,14 +1027,44 @@
 
         function insertSignBlock() {
             const range = quill.getSelection(true);
-            const block = `
+            const text = quill.getText();
+            
+            const count = prompt("Počet podpisů (1 nebo 2):", "2");
+            if (count !== "1" && count !== "2") return;
+
+            // Inteligentní detekce stran
+            let partyA = "Objednatel";
+            let partyB = "Zhotovitel";
+            if (text.includes("Prodávající") || text.includes("Kupující")) {
+                partyA = "Prodávající"; partyB = "Kupující";
+            } else if (text.includes("Pronajímatel") || text.includes("Nájemce")) {
+                partyA = "Pronajímatel"; partyB = "Nájemce";
+            }
+
+            if (count === "2") {
+                const pA = prompt("Název první strany:", partyA);
+                const pB = prompt("Název druhé strany:", partyB);
+                if (!pA || !pB) return;
+
+                const block = `
+V ........................ dne ...............     V ........................ dne ...............
+
+..............................................     ..............................................
+             ${pA.padEnd(20)}                                   ${pB.padEnd(20)}
+`;
+                quill.insertText(range.index, block);
+            } else {
+                const pA = prompt("Název strany:", "Odesílatel");
+                if (!pA) return;
+                const block = `
 V ................................... dne ...................................
 
-..........................................          ..........................................
-            Objednatel                                          Zhotovitel
+.............................................................................
+                                ${pA}
 `;
-            quill.insertText(range.index, block);
-            quill.setSelection(range.index + block.length);
+                quill.insertText(range.index, block);
+            }
+            quill.setSelection(range.index + 5); // Pozice pro začátek psaní
         }
 
         function checkHierarchy() {
