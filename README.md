@@ -15,21 +15,21 @@
 **LexisEditor** není jen textový editor, je to plnohodnotné, nativní LegalTech prostředí (IDE pro právníky). Byl navržen od základů jako náhrada Microsoft Wordu s primárním zaměřením na absolutní kontrolu nad daty, integraci lokální umělé inteligence a automatizaci rutinních právních úkonů.
 
 Díky architektuře založené na Electronu běží aplikace nezávisle, přímo přistupuje k souborovému systému a zaručuje 100% ochranu klientských dat.
+### ✨ Klíčové vlastnosti v1.3.0
 
-## ✨ Klíčové vlastnosti
+#### ⏰ 1. Proaktivní hlídání lhůt
+Editor v reálném čase analyzuje text a detekuje termíny (např. "ve lhůtě 15 dnů"). Jedním kliknutím lhůtu uložíte do bočního panelu, kde ji editor hlídá, odpočítává dny a včas vás varuje vizuální signalizací. Podporuje export do kalendářů (.ics).
 
-### 1. Nativní správa dokumentů
-- **.DOCX Export:** Integrace `html-to-docx` pro generování nativních Word dokumentů plně kompatibilních s úřady a protistranami.
-- **Glassmorphism UI:** Moderní, nerušivé uživatelské rozhraní se strukturou podobnou Ribbonu MS Word.
+#### 💰 2. Právní Toolbox "All-in-One"
+- **Advokátní tarif:** Automatický výpočet odměny podle hodnoty sporu a počtu úkonů.
+- **Inteligentní anonymizace:** Automatické vyhledání a maskování RC, dat narození a kontaktů před odesláním dokumentu.
+- **Kalkulačky:** Soudní poplatky, zákonné úroky z prodlení a smluvní pokuty.
 
-### 2. Právní Toolbox (Legal Powerhouse)
-- **Kalkulátory:** Automatický výpočet soudních poplatků, úroků z prodlení a procesních lhůt.
-- **Validace:** Kontrola hierarchie paragrafů (prevence formálních chyb v číslování) a inteligentní vkládání podpisových doložek s detekcí stran.
-- **Registry:** Příprava na napojení do systémů ARES a ISDS (Datové schránky).
+#### 🏗️ 3. Inteligentní šablony a Auto-fill
+Systém detekuje pole v hranatých závorkách `[ ]`. Vyplněním jednoho pole v bočním panelu dojde k okamžité aktualizaci všech výskytů v celém dokumentu.
 
-### 3. Local-First AI Integrace (LexisAI)
-- **Bezpečná syntéza:** Plná podpora lokálních modelů přes **Ollama** (Llama 3, Mistral) – žádná data neopouštějí váš počítač.
-- **AI Assistent:** Rychlé generování doložek, smluvních ustanovení a revize smluv přes vestavěný boční panel.
+#### 🔌 4. Integrace a Konektivita
+LexisEditor je připraven na moderní svět. Díky podpoře Webhooků jej lze propojit se systémy jako Evolio, SingleCase nebo Zapier/Make.
 
 ## 🛠 Instalace a Build
 
