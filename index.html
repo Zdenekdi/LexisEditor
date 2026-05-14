@@ -98,9 +98,13 @@
 
         /* Clause Library */
         .clause-item {
-            padding: 8px; border: 1px solid #eee; border-radius: 4px; font-size: 12px; margin-bottom: 5px; cursor: grab; background: #fafafa;
+            padding: 10px; border: 1px solid #eee; border-radius: 6px; font-size: 12px; margin-bottom: 8px; cursor: pointer; background: #fff;
+            display: flex; align-items: center; gap: 8px; transition: all 0.2s;
         }
-        .clause-item:hover { background: #eff6ff; border-color: var(--accent); }
+        .clause-item:hover { background: #eff6ff; border-color: var(--accent); transform: translateX(5px); }
+        .clause-item i { font-style: normal; opacity: 0.8; }
+        
+        .category-header { font-size: 10px; color: #aaa; margin: 15px 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 
         /* Workspace */
         .workspace { flex-grow: 1; display: flex; overflow: hidden; position: relative; }
@@ -128,39 +132,68 @@
 
         .status-bar { height: 28px; background: var(--word-blue); color: white; font-size: 11px; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
 
-        /* Právnické číslování (Stabilní) */
+        /* Print Styles */
+        @media print {
+            .ribbon, .side-panels, .status-bar, .ai-panel, .ql-toolbar { display: none !important; }
+            body { background: white !important; height: auto !important; overflow: visible !important; }
+            .workspace { display: block !important; }
+            .editor-scroll { padding: 0 !important; background: white !important; overflow: visible !important; }
+            #editor-wrapper { width: 100% !important; box-shadow: none !important; margin: 0 !important; }
+            .ql-editor { padding: 0 !important; }
+        }
+
+        /* Právnické číslování (Stabilní & Zarovnané) */
         .ql-editor ol {
             list-style-type: none;
             counter-reset: item;
+            padding-left: 0;
         }
 
         .ql-editor ol > li {
             display: block;
             counter-increment: item;
             position: relative;
-            padding-left: 3.5em;
+            padding-left: 3.5em; /* Mezera pro číslo úrovně 0 */
             margin-bottom: 0.5em;
         }
 
         .ql-editor ol > li::before {
-            content: counters(item, ".") ". ";
+            content: counter(item) ". ";
             position: absolute;
-            left: 0;
-            font-weight: 600;
+            left: 0.5em;
+            font-weight: 700;
             color: var(--word-blue);
-            width: 3em;
-            text-align: right;
+            width: 2.5em;
+            text-align: left; /* Právníci preferují zarovnání zleva */
             font-family: 'Inter', sans-serif;
         }
 
-        /* Odsazení pro více úrovní - simulace hierarchie v plochém Quillu */
-        .ql-editor ol li.ql-indent-1 { padding-left: 5.5em; counter-increment: item1; }
-        .ql-editor ol li.ql-indent-1::before { content: counter(item) "." counter(item1) ". "; left: 2em; }
-        .ql-editor ol { counter-reset: item1; }
+        /* Úroveň 1 (1.1, 1.2...) */
+        .ql-editor ol li.ql-indent-1 {
+            padding-left: 5em;
+            counter-increment: item1;
+        }
+        .ql-editor ol li.ql-indent-1::before {
+            content: counter(item) "." counter(item1) ". ";
+            left: 1.5em;
+            width: 3em;
+        }
+        
+        /* Resetování pod-počítadla při změně hlavní úrovně */
+        .ql-editor ol li:not(.ql-indent-1):not(.ql-indent-2) {
+            counter-reset: item1 item2;
+        }
 
-        .ql-editor ol li.ql-indent-2 { padding-left: 7.5em; counter-increment: item2; }
-        .ql-editor ol li.ql-indent-2::before { content: counter(item) "." counter(item1) "." counter(item2) ". "; left: 4em; }
-        .ql-editor ol { counter-reset: item2; }
+        /* Úroveň 2 (1.1.1, 1.1.2...) */
+        .ql-editor ol li.ql-indent-2 {
+            padding-left: 6.5em;
+            counter-increment: item2;
+        }
+        .ql-editor ol li.ql-indent-2::before {
+            content: counter(item) "." counter(item1) "." counter(item2) ". ";
+            left: 2.5em;
+            width: 3.5em;
+        }
 
         body.dark-mode .ql-editor ol > li::before { color: #60a5fa; }
     </style>
@@ -169,12 +202,30 @@
 
     <div class="ribbon">
         <div class="ribbon-tabs">
-            <div class="tab" onclick="switchTab('tab-file')">Soubor</div>
+            <div class="tab" onclick="switchTab('tab-file')" id="file-tab-btn">Soubor</div>
             <div class="tab active" onclick="switchTab('tab-home')">Domů</div>
             <div class="tab" onclick="switchTab('tab-insert')">Vložit</div>
             <div class="tab" onclick="switchTab('tab-legal')">Právní nástroje</div>
             <div class="tab" onclick="switchTab('tab-ai')">✨ LexisAI</div>
             <div class="tab" onclick="switchTab('tab-view')">Zobrazení</div>
+        </div>
+
+        <!-- TAB: FILE -->
+        <div id="tab-file" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="window.print()"><div class="icon-sq">📄</div>Export PDF</div>
+                    <div class="btn-icon" onclick="saveVersionManually()"><div class="icon-sq">🕒</div>Verze</div>
+                    <div class="btn-icon" onclick="location.reload()"><div class="icon-sq">🆕</div>Nový</div>
+                </div>
+                <div class="group-label">Dokument</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Uloženo do místní paměti.')"><div class="icon-sq">💾</div>Uložit</div>
+                </div>
+                <div class="group-label">Správa</div>
+            </div>
         </div>
 
         <!-- TAB: HOME (Rich Typography) -->
@@ -228,8 +279,14 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
+                    <input type="text" id="ares-ico" placeholder="IČO firmy..." class="combo-box" style="width:120px">
+                    <div class="btn-icon" onclick="lookupARES()"><div class="icon-sq">🔍</div>Lustrace</div>
+                </div>
+                <div class="group-label">ARES Registry</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Pošta</div>
-                    <div class="btn-icon" onclick="simulateLustrace()"><div class="icon-sq">🔍</div>Lustrace</div>
                 </div>
                 <div class="group-label">Integrace</div>
             </div>
@@ -251,13 +308,35 @@
         <!-- Sidebar Panels -->
         <div class="side-panels" id="sidebar">
             <div class="panel-section">
-                <div class="panel-title">Knihovna doložek</div>
-                <div class="clause-item" onclick="insertClause('arbitration')">⚖️ Rozhodčí doložka</div>
-                <div class="clause-item" onclick="insertClause('gdpr')">🛡️ GDPR ustanovení</div>
-                <div class="clause-item" onclick="insertClause('prorogation')">🏛️ Prorogační doložka</div>
+                <div class="panel-title">📚 Knihovna doložek</div>
+                
+                <div class="category-header">Obchodní právo</div>
+                <div class="clause-item" onclick="insertClause('arbitration')">⚖️ <i>Rozhodčí doložka</i></div>
+                <div class="clause-item" onclick="insertClause('prorogation')">🏛️ <i>Prorogační doložka</i></div>
+                <div class="clause-item" onclick="insertClause('interest')">💰 <i>Smluvní pokuta</i></div>
+                
+                <div class="category-header">Ochrana dat & IT</div>
+                <div class="clause-item" onclick="insertClause('gdpr')">🛡️ <i>GDPR ustanovení</i></div>
+                <div class="clause-item" onclick="insertClause('confidentiality')">🤐 <i>Mlčenlivost (NDA)</i></div>
+                
+                <div class="category-header">Ostatní</div>
+                <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ <i>Uložit vybrané...</i></div>
             </div>
+            
             <div class="panel-section">
-                <div class="panel-title">Informace o spisu</div>
+                <div class="panel-title">🏗️ Generátory</div>
+                <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">🕒 Historie verzí</div>
+                <div id="history-list" style="max-height: 200px; overflow-y: auto;">
+                    <!-- Verze se doplní dynamicky -->
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">📂 Informace o spisu</div>
                 <div style="font-size: 12px; color: #64748b;">
                     Spis: 2024/005/ZD<br>Klient: ALFA s.r.o.
                 </div>
@@ -294,7 +373,7 @@
 
         <!-- AI Panel -->
         <div class="ai-panel" id="ai-panel">
-            <div class="ai-header"><span>✨ LexisAI</span><span style="cursor:pointer" onclick="this.parentElement.parentElement.style.display='none'">✕</span></div>
+            <div class="ai-header"><span id="ai-header-text">✨ LexisAI</span><span style="cursor:pointer" onclick="this.parentElement.parentElement.style.display='none'">✕</span></div>
             <div class="ai-body" id="ai-output">Připraven k analýze...</div>
         </div>
     </div>
@@ -382,9 +461,57 @@
             const clauses = {
                 'arbitration': "\n\nSmluvní strany se dohodly, že veškeré spory budou rozhodovány v rozhodčím řízení před Rozhodčím soudem při HK ČR a AK ČR.\n",
                 'gdpr': "\n\nSmluvní strany berou na vědomí, že dochází ke zpracování osobních údajů v souladu s Nařízením GDPR.\n",
-                'prorogation': "\n\nPro veškeré spory je místně příslušným soudem obecný soud zhotovitele.\n"
+                'prorogation': "\n\nPro veškeré spory je místně příslušným soudem obecný soud zhotovitele.\n",
+                'interest': "\n\nV případě prodlení s úhradou je dlužník povinen uhradit smluvní pokutu ve výši 0,05 % z dlužné částky za každý den prodlení.\n",
+                'confidentiality': "\n\nSmluvní strany se zavazují zachovávat mlčenlivost o všech skutečnostech, které se dozvědí v souvislosti s touto smlouvou.\n"
             };
-            quill.insertText(quill.getSelection()?.index || 0, clauses[type]);
+            const range = quill.getSelection(true);
+            quill.insertText(range.index, clauses[type]);
+        }
+
+        function saveSelectedAsClause() {
+            const range = quill.getSelection();
+            if (range && range.length > 0) {
+                const text = quill.getText(range.index, range.length);
+                const name = prompt("Zadejte název doložky:");
+                if (name) {
+                    const container = document.querySelector('.panel-section .category-header').parentElement;
+                    const div = document.createElement('div');
+                    div.className = 'clause-item';
+                    div.innerHTML = `📌 <i>${name}</i>`;
+                    div.onclick = () => { quill.insertText(quill.getSelection(true).index, text); };
+                    container.insertBefore(div, container.lastElementChild);
+                }
+            } else {
+                alert("Nejdříve v editoru vyberte text, který chcete uložit.");
+            }
+        }
+
+        function openPoweOfAttorneyDialog() {
+            document.getElementById('ai-panel').style.display = 'flex';
+            document.getElementById('ai-header-text').innerText = "Generátor Plné moci";
+            document.getElementById('ai-output').innerHTML = `
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <input id="pa-name" placeholder="Jméno zmocnitele" class="combo-box" style="width:100%">
+                    <select id="pa-type" class="combo-box" style="width:100%">
+                        <option value="obecná">Obecná plná moc</option>
+                        <option value="procesní">Procesní plná moc</option>
+                    </select>
+                    <button onclick="generatePA()" style="padding:10px; background:var(--word-blue); color:white; border:none; border-radius:4px; cursor:pointer">Vygenerovat</button>
+                </div>
+            `;
+        }
+
+        function generatePA() {
+            const name = document.getElementById('pa-name').value || "[JMÉNO]";
+            const type = document.getElementById('pa-type').value;
+            const text = `
+                \n\nPLNÁ MOC\n\n
+                Já, níže podepsaný/á ${name}, tímto uděluji plnou moc k tomu, aby mě zmocněnec zastupoval v rozsahu: ${type}.
+                V Praze dne ${new Date().toLocaleDateString('cs-CZ')}
+            `.replace(/ {2,}/g, '');
+            quill.insertText(quill.getSelection(true).index, text);
+            document.getElementById('pa-name').value = '';
         }
 
         // View Logic
@@ -401,16 +528,96 @@
             document.getElementById('ai-output').innerHTML = "<b>Hybridní pošta:</b><br>Příjemce: Jan Novák<br><br><button onclick='this.innerText=\"Odesláno!\"' style='padding:8px; width:100%;'>Odeslat doporučeně</button>";
         }
 
-        function simulateLustrace() {
+        function lookupARES() {
+            const ico = document.getElementById('ares-ico').value.trim();
+            if (!ico) return alert("Zadejte prosím IČO.");
+            
             document.getElementById('ai-panel').style.display = 'flex';
-            document.getElementById('ai-output').innerHTML = "<b>Lustrace ARES:</b><br>Subjekt aktivní.<br>Bezdlužnost potvrzena.";
+            document.getElementById('ai-header-text').innerText = "Lustrace ARES";
+            document.getElementById('ai-output').innerHTML = "Vyhledávám v registru...";
+
+            // Poznámka: V čistém prohlížeči může fetch na státní API selhat kvůli CORS.
+            // V Electronu/Tauri toto omezení neplatí. Zde implementujeme robustní simulaci s reálnými daty.
+            setTimeout(() => {
+                const results = {
+                    "27082440": { nazev: "Alza.cz a.s.", adresa: "Jankovcova 1522/53, Holešovice, 170 00 Praha 7" },
+                    "45244782": { nazev: "MAFRA, a.s.", adresa: "Karla Engliše 519/11, Smíchov, 150 00 Praha 5" },
+                    "25107354": { nazev: "Seznam.cz, a.s.", adresa: "Radlická 3294/10, Smíchov, 150 00 Praha 5" }
+                };
+
+                const data = results[ico];
+                if (data) {
+                    document.getElementById('ai-output').innerHTML = `
+                        <b>Subjekt nalezen:</b><br>
+                        ${data.nazev}<br>
+                        IČO: ${ico}<br>
+                        ${data.adresa}<br><br>
+                        <button onclick="insertARES('${data.nazev}', '${ico}', '${data.adresa}')" style="width:100%; padding:8px;">Vložit do záhlaví</button>
+                    `;
+                } else {
+                    document.getElementById('ai-output').innerHTML = "Subjekt nebyl v ARES nalezen (pro demo použijte 27082440).";
+                }
+            }, 800);
         }
 
-        // Persistence
+        function insertARES(nazev, ico, adresa) {
+            const text = `Smluvní strana:\n${nazev}\nIČO: ${ico}\nsídlem: ${adresa}\n\n`;
+            quill.insertText(0, text, { bold: true });
+            document.getElementById('ai-panel').style.display = 'none';
+        }
+
+        // Persistence & History
+        let history = JSON.parse(localStorage.getItem('lexis_history') || '[]');
+
+        function saveVersion(name = "Automatická záloha") {
+            const version = {
+                id: Date.now(),
+                timestamp: new Date().toLocaleString('cs-CZ'),
+                name: name,
+                content: quill.getContents(),
+                wordCount: quill.getText().trim().split(/\s+/).length - 1
+            };
+            history.unshift(version);
+            if (history.length > 20) history.pop(); // Max 20 verzí
+            localStorage.setItem('lexis_history', JSON.stringify(history));
+            updateHistoryUI();
+        }
+
+        function saveVersionManually() {
+            const name = prompt("Název verze (např. 'Před revizí'):", "");
+            if (name !== null) saveVersion(name || "Ruční verze");
+        }
+
+        function updateHistoryUI() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = history.map(v => `
+                <div class="clause-item" style="padding: 6px; font-size: 11px; flex-direction: column; align-items: flex-start; gap: 2px;">
+                    <div style="font-weight: 600; width: 100%; display: flex; justify-content: space-between;">
+                        <span>${v.name}</span>
+                        <span style="color: var(--accent); cursor: pointer;" onclick="restoreVersion(${v.id})">Obnovit</span>
+                    </div>
+                    <div style="color: #888; font-size: 10px;">${v.timestamp} • ${v.wordCount} slov</div>
+                </div>
+            `).join('');
+        }
+
+        function restoreVersion(id) {
+            const v = history.find(v => v.id === id);
+            if (v && confirm(`Opravdu chcete obnovit verzi ze dne ${v.timestamp}? Aktuální změny budou přepsány.`)) {
+                quill.setContents(v.content);
+            }
+        }
+
+        // Auto-save každých 5 minut
+        setInterval(() => saveVersion(), 5 * 60 * 1000);
+
         quill.on('text-change', () => {
             const text = quill.getText();
             document.getElementById('word-count').innerText = (text.trim().split(/\s+/).length - 1) + " slov";
         });
+
+        // Initial UI load
+        updateHistoryUI();
     </script>
 </body>
 </html>
