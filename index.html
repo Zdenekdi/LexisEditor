@@ -186,34 +186,48 @@
             justify-content: center;
         }
         .ai-header-close:hover { opacity: 1; background: rgba(255,255,255,0.1); border-radius: 50%; }
-        .ai-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.2); z-index: 1999; display: none;
-        }
-        .ai-overlay.active { display: block; }
-
-        .icon-sq-mini { 
-            width: 22px; height: 22px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px;
-            display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer;
-            transition: all 0.2s;
-        }
-        .icon-sq-mini:hover { background: var(--accent); color: white; border-color: var(--accent); }
-
-        .ai-side-tab {
+        
+        /* Floating Tabs */
+        .ai-side-tab, .comment-side-tab {
             position: fixed; right: 0; top: 50%; transform: translateY(-50%);
-            width: 28px; height: 100px; background: linear-gradient(to bottom, var(--ai-color), #7c3aed);
+            width: 32px; height: 120px; 
             color: white; display: flex; align-items: center; justify-content: center;
-            writing-mode: vertical-rl; text-orientation: mixed; border-radius: 8px 0 0 8px;
-            cursor: pointer; z-index: 1000; box-shadow: -2px 0 10px rgba(0,0,0,0.2);
-            font-size: 9px; font-weight: 700; letter-spacing: 1.5px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);
+            writing-mode: vertical-rl; text-orientation: mixed; border-radius: 12px 0 0 12px;
+            cursor: pointer; z-index: 1000; box-shadow: -2px 0 15px rgba(0,0,0,0.15);
+            font-size: 10px; font-weight: 800; letter-spacing: 1.5px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3);
             border-right: none;
         }
-        .ai-side-tab:hover { width: 35px; padding-right: 5px; }
+        .ai-side-tab {
+            transform: translateY(-130%);
+            background: linear-gradient(to bottom, var(--ai-color), #7c3aed);
+        }
+        .comment-side-tab {
+            transform: translateY(10%);
+            background: linear-gradient(to bottom, #f59e0b, #d97706);
+        }
+        .ai-side-tab:hover, .comment-side-tab:hover { width: 42px; padding-right: 8px; }
 
         .thinking { display: flex; gap: 4px; padding: 10px; }
         .dot { width: 6px; height: 6px; background: #cbd5e1; border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }
+
+        .editor-scroll.has-grid {
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .has-ruler {
+            border-top: 25px solid #f1f5f9;
+            position: relative;
+        }
+        .has-ruler::before {
+            content: "1 · · 2 · · 3 · · 4 · · 5 · · 6 · · 7 · · 8 · · 9 · · 10 · · 11 · · 12 · · 13 · · 14 · · 15 · · 16 · · 17 · · 18 · · 19";
+            position: absolute; top: -20px; left: 0; width: 100%; font-size: 10px; color: #94a3b8;
+            text-align: center; letter-spacing: 5px; font-family: monospace;
+        }
 
         .status-bar { height: 28px; background: var(--word-blue); color: white; font-size: 11px; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
 
@@ -292,6 +306,8 @@
             <div class="tab" onclick="switchTab('tab-file')" id="file-tab-btn">Soubor</div>
             <div class="tab active" onclick="switchTab('tab-home')">Domů</div>
             <div class="tab" onclick="switchTab('tab-insert')">Vložit</div>
+            <div class="tab" onclick="switchTab('tab-design')">Návrh</div>
+            <div class="tab" onclick="switchTab('tab-layout')">Rozložení</div>
             <div class="tab" onclick="switchTab('tab-reference')">Reference</div>
             <div class="tab" onclick="switchTab('tab-revize')">Revize</div>
             <div class="tab" onclick="switchTab('tab-legal')">Právní nástroje</div>
@@ -378,6 +394,14 @@
         <div id="tab-insert" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="alert('Vkládám titulní stranu...')"><div class="icon-sq">📄</div>Titulní str.</div>
+                    <div class="btn-icon" onclick="alert('Nová prázdná strana...')"><div class="icon-sq">🗒️</div>Prázdná str.</div>
+                    <div class="btn-icon" onclick="alert('Konec stránky vložen')"><div class="icon-sq">✂️</div>Konec str.</div>
+                </div>
+                <div class="group-label">Stránky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">👤</div>Fyzická osoba</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">💼</div>Podnikatel</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏢</div>Firma</div>
@@ -387,6 +411,7 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📅</div>Tabulka</div>
+                    <div class="btn-icon" onclick="alert('Grafy a SmartArt...')"><div class="icon-sq">📊</div>Ilustrace</div>
                 </div>
                 <div class="group-label">Objekty</div>
             </div>
@@ -394,6 +419,30 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">🖼️</div>Obrázek</div>
                     <div class="btn-icon" onclick="insertLink()"><div class="icon-sq">🔗</div>Odkaz</div>
+                    <div class="btn-icon" onclick="alert('Záložky a křížové odkazy...')"><div class="icon-sq">🔖</div>Záložka</div>
+                </div>
+                <div class="group-label">Propojení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Editace záhlaví...')"><div class="icon-sq">🔝</div>Záhlaví</div>
+                    <div class="btn-icon" onclick="alert('Editace zápatí...')"><div class="icon-sq">🔙</div>Zápatí</div>
+                    <div class="btn-icon" onclick="alert('Číslování stránek...')"><div class="icon-sq">🔢</div>Číslo str.</div>
+                </div>
+                <div class="group-label">Záhlaví & Zápatí</div>
+            </div>
+        </div>
+
+        <div id="tab-design" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Změna motivu...')"><div class="icon-sq">🎨</div>Motivy</div>
+                    <div class="btn-icon" onclick="alert('Paleta barev...')"><div class="icon-sq">🌈</div>Barvy</div>
+                </div>
+                <div class="group-label">Vzhled</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; margin-left:10px;">
                         <span>Vodoznak:</span>
                         <div style="display:flex; gap:4px;">
@@ -402,37 +451,29 @@
                                 <option value="DRAFT">DRAFT</option>
                                 <option value="ORIGINÁL">ORIGINÁL</option>
                                 <option value="SOUKROMÉ">SOUKROMÉ</option>
-                                <option value="NALÉHAVÉ">NALÉHAVÉ</option>
                             </select>
-                            <button class="icon-sq-mini" title="Vlastní obrázek" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
-                            <input type="file" id="wm-image-input" hidden accept="image/*" onchange="uploadImageWatermark(this)">
+                            <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
                         </div>
                     </div>
+                    <div class="btn-icon" onclick="alert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>
+                    <div class="btn-icon" onclick="alert('Ohraničení stránky...')"><div class="icon-sq">🖼️</div>Ohraničení</div>
                 </div>
-                <div class="group-label">Ilustrace & Odkazy</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
-                    <div class="btn-icon" onclick="insertDate()"><div class="icon-sq">📅</div>Datum</div>
-                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px;">
-                        <button class="icon-sq-mini" onclick="insertSymbol('⚖️')">⚖️</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('§')">§</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('📜')">📜</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('✅')">✅</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('❌')">❌</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('➡️')">➡️</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('🔹')">🔹</button>
-                        <button class="icon-sq-mini" onclick="insertSymbol('⚠️')">⚠️</button>
-                    </div>
-                </div>
-                <div class="group-label">Text & Symboly</div>
+                <div class="group-label">Pozadí stránky</div>
             </div>
         </div>
         <div id="tab-legal" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="alert('Vyhledávání v ARES...')"><div class="icon-sq">🏢</div>ARES</div>
+                    <div class="btn-icon" onclick="alert('Kontrola Datové schránky...')"><div class="icon-sq">📨</div>ISDS</div>
+                </div>
+                <div class="group-label">Registry</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="showFeeCalc()"><div class="icon-sq">📊</div>Poplatky</div>
                     <div class="btn-icon" onclick="showInterestCalc()"><div class="icon-sq">📉</div>Úroky</div>
+                    <div class="btn-icon" onclick="showDeadlineCalc()"><div class="icon-sq">📅</div>Lhůty</div>
                 </div>
                 <div class="group-label">Výpočty</div>
             </div>
@@ -445,6 +486,13 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="window.open('https://www.zakonyprolidi.cz', '_blank')"><div class="icon-sq">📜</div>Zákony</div>
+                    <div class="btn-icon" onclick="window.open('https://judikaty.info', '_blank')"><div class="icon-sq">⚖️</div>Judikáty</div>
+                </div>
+                <div class="group-label">Právní zdroje</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="insertCite()"><div class="icon-sq">⚖️</div>Citace</div>
                     <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anon</div>
                     <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Paragraf</div>
@@ -452,6 +500,38 @@
                 <div class="group-label">Rychlé prvky</div>
             </div>
         </div>
+        <div id="tab-layout" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setMargins('normal')"><div class="icon-sq">↔️</div>Normální</div>
+                    <div class="btn-icon" onclick="setMargins('narrow')"><div class="icon-sq">↔️</div>Úzké</div>
+                    <div class="btn-icon" onclick="setMargins('wide')"><div class="icon-sq">↔️</div>Široké</div>
+                </div>
+                <div class="group-label">Okraje</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setOrientation('portrait')"><div class="icon-sq">📄</div>Na výšku</div>
+                    <div class="btn-icon" onclick="setOrientation('landscape')"><div class="icon-sq">📂</div>Na šířku</div>
+                </div>
+                <div class="group-label">Orientace</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setColumns(1)"><div class="icon-sq">▯</div>Jeden</div>
+                    <div class="btn-icon" onclick="setColumns(2)"><div class="icon-sq">▯▯</div>Dva</div>
+                </div>
+                <div class="group-label">Sloupce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Zalamování textu...')"><div class="icon-sq">↩️</div>Zalomit</div>
+                    <div class="btn-icon" onclick="alert('Číslování řádků...')"><div class="icon-sq">🔢</div>Řádky</div>
+                </div>
+                <div class="group-label">Uspořádání</div>
+            </div>
+        </div>
+
 
         <div id="tab-reference" class="tool-groups-container">
             <div class="tool-group">
@@ -478,10 +558,10 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Sledování změn aktivováno...')"><div class="icon-sq">📝</div>Sledovat</div>
-                    <div class="btn-icon" onclick="alert('Nový komentář...')"><div class="icon-sq">💬</div>Komentář</div>
+                    <div class="btn-icon" onclick="toggleTrackChanges()"><div class="icon-sq">📝</div>Sledovat</div>
+                    <div class="btn-icon" onclick="addComment()"><div class="icon-sq">💬</div>Komentář</div>
                 </div>
-                <div class="group-label">Změny</div>
+                <div class="group-label">Změny & Revize</div>
             </div>
         </div>
 
@@ -498,10 +578,25 @@
         <div id="tab-view" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="alert('Režim čtení...')"><div class="icon-sq">📖</div>Čtení</div>
+                    <div class="btn-icon" onclick="alert('Rozložení při tisku...')"><div class="icon-sq">🖨️</div>Tisk</div>
+                    <div class="btn-icon" onclick="alert('Webové rozložení...')"><div class="icon-sq">🌐</div>Web</div>
+                </div>
+                <div class="group-label">Zobrazení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleRuler()"><div class="icon-sq">📏</div>Pravítko</div>
+                    <div class="btn-icon" onclick="toggleGrid()"><div class="icon-sq">🏁</div>Mřížka</div>
+                </div>
+                <div class="group-label">Pomůcky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="toggleSidebar('sidebar')"><div class="icon-sq">⬅️</div>Levý panel</div>
                     <div class="btn-icon" onclick="toggleSidebar('right-sidebar')"><div class="icon-sq">➡️</div>Pravý panel</div>
                 </div>
-                <div class="group-label">Rozložení</div>
+                <div class="group-label">Panely</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -600,6 +695,9 @@
     <div class="ai-side-tab" onclick="toggleAIDrawer(true)">
         <span>✨ LEXIS AI</span>
     </div>
+    <div class="comment-side-tab" onclick="toggleCommentDrawer(true)">
+        <span>💬 REVIZE</span>
+    </div>
     
     <div class="workspace">
             <!-- Left Sidebar -->
@@ -663,6 +761,17 @@
                     </div>
                 </div>
             </div>
+
+    <!-- Comment Drawer -->
+    <div id="comment-sidebar" class="ai-drawer">
+        <div class="ai-header" style="background: linear-gradient(to right, #f59e0b, #d97706);">
+            <span class="ai-header-close" onclick="toggleCommentDrawer(false)">✕</span>
+            <span style="font-weight: 700; letter-spacing: 0.5px;">💬 KOMENTÁŘE A REVIZE</span>
+        </div>
+        <div id="comments-list" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-grow: 1;">
+            <div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Žádné komentáře</div>
+        </div>
+    </div>
     </div>
     
     <div class="ai-overlay" id="ai-overlay" onclick="toggleAIDrawer(false)"></div>
@@ -917,8 +1026,15 @@
         }
 
         function insertSignBlock() {
-            const block = "\n\nV ..................... dne .....................\n\n\n..........................................          ..........................................\n      [Zmocnitel / Jméno]                        [Zmocněnec / Jméno]\n";
-            quill.insertText(quill.getSelection(true).index, block);
+            const range = quill.getSelection(true);
+            const block = `
+V ................................... dne ...................................
+
+..........................................          ..........................................
+            Objednatel                                          Zhotovitel
+`;
+            quill.insertText(range.index, block);
+            quill.setSelection(range.index + block.length);
         }
 
         function checkHierarchy() {
@@ -1255,6 +1371,112 @@
             const subject = "Dokument z LexisEditoru: " + (document.querySelector('.ql-editor h1')?.innerText || "Bez názvu");
             const body = "V příloze naleznete vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
             window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        function setMargins(m) {
+            const wrapper = document.getElementById('editor-wrapper');
+            if (m === 'narrow') wrapper.style.padding = '20mm';
+            else if (m === 'wide') wrapper.style.padding = '60mm';
+            else wrapper.style.padding = '40mm';
+            document.getElementById('margin-val').value = parseInt(wrapper.style.padding);
+        }
+
+        function toggleRuler() {
+            const wrapper = document.getElementById('editor-wrapper');
+            wrapper.classList.toggle('has-ruler');
+            if (wrapper.classList.contains('has-ruler')) {
+                alert("Pravítko zobrazeno (simulace v CSS)");
+            }
+        }
+
+        function toggleGrid() {
+            const scroll = document.querySelector('.editor-scroll');
+            scroll.classList.toggle('has-grid');
+        }
+
+        function setOrientation(o) {
+            const wrapper = document.getElementById('editor-wrapper');
+            if (o === 'landscape') {
+                wrapper.style.width = '297mm';
+                wrapper.style.minHeight = '210mm';
+            } else {
+                wrapper.style.width = '210mm';
+                wrapper.style.minHeight = '297mm';
+            }
+        }
+
+        function setColumns(c) {
+            const editor = document.querySelector('.ql-editor');
+            editor.style.columnCount = c;
+            editor.style.columnGap = '10mm';
+        }
+
+        let isTracking = false;
+        function toggleTrackChanges() {
+            isTracking = !isTracking;
+            alert(isTracking ? "Sledování změn ZAPNUTO" : "Sledování změn VYPNUTO");
+        }
+
+        function showDeadlineCalc() {
+            const days = prompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15");
+            if (!days) return;
+            const target = new Date();
+            target.setDate(target.getDate() + parseInt(days));
+            alert(`Lhůta končí dne: ${target.toLocaleDateString('cs-CZ')}`);
+        }
+
+        function toggleCommentDrawer(open) {
+            const drawer = document.getElementById('comment-sidebar');
+            const overlay = document.getElementById('ai-overlay');
+            if (open) {
+                drawer.classList.add('open');
+                overlay.classList.add('active');
+            } else {
+                drawer.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        }
+
+        function addComment() {
+            const range = quill.getSelection();
+            if (!range || range.length === 0) {
+                alert("Pro přidání komentáře nejprve vyberte text.");
+                return;
+            }
+
+            const text = prompt("Zadejte text komentáře:");
+            if (!text) return;
+
+            // Highlight
+            quill.formatText(range.index, range.length, { background: '#fef08a' });
+
+            // Show Drawer
+            toggleCommentDrawer(true);
+
+            // Add to list
+            const list = document.getElementById('comments-list');
+            if (list.innerText === "Žádné komentáře") list.innerHTML = "";
+
+            const commentId = 'comment-' + Date.now();
+            const card = document.createElement('div');
+            card.id = commentId;
+            card.style = "background:#fefce8; border:1px solid #fef08a; padding:12px; border-radius:8px; font-size:12px; position:relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom:10px;";
+            card.innerHTML = `
+                <div style="font-weight:600; color:#854d0e; margin-bottom:4px;">Uživatel (Právník)</div>
+                <div style="color:#713f12;">${text}</div>
+                <div style="margin-top:8px; display:flex; gap:8px;">
+                    <button onclick="resolveComment('${commentId}', ${range.index}, ${range.length})" style="font-size:10px; background:#facc15; color:#111; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:600;">Vyřešit</button>
+                </div>
+            `;
+            list.prepend(card);
+        }
+
+        function resolveComment(id, index, length) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+            quill.formatText(index, length, { background: false });
+            const list = document.getElementById('comments-list');
+            if (list.children.length === 0) list.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Žádné komentáře</div>';
         }
     </script>
 </body>
