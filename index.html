@@ -411,7 +411,7 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📅</div>Tabulka</div>
-                    <div class="btn-icon" onclick="alert('Grafy a SmartArt...')"><div class="icon-sq">📊</div>Ilustrace</div>
+                    <div class="btn-icon" onclick="customAlert('Grafy a SmartArt...')"><div class="icon-sq">📊</div>Ilustrace</div>
                 </div>
                 <div class="group-label">Objekty</div>
             </div>
@@ -419,15 +419,15 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">🖼️</div>Obrázek</div>
                     <div class="btn-icon" onclick="insertLink()"><div class="icon-sq">🔗</div>Odkaz</div>
-                    <div class="btn-icon" onclick="alert('Záložky a křížové odkazy...')"><div class="icon-sq">🔖</div>Záložka</div>
+                    <div class="btn-icon" onclick="customAlert('Záložky a křížové odkazy...')"><div class="icon-sq">🔖</div>Záložka</div>
                 </div>
                 <div class="group-label">Propojení</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Editace záhlaví...')"><div class="icon-sq">🔝</div>Záhlaví</div>
-                    <div class="btn-icon" onclick="alert('Editace zápatí...')"><div class="icon-sq">🔙</div>Zápatí</div>
-                    <div class="btn-icon" onclick="alert('Číslování stránek...')"><div class="icon-sq">🔢</div>Číslo str.</div>
+                    <div class="btn-icon" onclick="customAlert('Editace záhlaví...')"><div class="icon-sq">🔝</div>Záhlaví</div>
+                    <div class="btn-icon" onclick="customAlert('Editace zápatí...')"><div class="icon-sq">🔙</div>Zápatí</div>
+                    <div class="btn-icon" onclick="customAlert('Číslování stránek...')"><div class="icon-sq">🔢</div>Číslo str.</div>
                 </div>
                 <div class="group-label">Záhlaví & Zápatí</div>
             </div>
@@ -436,8 +436,8 @@
         <div id="tab-design" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Změna motivu...')"><div class="icon-sq">🎨</div>Motivy</div>
-                    <div class="btn-icon" onclick="alert('Paleta barev...')"><div class="icon-sq">🌈</div>Barvy</div>
+                    <div class="btn-icon" onclick="customAlert('Změna motivu...')"><div class="icon-sq">🎨</div>Motivy</div>
+                    <div class="btn-icon" onclick="customAlert('Paleta barev...')"><div class="icon-sq">🌈</div>Barvy</div>
                 </div>
                 <div class="group-label">Vzhled</div>
             </div>
@@ -455,8 +455,8 @@
                             <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
                         </div>
                     </div>
-                    <div class="btn-icon" onclick="alert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>
-                    <div class="btn-icon" onclick="alert('Ohraničení stránky...')"><div class="icon-sq">🖼️</div>Ohraničení</div>
+                    <div class="btn-icon" onclick="customAlert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>
+                    <div class="btn-icon" onclick="customAlert('Ohraničení stránky...')"><div class="icon-sq">🖼️</div>Ohraničení</div>
                 </div>
                 <div class="group-label">Pozadí stránky</div>
             </div>
@@ -464,8 +464,8 @@
         <div id="tab-legal" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Vyhledávání v ARES...')"><div class="icon-sq">🏢</div>ARES</div>
-                    <div class="btn-icon" onclick="alert('Kontrola Datové schránky...')"><div class="icon-sq">📨</div>ISDS</div>
+                    <div class="btn-icon" onclick="customAlert('Vyhledávání v ARES...')"><div class="icon-sq">🏢</div>ARES</div>
+                    <div class="btn-icon" onclick="customAlert('Kontrola Datové schránky...')"><div class="icon-sq">📨</div>ISDS</div>
                 </div>
                 <div class="group-label">Registry</div>
             </div>
@@ -1006,65 +1006,111 @@
             quill.insertText(range.index, clauses[type]);
         }
 
+        // ==========================================
+        // ✨ CUSTOM MODALS (Náhrada za blokovaný prompt/alert)
+        // ==========================================
+        function customPrompt(title, defaultValue, callback) {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.innerHTML = `
+                <h3 style="margin:0 0 12px 0;font-size:14px;color:#1e293b;font-weight:600;">${title}</h3>
+                <input type="text" id="cp-input" value="${defaultValue}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:20px;box-sizing:border-box;font-size:13px;outline:none;">
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="cp-cancel" style="padding:8px 16px;background:#f1f5f9;color:#475569;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
+                    <button id="cp-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Potvrdit</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            
+            const input = document.getElementById('cp-input');
+            input.focus();
+            input.select();
+            
+            input.addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('cp-ok').click(); });
+
+            document.getElementById('cp-ok').onclick = () => {
+                document.body.removeChild(overlay);
+                callback(input.value);
+            };
+            document.getElementById('cp-cancel').onclick = () => {
+                document.body.removeChild(overlay);
+                callback(null);
+            };
+        }
+
+        function customAlert(text) {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.innerHTML = `
+                <div style="margin:0 0 20px 0;font-size:14px;color:#1e293b;line-height:1.5;white-space:pre-wrap;">${text}</div>
+                <div style="display:flex;justify-content:flex-end;">
+                    <button id="ca-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Rozumím</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            document.getElementById('ca-ok').focus();
+            document.getElementById('ca-ok').onclick = () => {
+                document.body.removeChild(overlay);
+            };
+        }
+
         function showFeeCalc() {
-            const amount = prompt("Zadejte žalovanou částku (Kč):");
-            if (!amount) return;
-            const val = parseFloat(amount.replace(/\s/g, ''));
-            let fee = 0;
-            if (val <= 20000) fee = 1000;
-            else if (val <= 40000000) fee = Math.ceil(val * 0.05);
-            else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
-            alert(`Soudní poplatek činí: ${fee.toLocaleString()} Kč`);
+            customPrompt("Zadejte žalovanou částku (Kč):", "", (amount) => {
+                if (!amount) return;
+                const val = parseFloat(amount.replace(/\s/g, ''));
+                if (isNaN(val)) return customAlert("Zadána neplatná částka.");
+                let fee = 0;
+                if (val <= 20000) fee = 1000;
+                else if (val <= 40000000) fee = Math.ceil(val * 0.05);
+                else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
+                customAlert(`Soudní poplatek činí:\n\n${fee.toLocaleString('cs-CZ')} Kč`);
+            });
         }
 
         function showInterestCalc() {
-            const amount = prompt("Zadejte jistinu (Kč):");
-            if (!amount) return;
-            const repo = 5.25; // Aktuální REPO (přibližné)
-            const rate = repo + 8;
-            alert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\nRočně: ${(amount * rate / 100).toLocaleString()} Kč\nMěsíčně: ${(amount * rate / 1200).toLocaleString()} Kč`);
+            customPrompt("Zadejte jistinu (Kč):", "", (amount) => {
+                if (!amount) return;
+                const val = parseFloat(amount.replace(/\s/g, ''));
+                if (isNaN(val)) return customAlert("Zadána neplatná jistina.");
+                const repo = 5.25;
+                const rate = repo + 8;
+                customAlert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\n\nRočně: ${(val * rate / 100).toLocaleString('cs-CZ')} Kč\nMěsíčně: ${(val * rate / 1200).toLocaleString('cs-CZ')} Kč`);
+            });
         }
 
         function insertSignBlock() {
-            const range = quill.getSelection(true);
+            // Zajištění focusu pro quill
+            let range = quill.getSelection();
+            if (!range) { quill.focus(); range = quill.getSelection(); }
+            if (!range) range = { index: quill.getLength() };
+
             const text = quill.getText();
             
-            const count = prompt("Počet podpisů (1 nebo 2):", "2");
-            if (count !== "1" && count !== "2") return;
-
-            // Inteligentní detekce stran
+            // Inteligentní detekce stran - bez dialogu
             let partyA = "Objednatel";
             let partyB = "Zhotovitel";
             if (text.includes("Prodávající") || text.includes("Kupující")) {
                 partyA = "Prodávající"; partyB = "Kupující";
             } else if (text.includes("Pronajímatel") || text.includes("Nájemce")) {
                 partyA = "Pronajímatel"; partyB = "Nájemce";
+            } else if (text.includes("Půjčitel") || text.includes("Vypůjčitel")) {
+                partyA = "Půjčitel"; partyB = "Vypůjčitel";
             }
 
-            if (count === "2") {
-                const pA = prompt("Název první strany:", partyA);
-                const pB = prompt("Název druhé strany:", partyB);
-                if (!pA || !pB) return;
-
-                const block = `
+            const block = `
 V ........................ dne ...............     V ........................ dne ...............
 
 ..............................................     ..............................................
-             ${pA.padEnd(20)}                                   ${pB.padEnd(20)}
+             ${partyA.padEnd(20)}                                   ${partyB.padEnd(20)}
 `;
-                quill.insertText(range.index, block);
-            } else {
-                const pA = prompt("Název strany:", "Odesílatel");
-                if (!pA) return;
-                const block = `
-V ................................... dne ...................................
-
-.............................................................................
-                                ${pA}
-`;
-                quill.insertText(range.index, block);
-            }
-            quill.setSelection(range.index + 5); // Pozice pro začátek psaní
+            quill.insertText(range.index, block);
+            quill.setSelection(range.index + 5); 
         }
 
         function checkHierarchy() {
@@ -1078,8 +1124,8 @@ V ................................... dne ...................................
                 if (num > lastNum + 1) errors.push(`Možná chybějící sekce mezi § ${lastNum} a § ${num}`);
                 lastNum = num;
             });
-            if (errors.length > 0) alert("Kontrola hierarchie:\n" + errors.join('\n'));
-            else alert("Hierarchie paragrafů je v pořádku.");
+            if (errors.length > 0) customAlert("Kontrola hierarchie nalezla chyby:\n\n" + errors.join('\n'));
+            else customAlert("Značení § je v naprostém pořádku.");
         }
 
         function openPoweOfAttorneyDialog() {
@@ -1444,15 +1490,16 @@ V ................................... dne ...................................
         let isTracking = false;
         function toggleTrackChanges() {
             isTracking = !isTracking;
-            alert(isTracking ? "Sledování změn ZAPNUTO" : "Sledování změn VYPNUTO");
+            customAlert(isTracking ? "Sledování změn ZAPNUTO" : "Sledování změn VYPNUTO");
         }
 
         function showDeadlineCalc() {
-            const days = prompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15");
-            if (!days) return;
-            const target = new Date();
-            target.setDate(target.getDate() + parseInt(days));
-            alert(`Lhůta končí dne: ${target.toLocaleDateString('cs-CZ')}`);
+            customPrompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15", (days) => {
+                if (!days) return;
+                const target = new Date();
+                target.setDate(target.getDate() + parseInt(days));
+                customAlert(`Lhůta končí dne:\n\n${target.toLocaleDateString('cs-CZ')}`);
+            });
         }
 
         function toggleCommentDrawer(open) {
@@ -1470,35 +1517,36 @@ V ................................... dne ...................................
         function addComment() {
             const range = quill.getSelection();
             if (!range || range.length === 0) {
-                alert("Pro přidání komentáře nejprve vyberte text.");
+                customAlert("Pro přidání komentáře nejprve vyberte text.");
                 return;
             }
 
-            const text = prompt("Zadejte text komentáře:");
-            if (!text) return;
+            customPrompt("Zadejte text komentáře:", "", (text) => {
+                if (!text) return;
 
-            // Highlight
-            quill.formatText(range.index, range.length, { background: '#fef08a' });
+                // Highlight
+                quill.formatText(range.index, range.length, { background: '#fef08a' });
 
-            // Show Drawer
-            toggleCommentDrawer(true);
+                // Show Drawer
+                toggleCommentDrawer(true);
 
-            // Add to list
-            const list = document.getElementById('comments-list');
-            if (list.innerText === "Žádné komentáře") list.innerHTML = "";
+                // Add to list
+                const list = document.getElementById('comments-list');
+                if (list.innerText === "Žádné komentáře") list.innerHTML = "";
 
-            const commentId = 'comment-' + Date.now();
-            const card = document.createElement('div');
-            card.id = commentId;
-            card.style = "background:#fefce8; border:1px solid #fef08a; padding:12px; border-radius:8px; font-size:12px; position:relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom:10px;";
-            card.innerHTML = `
-                <div style="font-weight:600; color:#854d0e; margin-bottom:4px;">Uživatel (Právník)</div>
-                <div style="color:#713f12;">${text}</div>
-                <div style="margin-top:8px; display:flex; gap:8px;">
-                    <button onclick="resolveComment('${commentId}', ${range.index}, ${range.length})" style="font-size:10px; background:#facc15; color:#111; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:600;">Vyřešit</button>
-                </div>
-            `;
-            list.prepend(card);
+                const commentId = 'comment-' + Date.now();
+                const card = document.createElement('div');
+                card.id = commentId;
+                card.style = "background:#fefce8; border:1px solid #fef08a; padding:12px; border-radius:8px; font-size:12px; position:relative; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom:10px;";
+                card.innerHTML = `
+                    <div style="font-weight:600; color:#854d0e; margin-bottom:4px;">Uživatel (Právník)</div>
+                    <div style="color:#713f12;">${text}</div>
+                    <div style="margin-top:8px; display:flex; gap:8px;">
+                        <button onclick="resolveComment('${commentId}', ${range.index}, ${range.length})" style="font-size:10px; background:#facc15; color:#111; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:600;">Vyřešit</button>
+                    </div>
+                `;
+                list.prepend(card);
+            });
         }
 
         function resolveComment(id, index, length) {
