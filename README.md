@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://ui-avatars.com/api/?name=Lexis+Editor&background=2563eb&color=fff&size=150&rounded=true&font-size=0.33" width="120" alt="LexisEditor Logo" style="border-radius: 20px;">
   
-  # LexisEditor v1.1 ULTIMATE
+  # LexisEditor v1.3.0
   **AI-Native Legal Word Processor & Workspace**
   
   [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#)
@@ -17,6 +17,7 @@
 Díky architektuře založené na Electronu běží aplikace nezávisle, přímo přistupuje k souborovému systému a zaručuje 100% ochranu klientských dat.
 ### ✨ Klíčové vlastnosti v1.3.0
 
+<<<<<<< HEAD
 #### ⏰ 1. Proaktivní hlídání lhůt
 Editor v reálném čase analyzuje text a detekuje termíny (např. "ve lhůtě 15 dnů"). Jedním kliknutím lhůtu uložíte do bočního panelu, kde ji editor hlídá, odpočítává dny a včas vás varuje vizuální signalizací. Podporuje export do kalendářů (.ics).
 
@@ -30,6 +31,27 @@ Systém detekuje pole v hranatých závorkách `[ ]`. Vyplněním jednoho pole v
 
 #### 🔌 4. Integrace a Konektivita
 LexisEditor je připraven na moderní svět. Díky podpoře Webhooků jej lze propojit se systémy jako Evolio, SingleCase nebo Zapier/Make.
+=======
+## ✨ Klíčové vlastnosti v1.3.0
+
+### ⏰ 1. Proaktivní hlídání lhůt
+Editor v reálném čase analyzuje text a detekuje termíny (např. "ve lhůtě 15 dnů"). Jedním kliknutím lhůtu uložíte do bočního panelu, kde ji editor hlídá, odpočítává dny a včas vás varuje vizuální signalizací. Podporuje export do kalendářů (.ics).
+
+### 💰 2. Právní Toolbox "All-in-One"
+- **Advokátní tarif:** Automatický výpočet odměny podle hodnoty sporu a počtu úkonů (§ 7 vyhl. č. 177/1996 Sb.).
+- **Inteligentní anonymizace:** Automatické vyhledání a maskování RC, dat narození a kontaktů před odesláním dokumentu.
+- **Konektivita:** Rychlé vyhledávání v registru ARES přímo z editoru.
+
+### 🏗️ 3. Inteligentní šablony a Auto-fill
+Systém detekuje pole v hranatých závorkách `[ ]`. Vyplněním jednoho pole v bočním panelu dojde k okamžité aktualizaci všech výskytů v celém dokumentu.
+
+### 🔌 4. Integrace a Webhooky
+LexisEditor lze propojit se systémy jako Evolio, SingleCase nebo Zapier/Make pomocí konfigurovatelných Webhooků.
+
+### 🤖 5. Local-First AI Integrace (LexisAI)
+- **Bezpečná syntéza:** Plná podpora lokálních modelů přes **Ollama** (Llama 3, Mistral) – žádná data neopouštějí váš počítač.
+- **AI Assistent:** Rychlé generování doložek, smluvních ustanovení a revize smluv přes vestavěný boční panel.
+>>>>>>> 7b506c3 (feat: refactor UI ribbon, add deadline monitoring, and implement autosave/integration settings with version tracking.)
 
 ## 🛠 Instalace a Build
 

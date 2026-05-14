@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     searchAres: (ico) => ipcRenderer.invoke('search-ares', ico),
     getTemplates: () => ipcRenderer.invoke('get-templates'),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
-    resetTemplates: () => ipcRenderer.invoke('reset-templates')
+    resetTemplates: () => ipcRenderer.invoke('reset-templates'),
+    getAppVersion: () => ipcRenderer.invoke('get-version')
 });

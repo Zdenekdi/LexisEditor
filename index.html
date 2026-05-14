@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LexisEditor v1.2.0 ULTIMATE - Legal Powerhouse</title>
+    <title>LexisEditor</title>
     
     <!-- Libraries -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -52,13 +52,15 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.03);
         }
         .ribbon-tabs { 
-            display: flex; background: var(--word-blue); padding: 0 10px; 
+            display: flex; background: var(--word-blue); padding: 0 10px 0 80px; 
             height: 34px; align-items: flex-end; gap: 2px;
+            -webkit-app-region: drag;
         }
         .tab { 
             padding: 8px 20px; color: rgba(255,255,255,0.8); cursor: pointer; 
             font-size: 13px; font-weight: 500; transition: all 0.2s;
             border-radius: 4px 4px 0 0; position: relative;
+            -webkit-app-region: no-drag;
         }
         .tab:hover { color: white; background: rgba(255,255,255,0.1); }
         .tab.active { 
@@ -296,6 +298,44 @@
 
         body.dark-mode .ql-editor ol > li::before { color: #60a5fa; }
 
+        /* Inteligentní pole */
+        .placeholder-highlight {
+            background-color: rgba(254, 240, 138, 0.5);
+            border-radius: 3px;
+            padding: 0 2px;
+            transition: background 0.3s;
+        }
+        .placeholder-highlight.filled {
+            background-color: rgba(187, 247, 208, 0.4);
+        }
+        .autofill-input-group {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 10px;
+        }
+        .autofill-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .autofill-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'Inter', sans-serif;
+            background: #fff;
+        }
+        .autofill-input:focus {
+            border-color: var(--word-blue);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
         /* Start Screen */
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -361,7 +401,7 @@
     <!-- Úvodní Rozcestník -->
     <div id="start-screen">
         <div class="start-container">
-            <div class="start-version">v1.2.0</div>
+            <div class="start-version" id="app-version-start">v1.3.0</div>
             <div class="start-logo">⚖️</div>
             <div class="start-title">LexisEditor</div>
             <div class="start-subtitle">Dobrý den, co dnes vytvoříme?</div>
@@ -375,6 +415,11 @@
                     <div class="card-icon">📂</div>
                     <div class="card-title">Otevřít dokument</div>
                     <div class="card-desc">Nahrát lokální soubor (.docx, .txt, .html)</div>
+                </div>
+                <div class="start-card" onclick="showHelp('start')">
+                    <div class="card-icon">❓</div>
+                    <div class="card-title">Potřebuji pomoc</div>
+                    <div class="card-desc">Nápověda a rychlý start s LexisEditor</div>
                 </div>
                 <!-- Uživatelské šablony se načtou dynamicky -->
             </div>
@@ -403,6 +448,7 @@
             <div class="tab" onclick="switchTab('tab-lexisai')">LexisAI</div>
             <div class="tab" onclick="switchTab('tab-view')">Zobrazení</div>
             <div class="tab" onclick="switchTab('tab-settings')">Nastavení</div>
+            <div class="tab" onclick="switchTab('tab-help')">Nápověda</div>
         </div>
 
         <div id="tab-file" class="tool-groups-container">
@@ -554,36 +600,28 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="searchAres()"><div class="icon-sq">🏢</div>ARES</div>
-                    <div class="btn-icon" onclick="customAlert('Kontrola Datové schránky...')"><div class="icon-sq">📨</div>ISDS</div>
+                    <div class="btn-icon" onclick="showTariffCalc()"><div class="icon-sq">💰</div>Tarif</div>
+                    <div class="btn-icon" onclick="showFeeCalc()"><div class="icon-sq">📊</div>Poplatek</div>
                 </div>
-                <div class="group-label">Registry</div>
+                <div class="group-label">Registry & Výpočty</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="showFeeCalc()"><div class="icon-sq">📊</div>Poplatky</div>
-                    <div class="btn-icon" onclick="showInterestCalc()"><div class="icon-sq">📉</div>Úroky</div>
-                    <div class="btn-icon" onclick="showDeadlineCalc()"><div class="icon-sq">📅</div>Lhůty</div>
+                    <div class="btn-icon" onclick="showDeadlineCalc()"><div class="icon-sq">📅</div>Lhůtník</div>
+                    <div class="btn-icon" onclick="showInterestCalc()"><div class="icon-sq">📈</div>Úroky</div>
                 </div>
-                <div class="group-label">Výpočty</div>
+                <div class="group-label">Termíny & Sankce</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertSignBlock()"><div class="icon-sq">✒️</div>Podpis</div>
-                    <div class="btn-icon" onclick="checkHierarchy()"><div class="icon-sq">🔢</div>Kontrola §</div>
+                    <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anonym</div>
                 </div>
-                <div class="group-label">Validace & Podpis</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
-                    <div class="btn-icon" onclick="window.open('https://www.zakonyprolidi.cz', '_blank')"><div class="icon-sq">📜</div>Zákony</div>
-                    <div class="btn-icon" onclick="window.open('https://judikaty.info', '_blank')"><div class="icon-sq">⚖️</div>Judikáty</div>
-                </div>
-                <div class="group-label">Právní zdroje</div>
+                <div class="group-label">Validace & Bezpečí</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertCite()"><div class="icon-sq">⚖️</div>Citace</div>
-                    <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anon</div>
                     <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Paragraf</div>
                 </div>
                 <div class="group-label">Rychlé prvky</div>
@@ -784,6 +822,28 @@
                 </div>
                 <div class="group-label">Konektivita</div>
             </div>
+            <div class="tool-group">
+                <div class="group-label">Automatizace verzí</div>
+                <div style="padding: 5px; display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-size: 11px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="autosave-toggle" onchange="toggleAutoSave(this.checked)"> Auto-save
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="number" id="autosave-interval" value="5" min="1" max="60" 
+                               style="width: 40px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px;"
+                               onchange="updateAutoSaveInterval(this.value)"> <span style="font-size: 10px;">min</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tool-group">
+                <div class="group-label">Integrace (Evolio/Zapier)</div>
+                <div style="padding: 5px; display: flex; flex-direction: column; gap: 8px;">
+                    <input type="text" id="webhook-url" placeholder="https://..." 
+                           style="width: 120px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px;"
+                           onchange="saveIntegrationSettings()">
+                    <span style="font-size: 9px; color: #94a3b8;">Webhook URL</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -813,9 +873,29 @@
                     <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ Uložit vybrané...</div>
                 </div>
                 
+                <div class="panel-section" id="active-deadlines-section">
+                    <div class="panel-title">⏰ Aktivní lhůty</div>
+                    <div id="deadlines-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Lhůty se načtou dynamicky -->
+                        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Žádné aktivní lhůty ke sledování.</div>
+                    </div>
+                </div>
+
+                <div class="panel-section" id="detected-deadlines-section" style="display:none; background: #fffbeb; border: 1px solid #fde68a;">
+                    <div class="panel-title" style="color: #92400e;">💡 Nalezena lhůta v textu!</div>
+                    <div id="detected-list" style="padding: 5px;"></div>
+                </div>
+
                 <div class="panel-section">
                     <div class="panel-title">🏗️ Generátory</div>
                     <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
+                </div>
+
+                <div class="panel-section" id="autofill-section" style="display:none;">
+                    <div class="panel-title">📝 Vyplnění údajů</div>
+                    <div id="autofill-container" style="padding: 5px 0;">
+                        <!-- Sem se dynamicky vygenerují vstupy pro [POLE] -->
+                    </div>
                 </div>
 
                 <div class="panel-section">
@@ -938,9 +1018,19 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
+        async function initApp() {
+            if (window.electronAPI && window.electronAPI.getAppVersion) {
+                const ver = await window.electronAPI.getAppVersion();
+                document.title = `LexisEditor v${ver}`;
+                const verEl = document.getElementById('app-version-start');
+                if (verEl) verEl.innerText = `v${ver}`;
+            }
             loadDynamicTemplates();
-        });
+            if (typeof renderDeadlines === 'function') renderDeadlines();
+            if (typeof loadIntegrationSettings === 'function') loadIntegrationSettings();
+        }
+
+        window.addEventListener('DOMContentLoaded', initApp);
 
         function showLoader(text, callback) {
             const loader = document.getElementById('loader-overlay');
@@ -957,7 +1047,8 @@
             setTimeout(() => {
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('app-container').style.display = 'flex';
-                quill.clipboard.dangerouslyPasteHTML(0, htmlContent || '');
+                // Správné nahrazení celého obsahu (odstranění původního textu v HTML)
+                quill.root.innerHTML = htmlContent || '<p><br></p>';
             }, 500);
         }
 
@@ -1263,8 +1354,58 @@
 
         // Legal Tools
         function insertPara() { quill.insertText(quill.getSelection()?.index || 0, "§ "); }
-        function insertCite() { quill.insertText(quill.getSelection()?.index || 0, "[Citace: č. 89/2012 Sb.]"); }
-        function anonymize() { quill.setText(quill.getText().replace(/Jan Novák/g, "J. N.")); }
+        function insertCite() { quill.insertText(quill.getSelection()?.index || 0, "[Citace: zákon č. 89/2012 Sb., občanský zákoník]"); }
+        
+        function anonymize() {
+            const text = quill.getText();
+            const patterns = {
+                "Rodná čísla": /\d{6}\/\d{3,4}/g,
+                "Data narození": /\b\d{1,2}\.\s*\d{1,2}\.\s*\d{4}\b/g,
+                "E-maily": /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+                "Telefony": /(\+420)?\s*\d{3}\s*\d{3}\s*\d{3}/g
+            };
+
+            let foundCount = 0;
+            let results = [];
+            for (const [name, regex] of Object.entries(patterns)) {
+                const matches = text.match(regex);
+                if (matches) {
+                    foundCount += matches.length;
+                    results.push(`${name}: ${matches.length}x`);
+                }
+            }
+
+            if (foundCount === 0) return customAlert("V dokumentu nebyla nalezena žádná citlivá data k anonymizaci.");
+
+            const msg = `Nalezeno celkem ${foundCount} citlivých údajů:\n${results.join("\n")}\n\nChcete vše nahradit textem [ANONYMIZOVÁNO]?`;
+            
+            // Pro jednoduchost nahradíme vše naráz
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:24px;border-radius:12px;width:340px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.innerHTML = `
+                <div style="font-weight:600;font-size:15px;margin-bottom:12px;">🛡️ Právní anonymizátor</div>
+                <div style="font-size:13px;line-height:1.5;color:#475569;margin-bottom:20px;">${msg.replace(/\n/g, '<br>')}</div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="anon-cancel" style="padding:8px 16px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
+                    <button id="anon-go" style="padding:8px 16px;background:#1e293b;color:#fff;border:none;border-radius:6px;cursor:pointer;">Provést anonymizaci</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('anon-cancel').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('anon-go').onclick = () => {
+                let newText = text;
+                for (const regex of Object.values(patterns)) {
+                    newText = newText.replace(regex, "[ANONYMIZOVÁNO]");
+                }
+                quill.setText(newText);
+                document.body.removeChild(overlay);
+                customAlert("Dokument byl anonymizován.");
+            };
+        }
 
         function insertClause(type) {
             const clauses = {
@@ -1835,12 +1976,204 @@ V ........................ dne ...............     V ........................ dn
         }
 
         function showDeadlineCalc() {
-            customPrompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15", (days) => {
-                if (!days) return;
-                const target = new Date();
-                target.setDate(target.getDate() + parseInt(days));
-                customAlert(`Lhůta končí dne:\n\n${target.toLocaleDateString('cs-CZ')}`);
-            });
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:24px;border-radius:12px;width:340px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.innerHTML = `
+                <div style="font-weight:600;font-size:15px;margin-bottom:12px;">📅 Kalkulačka procesních lhůt</div>
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Typ lhůty</label>
+                    <select id="dl-type" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                        <option value="15">Civilní odvolání / Odpor (15 dní)</option>
+                        <option value="8">Trestní odvolání (8 dní)</option>
+                        <option value="15">Námitky proti exekuci (15 dní)</option>
+                        <option value="custom">Vlastní počet dní...</option>
+                    </select>
+                </div>
+                <div id="dl-custom-wrap" style="display:none;margin-bottom:15px;">
+                    <input type="number" id="dl-days" value="15" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Den doručení / Událost</label>
+                    <input type="date" id="dl-start" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="dl-cancel" style="padding:8px 16px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
+                    <button id="dl-calc" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;">Spočítat konec</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('dl-start').valueAsDate = new Date();
+            document.getElementById('dl-type').onchange = (e) => {
+                document.getElementById('dl-custom-wrap').style.display = e.target.value === 'custom' ? 'block' : 'none';
+            };
+
+            document.getElementById('dl-cancel').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('dl-calc').onclick = () => {
+                const start = document.getElementById('dl-start').valueAsDate;
+                let days = document.getElementById('dl-type').value === 'custom' ? parseInt(document.getElementById('dl-days').value) : parseInt(document.getElementById('dl-type').value);
+                
+                if (!start || isNaN(days)) return;
+
+                let end = new Date(start);
+                end.setDate(end.getDate() + days);
+
+                // Kontrola na víkendy a svátky (zjednodušený seznam pevných svátků)
+                const holidays = ["01-01", "05-01", "05-08", "07-05", "07-06", "09-28", "10-28", "11-17", "12-24", "12-25", "12-26"];
+                
+                function isHoliday(date) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    return holidays.includes(`${month}-${day}`);
+                }
+
+                while (end.getDay() === 0 || end.getDay() === 6 || isHoliday(end)) {
+                    end.setDate(end.getDate() + 1);
+                }
+
+                document.body.removeChild(overlay);
+                
+                // Vytvoříme vlastní dialog pro výsledek s možností exportu do kalendáře
+                const resOverlay = document.createElement('div');
+                resOverlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+                const resModal = document.createElement('div');
+                resModal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;text-align:center;";
+                resModal.innerHTML = `
+                    <div style="font-size:12px; color:#64748b; margin-bottom:10px;">Vypočtený konec lhůty:</div>
+                    <div style="font-size:16px; font-weight:700; color:#1e293b; margin-bottom:20px;">${end.toLocaleDateString('cs-CZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button id="dl-ics" style="padding:10px; background:#f1f5f9; color:#1e293b; border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">📅 Přidat do macOS Kalendáře</button>
+                        <button id="dl-webhook" style="padding:10px; background:#e0f2fe; color:#0369a1; border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">🌐 Odeslat do online systému (Evolio)</button>
+                        <button id="dl-ok" style="padding:10px; background:#2563eb; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600;">Rozumím</button>
+                    </div>
+                `;
+                resOverlay.appendChild(resModal);
+                document.body.appendChild(resOverlay);
+
+                document.getElementById('dl-ok').onclick = () => document.body.removeChild(resOverlay);
+                document.getElementById('dl-ics').onclick = () => {
+                    const title = `KONEC LHŮTY: ${document.getElementById('dl-type').options[document.getElementById('dl-type').selectedIndex].text}`;
+                    downloadICS(end, title);
+                    document.body.removeChild(resOverlay);
+                };
+                document.getElementById('dl-webhook').onclick = () => {
+                    const title = `KONEC LHŮTY: ${document.getElementById('dl-type').options[document.getElementById('dl-type').selectedIndex].text}`;
+                    sendToWebhook(end, title);
+                    document.body.removeChild(resOverlay);
+                };
+            };
+        }
+
+        function downloadICS(date, title) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${y}${m}${d}T090000`; // 9:00 ráno
+            
+            const icsData = [
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//LexisEditor//LegalTools//CS",
+                "BEGIN:VEVENT",
+                "DTSTART;VALUE=DATE:" + y + m + d,
+                "DTEND;VALUE=DATE:" + y + m + d,
+                "SUMMARY:" + title,
+                "DESCRIPTION:Automaticky vygenerováno z LexisEditoru.",
+                "PRIORITY:1",
+                "END:VEVENT",
+                "END:VCALENDAR"
+            ].join("\n");
+
+            const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = "lhuta_lexis.ics";
+            link.click();
+        }
+
+        function showTariffCalc() {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:24px;border-radius:12px;width:380px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.innerHTML = `
+                <div style="font-weight:600;font-size:15px;margin-bottom:12px;">💰 Kalkulačka advokátního tarifu</div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Tarifní hodnota (Kč)</label>
+                    <input type="number" id="tr-val" placeholder="Např. 100000" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:11px;color:#64748b;display:block;margin-bottom:4px;">Počet úkonů</label>
+                    <input type="number" id="tr-acts" value="3" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="margin-bottom:20px; display:flex; gap:15px;">
+                    <label style="font-size:12px; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="tr-vat" checked> Plátce DPH
+                    </label>
+                    <label style="font-size:12px; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                        <input type="checkbox" id="tr-pau" checked> Režijní paušál
+                    </label>
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="tr-cancel" style="padding:8px 16px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
+                    <button id="tr-insert" style="padding:8px 16px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;">Vložit do textu</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('tr-cancel').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('tr-insert').onclick = () => {
+                const val = parseFloat(document.getElementById('tr-val').value);
+                const acts = parseInt(document.getElementById('tr-acts').value);
+                if (isNaN(val) || isNaN(acts)) return;
+
+                // Výpočet odměny (§ 7)
+                let base = 0;
+                if (val <= 500) base = 160;
+                else if (val <= 1000) base = 250;
+                else if (val <= 5000) base = 500;
+                else if (val <= 10000) base = 1000;
+                else if (val <= 200000) base = 1500 + Math.ceil((val - 10000) / 1000) * 40;
+                else if (val <= 10000000) base = 9100 + Math.ceil((val - 200000) / 10000) * 40;
+                else base = 48300 + Math.ceil((val - 10000000) / 100000) * 40;
+
+                const totalBase = base * acts;
+                const pau = document.getElementById('tr-pau').checked ? 300 * acts : 0;
+                const subtotal = totalBase + pau;
+                const vat = document.getElementById('tr-vat').checked ? Math.round(subtotal * 0.21) : 0;
+                const total = subtotal + vat;
+
+                const html = `
+                    <table style="width:100%; border-collapse: collapse; margin: 15px 0; font-family: 'Inter', sans-serif; font-size: 13px;">
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 10px; text-align: left;">Položka nákladů řízení</th>
+                            <th style="padding: 10px; text-align: right;">Částka</th>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">Odměna advokáta (§ 7): ${acts}x ${base.toLocaleString()} Kč</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right;">${totalBase.toLocaleString()} Kč</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">Režijní paušál (§ 13): ${acts}x 300 Kč</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right;">${pau.toLocaleString()} Kč</td>
+                        </tr>
+                        ${vat > 0 ? `<tr><td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">DPH 21 %</td><td style="padding: 8px; border-bottom: 1px solid #f1f5f9; text-align: right;">${vat.toLocaleString()} Kč</td></tr>` : ''}
+                        <tr style="font-weight: 700; color: #1e293b;">
+                            <td style="padding: 10px;">CELKEM K ÚHRADĚ</td>
+                            <td style="padding: 10px; text-align: right;">${total.toLocaleString()} Kč</td>
+                        </tr>
+                    </table>
+                    <p><br></p>
+                `;
+                
+                const range = quill.getSelection(true);
+                quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                document.body.removeChild(overlay);
+            };
         }
 
         function toggleCommentDrawer(open) {
@@ -1897,6 +2230,376 @@ V ........................ dne ...............     V ........................ dn
             const list = document.getElementById('comments-list');
             if (list.children.length === 0) list.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Žádné komentáře</div>';
         }
+
+        // --- INTELIGENTNÍ POLE & AUTOFILL ---
+        let foundPlaceholders = new Set();
+
+        function scanPlaceholders() {
+            const text = quill.getText();
+            const regex = /\[([^\]]+)\]/g;
+            let m;
+            const newPlaceholders = new Set();
+            while ((m = regex.exec(text)) !== null) {
+                newPlaceholders.add(m[1]);
+            }
+            
+            if (newPlaceholders.size !== foundPlaceholders.size || ![...newPlaceholders].every(x => foundPlaceholders.has(x))) {
+                foundPlaceholders = newPlaceholders;
+                renderAutofillUI();
+            }
+            highlightPlaceholders();
+            
+            // Nové: Skenování procesních lhůt
+            scanForDeadlines(text);
+        }
+
+        function scanForDeadlines(text) {
+            const deadlineRegex = /\b(?:lhůt[ěa]|lhůtě)\s+(\d+)\s+(?:dnů|dní|pracovních dnů)\b/gi;
+            const detectedWrap = document.getElementById('detected-deadlines-section');
+            const detectedList = document.getElementById('detected-list');
+            if (!detectedWrap || !detectedList) return;
+
+            let found = [];
+            let m;
+            while ((m = deadlineRegex.exec(text)) !== null) {
+                found.push({ days: parseInt(m[1]), text: m[0] });
+            }
+
+            if (found.length > 0) {
+                detectedWrap.style.display = 'block';
+                detectedList.innerHTML = '';
+                found.forEach(f => {
+                    const btn = document.createElement('div');
+                    btn.className = 'clause-item';
+                    btn.style = "background: #fef3c7; border: 1px solid #fbbf24; font-size: 11px; margin-bottom: 5px; cursor: pointer;";
+                    btn.innerHTML = `📌 Zaznamenat: <b>${f.days} dní</b><br><span style="font-size:9px; color:#92400e;">(${f.text})</span>`;
+                    btn.onclick = () => saveActiveDeadline(f.days, f.text);
+                    detectedList.appendChild(btn);
+                });
+            } else {
+                detectedWrap.style.display = 'none';
+            }
+        }
+
+        function saveActiveDeadline(days, context) {
+            const deadlines = JSON.parse(localStorage.getItem('lexis_active_deadlines') || '[]');
+            const now = new Date();
+            const end = new Date();
+            end.setDate(now.getDate() + days);
+            
+            deadlines.push({
+                id: Date.now(),
+                days: days,
+                context: context,
+                start: now.toISOString(),
+                end: end.toISOString()
+            });
+            
+            localStorage.setItem('lexis_active_deadlines', JSON.stringify(deadlines));
+            renderDeadlines();
+            customAlert(`Lhůta ${days} dní byla uložena do sledování.`);
+        }
+
+        function renderDeadlines() {
+            const list = document.getElementById('deadlines-list');
+            if (!list) return;
+            const deadlines = JSON.parse(localStorage.getItem('lexis_active_deadlines') || '[]');
+            
+            if (deadlines.length === 0) {
+                list.innerHTML = '<div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Žádné aktivní lhůty ke sledování.</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            deadlines.sort((a, b) => new Date(a.end) - new Date(b.end));
+
+            deadlines.forEach(d => {
+                const end = new Date(d.end);
+                const now = new Date();
+                const diffTime = end - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                let statusColor = "#10b981"; 
+                let animation = "";
+                if (diffDays <= 0) statusColor = "#ef4444"; 
+                else if (diffDays <= 5) {
+                    statusColor = "#f59e0b"; 
+                    animation = "animation: pulse 2s infinite;";
+                }
+
+                const item = document.createElement('div');
+                item.className = 'clause-item';
+                item.style = `border-left: 4px solid ${statusColor}; background: #f8fafc; padding: 8px; ${animation} margin-bottom: 8px;`;
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="font-weight:700; font-size:12px;">${diffDays > 0 ? 'Zbývá ' + diffDays + ' dní' : 'PO TERMÍNU!'}</div>
+                        <div onclick="deleteDeadline(${d.id})" style="cursor:pointer; color:#cbd5e1; font-size:14px; padding: 0 5px;">&times;</div>
+                    </div>
+                    <div style="font-size:10px; color:#64748b; margin-top:2px; line-height: 1.2;">${d.context}</div>
+                    <div style="font-size:9px; color:#94a3b8; margin-top:4px;">Termín: ${end.toLocaleDateString('cs-CZ')}</div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function deleteDeadline(id) {
+            let deadlines = JSON.parse(localStorage.getItem('lexis_active_deadlines') || '[]');
+            deadlines = deadlines.filter(d => d.id !== id);
+            localStorage.setItem('lexis_active_deadlines', JSON.stringify(deadlines));
+            renderDeadlines();
+        }
+
+        function renderAutofillUI() {
+            const container = document.getElementById('autofill-container');
+            const section = document.getElementById('autofill-section');
+            if (foundPlaceholders.size === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+            container.innerHTML = '';
+            foundPlaceholders.forEach(ph => {
+                const group = document.createElement('div');
+                group.className = 'autofill-input-group';
+                group.innerHTML = `
+                    <label class="autofill-label">${ph}</label>
+                    <input type="text" class="autofill-input" placeholder="Doplňte ${ph}..." oninput="updatePlaceholder('${ph}', this.value)">
+                `;
+                container.appendChild(group);
+            });
+        }
+
+        function updatePlaceholder(key, value) {
+            const placeholder = `[${key}]`;
+            const replacement = value || placeholder;
+            
+            let searchPos = 0;
+            let index;
+            let currentText = quill.getText();
+            
+            // Nahrazujeme text v Quillu
+            while ((index = currentText.indexOf(placeholder, searchPos)) !== -1) {
+                quill.deleteText(index, placeholder.length);
+                quill.insertText(index, replacement);
+                currentText = quill.getText();
+                searchPos = index + replacement.length;
+            }
+            highlightPlaceholders();
+        }
+
+        function highlightPlaceholders() {
+            const text = quill.getText();
+            const regex = /\[([^\]]+)\]/g;
+            let m;
+            while ((m = regex.exec(text)) !== null) {
+                quill.formatText(m.index, m[0].length, { 
+                    'background': 'rgba(254, 240, 138, 0.5)',
+                    'color': '#1e293b'
+                });
+            }
+        }
+
+        // --- VERZE & AUTO-SAVE ---
+        let docVersions = [];
+        let autoSaveTimer = null;
+
+        function manualSaveVersion() {
+            customPrompt("Zadejte název verze:", "Manuální záloha", (name) => {
+                if (!name) return;
+                saveVersion(name);
+            });
+        }
+
+        function saveVersion(name) {
+            const version = {
+                id: Date.now(),
+                timestamp: new Date().toLocaleString('cs-CZ'),
+                name: name,
+                content: quill.root.innerHTML,
+                header: document.getElementById('header-area').innerHTML,
+                footer: document.getElementById('footer-area').innerHTML
+            };
+            docVersions.unshift(version);
+            if (docVersions.length > 15) docVersions.pop(); 
+            renderHistory();
+            document.getElementById('save-status').innerText = `✓ Uloženo (${new Date().toLocaleTimeString('cs-CZ', {hour:'2-digit', minute:'2-digit'})})`;
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            if (docVersions.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:11px; padding:10px;">Žádné verze</div>';
+                return;
+            }
+            docVersions.forEach((v, idx) => {
+                const item = document.createElement('div');
+                item.className = 'clause-item';
+                item.style = "font-size: 11px; padding: 8px; margin-bottom: 5px; border-left: 3px solid var(--word-blue);";
+                item.innerHTML = `
+                    <div style="font-weight:600;">${v.name}</div>
+                    <div style="font-size:10px; color:#64748b;">${v.timestamp}</div>
+                    <button onclick="restoreVersion(${idx})" style="margin-top:5px; background:var(--word-blue); color:white; border:none; padding:2px 8px; border-radius:3px; cursor:pointer; font-size:10px;">Obnovit</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function restoreVersion(idx) {
+            const v = docVersions[idx];
+            if (v) {
+                quill.root.innerHTML = v.content;
+                document.getElementById('header-area').innerHTML = v.header;
+                document.getElementById('footer-area').innerHTML = v.footer;
+                customAlert(`Verze "${v.name}" byla obnovena.`);
+                scanPlaceholders();
+            }
+        }
+
+        function toggleAutoSave(active) {
+            if (autoSaveTimer) clearInterval(autoSaveTimer);
+            if (active) {
+                const min = parseInt(document.getElementById('autosave-interval').value) || 5;
+                autoSaveTimer = setInterval(() => {
+                    saveVersion("Automatická záloha");
+                }, min * 60 * 1000);
+            }
+        }
+
+        function updateAutoSaveInterval(val) {
+            if (document.getElementById('autosave-toggle').checked) {
+                toggleAutoSave(true);
+            }
+        }
+
+        // --- NÁPOVĚDA ---
+        function showHelp(topic) {
+            let title = "Lexis Nápověda";
+            let html = "";
+            if (topic === 'start') {
+                title = "🚀 Rychlý start";
+                html = `<div style="font-size:13px; line-height:1.6;">
+                    <p><b>1. Výběr šablony:</b> Na úvodní obrazovce zvolte vzor nebo otevřete .docx.</p>
+                    <p><b>2. Vyplnění údajů:</b> Pokud jsou v textu pole jako [JMÉNO], objeví se vlevo v panelu. Vyplňte je tam a přepíší se v celém dokumentu.</p>
+                    <p><b>3. ARES:</b> V záložce Právní nástroje zadejte IČO pro bleskovou identifikaci strany.</p>
+                </div>`;
+            } else if (topic === 'keys') {
+                title = "⌨️ Klávesové zkratky";
+                html = `<div style="font-size:13px; line-height:1.6;">
+                    <p><b>Cmd + Shift + S:</b> Uložit novou verzi</p>
+                    <p><b>Cmd + P:</b> Tisk / Export do PDF</p>
+                    <p><b>Cmd + B/I:</b> Tučné / Kurzíva</p>
+                </div>`;
+            } else if (topic === 'templates') {
+                title = "📄 Vlastní šablony";
+                html = `<div style="font-size:13px; line-height:1.6;">
+                    <p>Chcete-li nahradit naši šablonu vaší vlastní:</p>
+                    <p>1. Otevřete nebo napište váš dokument.</p>
+                    <p>2. V menu <b>Soubor</b> klikněte na <b>Uložit jako šablonu</b>.</p>
+                    <p>3. Vyberte pozici k nahrazení.</p>
+                </div>`;
+            }
+            document.getElementById('ai-header-text').innerText = title;
+            document.getElementById('ai-output').innerHTML = html;
+            toggleAIDrawer(true);
+        }
+
+        // Event listener pro skenování polí při psaní
+        quill.on('text-change', () => {
+            clearTimeout(window.scanT);
+            window.scanT = setTimeout(scanPlaceholders, 1200);
+        });
+
+        // Klávesová zkratka pro verzi
+        window.addEventListener('keydown', e => {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'S') {
+                e.preventDefault();
+                manualSaveVersion();
+            }
+        });
+        function showInterestCalc() {
+            customPrompt("Zadejte dlužnou částku (Kč):", "", (amt) => {
+                if (!amt) return;
+                customPrompt("Zadejte počet dní prodlení:", "30", (days) => {
+                    if (!days) return;
+                    const val = parseFloat(amt.replace(/\s/g, ''));
+                    const d = parseInt(days);
+                    // Standardní smluvní pokuta 0.05% / den
+                    const penalty = Math.round(val * 0.0005 * d);
+                    const legal = Math.round(val * (0.15 / 365) * d); // cca 15% p.a.
+                    
+                    customAlert(`Výpočet sankcí za ${d} dní:\n\nSmluvní pokuta (0.05%): ${penalty.toLocaleString()} Kč\nZákonný úrok (cca 15% p.a.): ${legal.toLocaleString()} Kč`);
+                });
+            });
+        }
+
+        function insertSignBlock() {
+            const html = `
+                <table style="width:100%; margin-top:50px; border:none; font-family:'Inter',sans-serif;">
+                    <tr>
+                        <td style="width:45%; border-top:1px solid #000; padding-top:10px; text-align:center;">
+                            <strong>[JMÉNO ZHOTOVITELE]</strong><br>
+                            <span style="font-size:10px; color:#64748b;">(Zhotovitel)</span>
+                        </td>
+                        <td style="width:10%;"></td>
+                        <td style="width:45%; border-top:1px solid #000; padding-top:10px; text-align:center;">
+                            <strong>[JMÉNO OBJEDNATELE]</strong><br>
+                            <span style="font-size:10px; color:#64748b;">(Objednatel)</span>
+                        </td>
+                    </tr>
+                </table>
+                <p><br></p>
+            `;
+            const range = quill.getSelection(true);
+            quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        }
+
+        // --- INTEGRACE ---
+        function saveIntegrationSettings() {
+            const url = document.getElementById('webhook-url').value;
+            localStorage.setItem('lexis_webhook_url', url);
+        }
+
+        function loadIntegrationSettings() {
+            const url = localStorage.getItem('lexis_webhook_url');
+            if (url) document.getElementById('webhook-url').value = url;
+        }
+
+        async function sendToWebhook(date, title) {
+            const url = localStorage.getItem('lexis_webhook_url');
+            if (!url) {
+                return customAlert("Pro odesílání do online systému musíte nejprve nastavit 'Webhook URL' v záložce Nastavení.");
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        event: 'LEGAL_DEADLINE',
+                        title: title,
+                        date: date.toISOString(),
+                        source: 'LexisEditor',
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                
+                if (response.ok) {
+                    customAlert("Lhůta byla úspěšně odeslána do vašeho online systému!");
+                } else {
+                    customAlert(`Chyba při odesílání: ${response.statusText}`);
+                }
+            } catch (error) {
+                customAlert(`Nepodařilo se navázat spojení s online systémem. Zkontrolujte URL v nastavení.`);
+            }
+        }
+
+        // Přidáme načtení integrací do initApp
+        const oldInitApp = initApp;
+        initApp = async function() {
+            await oldInitApp();
+            loadIntegrationSettings();
+        };
     </script>
 </body>
 </html>

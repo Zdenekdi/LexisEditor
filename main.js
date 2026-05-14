@@ -31,6 +31,12 @@ app.whenReady().then(() => {
     });
 });
 
+// IPC Handler pro získání verze aplikace z package.json
+ipcMain.handle('get-version', () => {
+    return app.getVersion();
+});
+
+// Start aplikace
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
 });

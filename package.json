@@ -1,7 +1,7 @@
 {
   "name": "lexiseditor",
   "productName": "LexisEditor",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "LexisEditor: AI-native náhrada MS Word pro advokáty. Stabilní právnické číslování, automatická anonymizace a hluboká integrace lokální AI (Ollama). Práce se strukturovanými daty pro přesnou rešerši a stylizaci dokumentů. Soukromí na prvním místě, 100% offline běh. Profesionální legal-tech pro Windows, Mac i Linux.",
   "main": "main.js",
   "scripts": {
