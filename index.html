@@ -16,7 +16,7 @@
             --word-blue: #2b579a;
             --ribbon-bg: #f3f3f3;
             --border: #d1d1d1;
-            --bg-workspace: #e6e6e6;
+            --bg-workspace: #f1f5f9;
             --accent: #3b82f6;
             --ai-color: #8b5cf6;
             --sidebar-bg: #ffffff;
@@ -107,28 +107,53 @@
         .category-header { font-size: 10px; color: #aaa; margin: 15px 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 
         /* Workspace */
-        .workspace { flex-grow: 1; display: flex; overflow: hidden; position: relative; }
-        .editor-scroll { flex-grow: 1; overflow-y: auto; padding: 40px; display: flex; flex-direction: column; align-items: center; background: var(--bg-workspace); }
-        #editor-wrapper { 
-            width: 816px; background: white; box-shadow: 0 0 30px rgba(0,0,0,0.15); min-height: 1100px; color: #1e293b;
-            transition: width 0.3s;
+        .workspace { flex-grow: 1; display: flex; overflow: hidden; background: var(--bg-workspace); }
+        
+        /* Sidebars (Docked) */
+        .side-panels { width: 260px; background: white; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; transition: width 0.3s; }
+        .side-panels.collapsed { width: 0; border: none; overflow: hidden; }
+
+        .right-panels { width: 320px; background: white; border-left: 1px solid var(--border); display: flex; flex-direction: column; transition: width 0.3s; }
+        .right-panels.collapsed { width: 0; border: none; overflow: hidden; }
+
+        .editor-scroll { flex-grow: 1; overflow-y: auto; padding: 60px; display: flex; flex-direction: column; align-items: center; background: var(--bg-workspace); transition: background 0.3s; }
+        
+        #editor-wrapper {
+            background: white; width: 210mm; min-height: 297mm; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column; flex-shrink: 0; position: relative; border: 1px solid #cbd5e1;
         }
         
+        .page-header, .page-footer {
+            padding: 20mm 40mm 10mm 40mm !important; font-size: 11px; color: #94a3b8; border: 1px dashed transparent; transition: all 0.2s;
+            min-height: 10mm; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .page-footer { padding: 10mm 40mm 20mm 40mm !important; margin-top: auto; }
+
+        .ql-container.ql-snow { border: none !important; flex-grow: 1; display: flex; flex-direction: column; }
+        /* Cílíme na všechny možné varianty, aby okraj byl konečně fixní */
+        .ql-editor, #editor .ql-editor, .ql-container .ql-editor { 
+            padding: 10mm 40mm 40mm 40mm !important; 
+            flex-grow: 1; outline: none; line-height: 1.6; 
+            font-size: 12pt; color: #1e293b;
+        }
+        .ql-editor h1, .ql-editor h2, .ql-editor p, .ql-editor ul, .ql-editor ol { 
+            margin-left: 0 !important; padding-left: 0 !important; 
+        }
+        .ql-toolbar.ql-snow { display: none; }
+
         /* Split View Mode */
         body.split-view #editor-wrapper { width: 600px; margin-right: 20px; }
         #reference-panel { width: 0; background: #f8fafc; border-left: 1px solid var(--border); transition: width 0.3s; overflow: hidden; }
         body.split-view #reference-panel { width: 500px; display: block; padding: 20px; }
 
-        .ql-editor { padding: 90px !important; min-height: 1100px; outline: none; }
-        .ql-toolbar.ql-snow { display: none; }
+        /* AI Panel (Docked) */
+        .ai-panel { height: 100%; display: flex; flex-direction: column; border-radius: 0; box-shadow: none; border: none; background: #fcfaff; }
+        .ai-header { padding: 12px; background: var(--ai-color); color: white; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        .ai-body { padding: 15px; font-size: 13px; color: #475569; flex-grow: 1; overflow-y: auto; line-height: 1.5; }
 
-        /* Floating AI Panel */
-        .ai-panel {
-            position: absolute; right: 30px; top: 30px; width: 300px; background: white; border: 1px solid var(--border);
-            border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; z-index: 500;
-        }
-        .ai-header { padding: 12px; background: var(--ai-color); color: white; border-radius: 12px 12px 0 0; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
-        .ai-body { padding: 15px; font-size: 13px; color: #475569; }
+        .thinking { display: flex; gap: 4px; padding: 10px; }
+        .dot { width: 6px; height: 6px; background: #cbd5e1; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }
 
         .status-bar { height: 28px; background: var(--word-blue); color: white; font-size: 11px; display: flex; align-items: center; padding: 0 20px; gap: 20px; }
 
@@ -138,8 +163,10 @@
             body { background: white !important; height: auto !important; overflow: visible !important; }
             .workspace { display: block !important; }
             .editor-scroll { padding: 0 !important; background: white !important; overflow: visible !important; }
-            #editor-wrapper { width: 100% !important; box-shadow: none !important; margin: 0 !important; }
-            .ql-editor { padding: 0 !important; }
+            #editor-wrapper { width: 100% !important; box-shadow: none !important; margin: 0 !important; border: none !important; }
+            .page-header, .page-footer { border: none !important; padding: 10mm 20mm !important; }
+            .ql-editor { padding: 0 25mm !important; }
+            @page { margin: 0; }
         }
 
         /* Právnické číslování (Stabilní & Zarovnané) */
@@ -292,91 +319,107 @@
             </div>
         </div>
 
-        <!-- TAB: VIEW (Layout) -->
+        <!-- TAB: VIEW -->
         <div id="tab-view" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="toggleSplitView()"><div class="icon-sq">📖</div>Split</div>
+                    <div class="btn-icon" onclick="toggleSidebar('sidebar')"><div class="icon-sq">⬅️</div>Levý panel</div>
+                    <div class="btn-icon" onclick="toggleSidebar('right-sidebar')"><div class="icon-sq">➡️</div>Pravý panel</div>
+                </div>
+                <div class="group-label">Rozložení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Tmavý</div>
                 </div>
-                <div class="group-label">Režimy</div>
+                <div class="group-label">Zobrazení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Okraje (mm):</span>
+                        <input type="number" id="margin-val" value="40" onchange="updateMargins()" style="width:50px; border:1px solid #ddd; padding:2px;">
+                    </div>
+                </div>
+                <div class="group-label">Vzhled stránky</div>
             </div>
         </div>
     </div>
 
     <div class="workspace">
-        <!-- Sidebar Panels -->
-        <div class="side-panels" id="sidebar">
-            <div class="panel-section">
-                <div class="panel-title">📚 Knihovna doložek</div>
+            <!-- Left Sidebar -->
+            <div class="side-panels" id="sidebar">
+                <!-- Obsah sidebaru (Doložky, Generátory) -->
+                <div class="panel-section">
+                    <div class="panel-title">📚 Knihovna doložek</div>
+                    <div class="category-header">Obchodní právo</div>
+                    <div class="clause-item" onclick="insertClause('arbitration')">⚖️ <i>Rozhodčí doložka</i></div>
+                    <div class="clause-item" onclick="insertClause('prorogation')">🏛️ <i>Prorogační doložka</i></div>
+                    <div class="clause-item" onclick="insertClause('interest')">💰 <i>Smluvní pokuta</i></div>
+                    
+                    <div class="category-header">Ochrana dat & IT</div>
+                    <div class="clause-item" onclick="insertClause('gdpr')">🛡️ <i>GDPR ustanovení</i></div>
+                    <div class="clause-item" onclick="insertClause('confidentiality')">🤐 <i>Mlčenlivost (NDA)</i></div>
+                    
+                    <div class="category-header">Ostatní</div>
+                    <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ <i>Uložit vybrané...</i></div>
+                </div>
                 
-                <div class="category-header">Obchodní právo</div>
-                <div class="clause-item" onclick="insertClause('arbitration')">⚖️ <i>Rozhodčí doložka</i></div>
-                <div class="clause-item" onclick="insertClause('prorogation')">🏛️ <i>Prorogační doložka</i></div>
-                <div class="clause-item" onclick="insertClause('interest')">💰 <i>Smluvní pokuta</i></div>
-                
-                <div class="category-header">Ochrana dat & IT</div>
-                <div class="clause-item" onclick="insertClause('gdpr')">🛡️ <i>GDPR ustanovení</i></div>
-                <div class="clause-item" onclick="insertClause('confidentiality')">🤐 <i>Mlčenlivost (NDA)</i></div>
-                
-                <div class="category-header">Ostatní</div>
-                <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ <i>Uložit vybrané...</i></div>
-            </div>
-            
-            <div class="panel-section">
-                <div class="panel-title">🏗️ Generátory</div>
-                <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
-            </div>
+                <div class="panel-section">
+                    <div class="panel-title">🏗️ Generátory</div>
+                    <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
+                </div>
 
-            <div class="panel-section">
-                <div class="panel-title">🕒 Historie verzí</div>
-                <div id="history-list" style="max-height: 200px; overflow-y: auto;">
-                    <!-- Verze se doplní dynamicky -->
+                <div class="panel-section">
+                    <div class="panel-title">🕒 Historie verzí</div>
+                    <div id="history-list" style="max-height: 200px; overflow-y: auto;"></div>
                 </div>
             </div>
 
-            <div class="panel-section">
-                <div class="panel-title">📂 Informace o spisu</div>
-                <div style="font-size: 12px; color: #64748b;">
-                    Spis: 2024/005/ZD<br>Klient: ALFA s.r.o.
+            <!-- Center Editor -->
+            <div class="editor-scroll">
+                <div id="editor-wrapper">
+                    <div class="page-header" id="header-area" contenteditable="true">
+                        <div>Advokátní kancelář Lexis</div>
+                        <div style="text-align: right;">Spis: 2024/005/ZD</div>
+                    </div>
+                    <div id="editor">
+                        <h1>SMLOUVA O DÍLO</h1>
+                        <p><b>I. Smluvní strany</b></p>
+                        <p>Zhotovitel: [JMÉNO], IČO: [IČO]</p>
+                        <p>Objednatel: [JMÉNO], IČO: [IČO]</p>
+                        <p><b>II. Předmět smlouvy</b></p>
+                        <p>Předmětem této smlouvy je závazek zhotovitele provést pro objednatele dílo spočívající v...</p>
+                    </div>
+                    <div class="page-footer" id="footer-area" contenteditable="true">
+                        <div>www.lexiseditor.cz</div>
+                        <div style="text-align: right;">Strana 1 z 1</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="right-panels" id="right-sidebar">
+                <div class="ai-panel">
+                    <div class="ai-header"><span id="ai-header-text">✨ LexisAI Bridge</span></div>
+                    <div class="ai-body" id="ai-output">
+                        <div class="ai-bubble bot">Dobrý den, jsem připraven analyzovat váš právní text. Jak vám mohu pomoci?</div>
+                    </div>
+                    <div class="ai-input-area">
+                        <input type="text" id="ai-prompt" placeholder="Zeptejte se AI..." onkeypress="if(event.key==='Enter') sendAIQuery()">
+                        <button onclick="sendAIQuery()">➤</button>
+                    </div>
+                </div>
+                
+                <div class="panel-section" style="border-top: 1px solid var(--border); padding: 15px;">
+                    <div class="panel-title">📚 Referenční materiály</div>
+                    <div class="clause-item" style="cursor:default; background:#f8fafc;">
+                        <small>NS 23 Cdo 456/2021:</small><br>
+                        "Zhotovitel odpovídá za vady díla..."
+                    </div>
                 </div>
             </div>
         </div>
-
-        <!-- Editor -->
-        <div class="editor-scroll">
-            <div id="editor-wrapper">
-                <div id="editor">
-                    <h1 style="text-align: center; font-family: 'Outfit';">SMLOUVA O DÍLO</h1>
-                    <p><br></p>
-                    <p><strong>I. Smluvní strany</strong></p>
-                    <p>Zhotovitel: [JMÉNO], IČO: [IČO]</p>
-                    <p>Objednatel: [JMÉNO], IČO: [IČO]</p>
-                    <p><br></p>
-                    <p><strong>II. Předmět smlouvy</strong></p>
-                    <p>Předmětem této smlouvy je závazek zhotovitele provést pro objednatele dílo spočívající v...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Reference Panel (Split View) -->
-        <div id="reference-panel">
-            <div class="panel-title" style="margin-bottom: 20px;">Referenční materiály</div>
-            <div style="background: white; border: 1px solid #ddd; padding: 15px; border-radius: 8px; font-size: 12px;">
-                <p><strong>Předchozí judikatura k tématu:</strong></p>
-                <hr style="margin: 10px 0;">
-                <p>NS 23 Cdo 456/2021: "Zhotovitel odpovídá za vady díla i v případě, že objednatel nepřevzal dílo protokolárně..."</p>
-                <br>
-                <button style="padding: 4px 8px; background: #eee; border: 1px solid #ccc; cursor: pointer;">Kopírovat do textu</button>
-            </div>
-        </div>
-
-        <!-- AI Panel -->
-        <div class="ai-panel" id="ai-panel">
-            <div class="ai-header"><span id="ai-header-text">✨ LexisAI</span><span style="cursor:pointer" onclick="this.parentElement.parentElement.style.display='none'">✕</span></div>
-            <div class="ai-body" id="ai-output">Připraven k analýze...</div>
-        </div>
-    </div>
 
     <div class="status-bar">
         <span>Strana 1 z 1</span>
@@ -488,7 +531,7 @@
         }
 
         function openPoweOfAttorneyDialog() {
-            document.getElementById('ai-panel').style.display = 'flex';
+            document.getElementById('right-sidebar').classList.remove('collapsed');
             document.getElementById('ai-header-text').innerText = "Generátor Plné moci";
             document.getElementById('ai-output').innerHTML = `
                 <div style="display:flex; flex-direction:column; gap:10px;">
@@ -514,9 +557,20 @@
             document.getElementById('pa-name').value = '';
         }
 
-        // View Logic
-        function toggleSplitView() {
-            document.body.classList.toggle('split-view');
+        // Page Layout Logic
+        function updateMargins() {
+            const m = document.getElementById('margin-val').value;
+            const editor = document.querySelector('.ql-editor');
+            editor.style.setProperty('padding-left', `${m}mm`, 'important');
+            editor.style.setProperty('padding-right', `${m}mm`, 'important');
+            // Také upravíme záhlaví a zápatí
+            document.getElementById('header-area').style.paddingLeft = `${m}mm`;
+            document.getElementById('header-area').style.paddingRight = `${m}mm`;
+            document.getElementById('footer-area').style.paddingLeft = `${m}mm`;
+            document.getElementById('footer-area').style.paddingRight = `${m}mm`;
+        }
+        function toggleSidebar(id) {
+            document.getElementById(id).classList.toggle('collapsed');
         }
 
         function toggleDarkMode() {
@@ -618,6 +672,64 @@
 
         // Initial UI load
         updateHistoryUI();
+        // ==========================================
+        // ✨ LEXIS AI BRIDGE (Configurable)
+        // ==========================================
+        const AI_CONFIG = {
+            provider: 'ollama', // 'ollama', 'openai', 'anthropic'
+            endpoint: 'http://localhost:11434/api/generate',
+            model: 'llama3',
+            apiKey: ''
+        };
+
+        async function sendAIQuery() {
+            const input = document.getElementById('ai-prompt');
+            const output = document.getElementById('ai-output');
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            // UI: Add User Bubble
+            output.innerHTML += `<div class="ai-bubble user">${prompt}</div>`;
+            input.value = '';
+            output.scrollTop = output.scrollHeight;
+
+            // UI: Add Thinking Indicator
+            const thinkingId = 'thinking-' + Date.now();
+            output.innerHTML += `
+                <div class="ai-bubble bot" id="${thinkingId}">
+                    <div class="thinking"><div class="dot"></div><div class="dot" style="animation-delay:0.2s"></div><div class="dot" style="animation-delay:0.4s"></div></div>
+                </div>
+            `;
+            output.scrollTop = output.scrollHeight;
+
+            try {
+                const response = await callAI(prompt);
+                document.getElementById(thinkingId).innerHTML = response;
+            } catch (err) {
+                document.getElementById(thinkingId).innerHTML = `<span style="color:red">Chyba připojení: ${err.message}</span>`;
+            }
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function callAI(prompt) {
+            // ZDE JE MÍSTO PRO VAŠE NAPOJENÍ
+            // Aktuálně vrací simulovanou odpověď pro testování UI
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve("Toto je simulovaná odpověď z <b>LexisAI Bridge</b>. Rozhraní je připraveno pro napojení na " + AI_CONFIG.provider + " na adrese " + AI_CONFIG.endpoint + ".");
+                }, 1500);
+            });
+
+            /* 
+            // PŘÍKLAD PRO OLLAMA:
+            const res = await fetch(AI_CONFIG.endpoint, {
+                method: 'POST',
+                body: JSON.stringify({ model: AI_CONFIG.model, prompt: prompt, stream: false })
+            });
+            const data = await res.json();
+            return data.response;
+            */
+        }
     </script>
 </body>
 </html>
