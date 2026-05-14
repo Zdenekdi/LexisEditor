@@ -1104,13 +1104,17 @@
             }
 
             const block = `
+
 V ........................ dne ...............     V ........................ dne ...............
+
+
 
 ..............................................     ..............................................
              ${partyA.padEnd(20)}                                   ${partyB.padEnd(20)}
 `;
             quill.insertText(range.index, block);
-            quill.setSelection(range.index + 5); 
+            quill.removeFormat(range.index, block.length); // Zabrání dědění nadpisu (H1, bold)
+            quill.setSelection(range.index + block.length); 
         }
 
         function checkHierarchy() {
