@@ -335,7 +335,7 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Uloženo do místní paměti.')"><div class="icon-sq">💾</div>Uložit</div>
+                    <div class="btn-icon" onclick="exportToDocx()"><div class="icon-sq">💾</div>Uložit do DOCX</div>
                 </div>
                 <div class="group-label">Správa</div>
             </div>
@@ -1451,6 +1451,24 @@ V ........................ dne ...............     V ........................ dn
             const subject = "Dokument z LexisEditoru: " + (document.querySelector('.ql-editor h1')?.innerText || "Bez názvu");
             const body = "V příloze naleznete vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
             window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        async function exportToDocx() {
+            if (window.electronAPI && window.electronAPI.exportDocx) {
+                const html = document.querySelector('.ql-editor').innerHTML;
+                try {
+                    const result = await window.electronAPI.exportDocx(html);
+                    if (result.success) {
+                        customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}`);
+                    } else if (!result.canceled) {
+                        customAlert(`Chyba při ukládání dokumentu:\n\n${result.error}`);
+                    }
+                } catch (error) {
+                    customAlert(`Neočekávaná chyba:\n\n${error.message}`);
+                }
+            } else {
+                customAlert("Export do DOCX je dostupný pouze v desktopové (Electron) verzi LexisEditoru.");
+            }
         }
 
         function setMargins(m) {

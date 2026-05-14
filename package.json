@@ -1,0 +1,31 @@
+{
+  "name": "lexiseditor",
+  "productName": "LexisEditor",
+  "version": "1.0.0",
+  "description": "LexisEditor: AI-native náhrada MS Word pro advokáty. Stabilní právnické číslování, automatická anonymizace a hluboká integrace lokální AI (Ollama). Práce se strukturovanými daty pro přesnou rešerši a stylizaci dokumentů. Soukromí na prvním místě, 100% offline běh. Profesionální legal-tech pro Windows, Mac i Linux.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "com.lexiseditor.app",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ]
+    }
+  },
+  "author": "Advokátní kancelář",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^42.0.1",
+    "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "html-to-docx": "^1.8.0"
+  }
+}

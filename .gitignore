@@ -1,0 +1,14 @@
+# Zamezení commitu systémových a generovaných souborů
+node_modules/
+dist/
+release-builds/
+.DS_Store
+*.log
+*.dmg
+*.exe
+*.app
+.env
+
+# Historie editoru a lokální data
+lexis_history.json
+lexis_settings.json
