@@ -437,17 +437,17 @@
 
     <div class="ribbon">
         <div class="ribbon-tabs">
-            <div class="tab" onclick="switchTab('tab-file')" id="file-tab-btn">Soubor</div>
-            <div class="tab active" onclick="switchTab('tab-home')">Domů</div>
-            <div class="tab" onclick="switchTab('tab-insert')">Vložit</div>
-            <div class="tab" onclick="switchTab('tab-design')">Návrh</div>
-            <div class="tab" onclick="switchTab('tab-layout')">Rozložení</div>
-            <div class="tab" onclick="switchTab('tab-reference')">Reference</div>
-            <div class="tab" onclick="switchTab('tab-revize')">Revize</div>
-            <div class="tab" onclick="switchTab('tab-legal')">Právní nástroje</div>
-            <div class="tab" onclick="switchTab('tab-lexisai')">LexisAI</div>
-            <div class="tab" onclick="switchTab('tab-view')">Zobrazení</div>
-            <div class="tab" onclick="switchTab('tab-settings')">Nastavení</div>
+            <div class="tab" onclick="switchTab('tab-file')" id="tab-file-btn" data-i18n="tab_file">Soubor</div>
+            <div class="tab active" onclick="switchTab('tab-home')" data-i18n="tab_home">Domů</div>
+            <div class="tab" onclick="switchTab('tab-insert')" data-i18n="tab_insert">Vložit</div>
+            <div class="tab" onclick="switchTab('tab-design')" data-i18n="tab_design">Návrh</div>
+            <div class="tab" onclick="switchTab('tab-layout')" data-i18n="tab_layout">Rozložení</div>
+            <div class="tab" onclick="switchTab('tab-reference')" data-i18n="tab_reference">Reference</div>
+            <div class="tab" onclick="switchTab('tab-revize')" data-i18n="tab_revize">Revize</div>
+            <div class="tab" onclick="switchTab('tab-legal')" data-i18n="tab_legal">Právní nástroje</div>
+            <div class="tab" onclick="switchTab('tab-lexisai')" data-i18n="tab_lexisai">LexisAI</div>
+            <div class="tab" onclick="switchTab('tab-view')" data-i18n="tab_view">Zobrazení</div>
+            <div class="tab" onclick="switchTab('tab-settings')" data-i18n="tab_settings">Nastavení</div>
             <div class="tab" onclick="switchTab('tab-help')">Nápověda</div>
         </div>
 
@@ -816,11 +816,23 @@
                 <div class="group-label">Připojení</div>
             </div>
             <div class="tool-group">
-                <div class="icons">
-                    <div class="btn-icon" onclick="alert('Nastavení ARES API...')"><div class="icon-sq">🏢</div>ARES</div>
-                    <div class="btn-icon" onclick="alert('Nastavení ISDS...')"><div class="icon-sq">📨</div>Datovky</div>
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span data-i18n="setting_lang">Jazyk:</span>
+                        <select id="app-lang" onchange="changeLanguage(this.value)" class="combo-box">
+                            <option value="cs">Čeština</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="group-label">Konektivita</div>
+                <div class="group-label" data-i18n="group_localization">Lokalizace</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('ARES...')"><div class="icon-sq">🏢</div>ARES</div>
+                    <div class="btn-icon" onclick="alert('ISDS...')"><div class="icon-sq">📨</div>Datovky</div>
+                </div>
+                <div class="group-label" data-i18n="group_connectivity">Konektivita</div>
             </div>
             <div class="tool-group">
                 <div class="group-label">Automatizace verzí</div>
@@ -2594,11 +2606,43 @@ V ........................ dne ...............     V ........................ dn
             }
         }
 
-        // Přidáme načtení integrací do initApp
-        const oldInitApp = initApp;
+        // --- LOKALIZACE (i18n) ---
+        const i18n = {
+            cs: {
+                tab_file: "Soubor", tab_home: "Domů", tab_insert: "Vložit", tab_design: "Návrh",
+                tab_layout: "Rozložení", tab_reference: "Reference", tab_revize: "Revize",
+                tab_legal: "Právní nástroje", tab_lexisai: "LexisAI", tab_view: "Zobrazení",
+                tab_settings: "Nastavení", setting_lang: "Jazyk:", group_localization: "Lokalizace",
+                group_connectivity: "Konektivita", start_subtitle: "Dobrý den, co dnes vytvoříme?",
+                card_new: "Nový dokument", card_open: "Otevřít dokument", card_help: "Potřebuji pomoc"
+            },
+            en: {
+                tab_file: "File", tab_home: "Home", tab_insert: "Insert", tab_design: "Design",
+                tab_layout: "Layout", tab_reference: "References", tab_revize: "Review",
+                tab_legal: "Legal Tools", tab_lexisai: "LexisAI", tab_view: "View",
+                tab_settings: "Settings", setting_lang: "Language:", group_localization: "Localization",
+                group_connectivity: "Connectivity", start_subtitle: "Good day, what shall we create today?",
+                card_new: "New Document", card_open: "Open Document", card_help: "I need help"
+            }
+        };
+
+        function changeLanguage(lang) {
+            localStorage.setItem('lexis_lang', lang);
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang][key]) {
+                    el.innerText = i18n[lang][key];
+                }
+            });
+        }
+
+        // Přidáme načtení jazyka do initApp
+        const oldInitApp3 = initApp;
         initApp = async function() {
-            await oldInitApp();
-            loadIntegrationSettings();
+            await oldInitApp3();
+            const savedLang = localStorage.getItem('lexis_lang') || 'cs';
+            document.getElementById('app-lang').value = savedLang;
+            changeLanguage(savedLang);
         };
     </script>
 </body>
