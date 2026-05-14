@@ -45,84 +45,94 @@
         }
 
         /* Ribbon UI */
-        .ribbon { background: var(--ribbon-bg); border-bottom: 1px solid var(--border); user-select: none; z-index: 1000; }
+        .ribbon { 
+            background: #f8fafc; border-bottom: 1px solid var(--border); 
+            user-select: none; z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+        .ribbon-tabs { 
+            display: flex; background: var(--word-blue); padding: 0 10px; 
+            height: 34px; align-items: flex-end; gap: 2px;
+        }
+        .tab { 
+            padding: 8px 20px; color: rgba(255,255,255,0.8); cursor: pointer; 
+            font-size: 13px; font-weight: 500; transition: all 0.2s;
+            border-radius: 4px 4px 0 0; position: relative;
+        }
+        .tab:hover { color: white; background: rgba(255,255,255,0.1); }
+        .tab.active { 
+            background: #f8fafc; color: var(--word-blue); font-weight: 600; 
+        }
+        .tab.active::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: #f8fafc;
+        }
+        .tool-groups-container { 
+            display: none; padding: 12px 20px; gap: 30px; background: #f8fafc;
+            min-height: 95px; border-bottom: 1px solid var(--border);
+        }
+        .tool-groups-container.active { display: flex; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
-        .ribbon-tabs {
-            display: flex;
-            padding: 5px 20px 0;
-            gap: 2px;
-            background: var(--word-blue);
-            color: white;
-            font-size: 13px;
+        .tool-group { 
+            display: flex; flex-direction: column; align-items: center; 
+            border-right: 1px solid #e2e8f0; padding-right: 25px;
         }
-
-        .tab { padding: 8px 18px; cursor: pointer; border-radius: 4px 4px 0 0; transition: background 0.2s; }
-        .tab:hover { background: rgba(255,255,255,0.1); }
-        .tab.active { background: var(--ribbon-bg); color: var(--word-blue); font-weight: 600; }
-
-        .tool-groups-container {
-            background: var(--sidebar-bg);
-            height: 105px;
-            border-bottom: 1px solid var(--border);
-            display: none;
-            padding: 10px 20px;
-            gap: 20px;
+        .tool-group:last-child { border-right: none; }
+        .icons { display: flex; gap: 12px; align-items: center; flex-grow: 1; }
+        .group-label { 
+            font-size: 10px; color: #94a3b8; margin-top: 8px; 
+            text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;
         }
-        .tool-groups-container.active { display: flex; animation: fadeIn 0.2s; }
-
-        .tool-group { display: flex; flex-direction: column; align-items: center; border-right: 1px solid #eee; padding-right: 20px; justify-content: space-between; }
-        .group-label { font-size: 10px; color: #888; margin-top: 5px; text-transform: uppercase; }
-        .icons { display: flex; gap: 8px; align-items: center; flex-grow: 1; }
-
-        .btn-icon {
-            display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; font-size: 11px; color: inherit; min-width: 45px;
+        .btn-icon { 
+            display: flex; flex-direction: column; align-items: center; 
+            gap: 6px; cursor: pointer; padding: 6px 12px; border-radius: 6px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 50px; text-align: center; font-size: 11px; color: #475569;
         }
-        .icon-sq {
-            width: 32px; height: 32px; background: rgba(0,0,0,0.03); border: 1px solid var(--border); border-radius: 6px;
-            display: flex; align-items: center; justify-content: center; font-size: 16px;
+        .btn-icon:hover { 
+            background: #edf2f7; transform: translateY(-2px);
+            color: var(--word-blue); box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        .btn-icon:hover .icon-sq { background: rgba(59, 130, 246, 0.1); border-color: var(--accent); }
+        .icon-sq { 
+            width: 32px; height: 32px; background: white; 
+            border: 1px solid #e2e8f0; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 16px; transition: inherit;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .btn-icon:hover .icon-sq { border-color: var(--word-blue); background: #fcfaff; }
 
         /* Typography Controls */
         .combo-box {
             padding: 4px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; background: white;
         }
 
-        /* Sidebar Panels */
-        .side-panels {
-            display: flex; flex-direction: column; width: 280px; background: var(--sidebar-bg); border-right: 1px solid var(--border);
-            transition: width 0.3s;
+        /* Workspace & Panels */
+        .workspace { flex-grow: 1; display: flex; overflow: hidden; background: var(--bg-workspace); }
+        
+        .side-panels { 
+            width: 280px; background: white; border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; overflow-y: auto; 
         }
         .panel-section { padding: 15px; border-bottom: 1px solid var(--border); }
         .panel-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 10px; }
+        
+        .clause-item { padding: 8px 15px; font-size: 12px; color: #334155; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
+        .clause-item:hover { background: #f1f5f9; border-left-color: var(--accent); color: var(--accent); }
+        .category-header { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8; padding: 15px 15px 5px 15px; letter-spacing: 0.5px; }
 
-        /* Clause Library */
-        .clause-item {
-            padding: 10px; border: 1px solid #eee; border-radius: 6px; font-size: 12px; margin-bottom: 8px; cursor: pointer; background: #fff;
-            display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+        .editor-scroll { 
+            flex-grow: 1; overflow-y: auto; padding: 60px 0; display: flex; flex-direction: column; align-items: center; 
+            background: var(--bg-workspace); transition: background 0.3s; 
         }
-        .clause-item:hover { background: #eff6ff; border-color: var(--accent); transform: translateX(5px); }
-        .clause-item i { font-style: normal; opacity: 0.8; }
-        
-        .category-header { font-size: 10px; color: #aaa; margin: 15px 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-
-        /* Workspace */
-        .workspace { flex-grow: 1; display: flex; overflow: hidden; background: var(--bg-workspace); }
-        
-        /* Sidebars (Docked) */
-        .side-panels { width: 260px; background: white; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; transition: width 0.3s; }
-        .side-panels.collapsed { width: 0; border: none; overflow: hidden; }
-
-        .right-panels { width: 320px; background: white; border-left: 1px solid var(--border); display: flex; flex-direction: column; transition: width 0.3s; }
-        .right-panels.collapsed { width: 0; border: none; overflow: hidden; }
-
-        .editor-scroll { flex-grow: 1; overflow-y: auto; padding: 60px; display: flex; flex-direction: column; align-items: center; background: var(--bg-workspace); transition: background 0.3s; }
         
         #editor-wrapper {
-            background: white; width: 210mm; min-height: 297mm; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            background: white; width: 210mm; min-height: 297mm; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             display: flex; flex-direction: column; flex-shrink: 0; position: relative; border: 1px solid #cbd5e1;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s, min-height 0.3s;
+            transform-origin: top center;
         }
-        
+
         .page-header, .page-footer {
             padding: 20mm 40mm 10mm 40mm !important; font-size: 11px; color: #94a3b8; border: 1px dashed transparent; transition: all 0.2s;
             min-height: 10mm; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
@@ -146,10 +156,60 @@
         #reference-panel { width: 0; background: #f8fafc; border-left: 1px solid var(--border); transition: width 0.3s; overflow: hidden; }
         body.split-view #reference-panel { width: 500px; display: block; padding: 20px; }
 
-        /* AI Panel (Docked) */
-        .ai-panel { height: 100%; display: flex; flex-direction: column; border-radius: 0; box-shadow: none; border: none; background: #fcfaff; }
-        .ai-header { padding: 12px; background: var(--ai-color); color: white; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
-        .ai-body { padding: 15px; font-size: 13px; color: #475569; flex-grow: 1; overflow-y: auto; line-height: 1.5; }
+        /* AI Drawer (Overlay) */
+        .ai-drawer {
+            position: fixed; top: 0; right: -400px; width: 400px; height: 100vh;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            box-shadow: -10px 0 30px rgba(0,0,0,0.1); z-index: 2000;
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex; flex-direction: column; border-left: 1px solid rgba(255,255,255,0.3);
+        }
+        .ai-drawer.open { right: 0; }
+        .ai-drawer .ai-header { 
+            background: linear-gradient(to right, var(--ai-color), #7c3aed); 
+            border-radius: 0; 
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .ai-header-close {
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ai-header-close:hover { opacity: 1; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        .ai-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.2); z-index: 1999; display: none;
+        }
+        .ai-overlay.active { display: block; }
+
+        .icon-sq-mini { 
+            width: 22px; height: 22px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center; font-size: 11px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .icon-sq-mini:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+        .ai-side-tab {
+            position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+            width: 28px; height: 100px; background: linear-gradient(to bottom, var(--ai-color), #7c3aed);
+            color: white; display: flex; align-items: center; justify-content: center;
+            writing-mode: vertical-rl; text-orientation: mixed; border-radius: 8px 0 0 8px;
+            cursor: pointer; z-index: 1000; box-shadow: -2px 0 10px rgba(0,0,0,0.2);
+            font-size: 9px; font-weight: 700; letter-spacing: 1.5px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);
+            border-right: none;
+        }
+        .ai-side-tab:hover { width: 35px; padding-right: 5px; }
 
         .thinking { display: flex; gap: 4px; padding: 10px; }
         .dot { width: 6px; height: 6px; background: #cbd5e1; border-radius: 50%; animation: pulse 1.5s infinite; }
@@ -232,20 +292,30 @@
             <div class="tab" onclick="switchTab('tab-file')" id="file-tab-btn">Soubor</div>
             <div class="tab active" onclick="switchTab('tab-home')">Domů</div>
             <div class="tab" onclick="switchTab('tab-insert')">Vložit</div>
+            <div class="tab" onclick="switchTab('tab-reference')">Reference</div>
+            <div class="tab" onclick="switchTab('tab-revize')">Revize</div>
             <div class="tab" onclick="switchTab('tab-legal')">Právní nástroje</div>
-            <div class="tab" onclick="switchTab('tab-ai')">✨ LexisAI</div>
+            <div class="tab" onclick="switchTab('tab-lexisai')">LexisAI</div>
             <div class="tab" onclick="switchTab('tab-view')">Zobrazení</div>
+            <div class="tab" onclick="switchTab('tab-settings')">Nastavení</div>
         </div>
 
-        <!-- TAB: FILE -->
         <div id="tab-file" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="window.print()"><div class="icon-sq">📄</div>Export PDF</div>
+                    <div class="btn-icon" onclick="sendViaEmail()"><div class="icon-sq">📧</div>E-mail</div>
                     <div class="btn-icon" onclick="saveVersionManually()"><div class="icon-sq">🕒</div>Verze</div>
-                    <div class="btn-icon" onclick="location.reload()"><div class="icon-sq">🆕</div>Nový</div>
                 </div>
                 <div class="group-label">Dokument</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Synchronizace s Dropboxem spuštěna...')"><div class="icon-sq">📦</div>Dropbox</div>
+                    <div class="btn-icon" onclick="alert('Synchronizace s Google Drive spuštěna...')"><div class="icon-sq">📂</div>Drive</div>
+                    <div class="btn-icon" onclick="alert('Synchronizace s OneDrive spuštěna...')"><div class="icon-sq">☁️</div>OneDrive</div>
+                </div>
+                <div class="group-label">Cloud Sync</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -255,7 +325,6 @@
             </div>
         </div>
 
-        <!-- TAB: HOME (Rich Typography) -->
         <div id="tab-home" class="tool-groups-container active">
             <div class="tool-group">
                 <div class="icons">
@@ -286,40 +355,146 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="exec('list', 'ordered')"><div class="icon-sq">1.</div>Číslování</div>
-                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">→</div>Vpravo</div>
-                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">←</div>Vlevo</div>
+                    <div class="btn-icon" onclick="exec('list', 'ordered')"><div class="icon-sq">🔢</div>Seznam</div>
+                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">➡️</div>Odsadit</div>
+                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">⬅️</div>Zmenšit</div>
                 </div>
                 <div class="group-label">Odstavec & Řádkování</div>
             </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="changeCase('upper')"><div class="icon-sq">AA</div>VELKÁ</div>
+                    <div class="btn-icon" onclick="changeCase('lower')"><div class="icon-sq">aa</div>malá</div>
+                </div>
+                <div class="group-label">Písmo</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Hledat</div>
+                </div>
+                <div class="group-label">Úpravy</div>
+            </div>
         </div>
-
-        <!-- TAB: LEGAL (Advanced) -->
+        <div id="tab-insert" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">👤</div>Fyzická osoba</div>
+                    <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">💼</div>Podnikatel</div>
+                    <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏢</div>Firma</div>
+                </div>
+                <div class="group-label">Identifikace</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📅</div>Tabulka</div>
+                </div>
+                <div class="group-label">Objekty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">🖼️</div>Obrázek</div>
+                    <div class="btn-icon" onclick="insertLink()"><div class="icon-sq">🔗</div>Odkaz</div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; margin-left:10px;">
+                        <span>Vodoznak:</span>
+                        <div style="display:flex; gap:4px;">
+                            <select onchange="applyWatermark(this.value)" class="combo-box" id="watermark-select">
+                                <option value="NONE">Žádný</option>
+                                <option value="DRAFT">DRAFT</option>
+                                <option value="ORIGINÁL">ORIGINÁL</option>
+                                <option value="SOUKROMÉ">SOUKROMÉ</option>
+                                <option value="NALÉHAVÉ">NALÉHAVÉ</option>
+                            </select>
+                            <button class="icon-sq-mini" title="Vlastní obrázek" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
+                            <input type="file" id="wm-image-input" hidden accept="image/*" onchange="uploadImageWatermark(this)">
+                        </div>
+                    </div>
+                </div>
+                <div class="group-label">Ilustrace & Odkazy</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertDate()"><div class="icon-sq">📅</div>Datum</div>
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px;">
+                        <button class="icon-sq-mini" onclick="insertSymbol('⚖️')">⚖️</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('§')">§</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('📜')">📜</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('✅')">✅</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('❌')">❌</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('➡️')">➡️</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('🔹')">🔹</button>
+                        <button class="icon-sq-mini" onclick="insertSymbol('⚠️')">⚠️</button>
+                    </div>
+                </div>
+                <div class="group-label">Text & Symboly</div>
+            </div>
+        </div>
         <div id="tab-legal" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showFeeCalc()"><div class="icon-sq">📊</div>Poplatky</div>
+                    <div class="btn-icon" onclick="showInterestCalc()"><div class="icon-sq">📉</div>Úroky</div>
+                </div>
+                <div class="group-label">Výpočty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertSignBlock()"><div class="icon-sq">✒️</div>Podpis</div>
+                    <div class="btn-icon" onclick="checkHierarchy()"><div class="icon-sq">🔢</div>Kontrola §</div>
+                </div>
+                <div class="group-label">Validace & Podpis</div>
+            </div>
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertCite()"><div class="icon-sq">⚖️</div>Citace</div>
                     <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anon</div>
                     <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Paragraf</div>
                 </div>
-                <div class="group-label">Legal</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
-                    <input type="text" id="ares-ico" placeholder="IČO firmy..." class="combo-box" style="width:120px">
-                    <div class="btn-icon" onclick="lookupARES()"><div class="icon-sq">🔍</div>Lustrace</div>
-                </div>
-                <div class="group-label">ARES Registry</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
-                    <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Pošta</div>
-                </div>
-                <div class="group-label">Integrace</div>
+                <div class="group-label">Rychlé prvky</div>
             </div>
         </div>
 
-        <!-- TAB: VIEW -->
+        <div id="tab-reference" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Generuji obsah dokumentu...')"><div class="icon-sq">📑</div>Obsah</div>
+                </div>
+                <div class="group-label">Rejstříky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Vložit poznámku pod čarou...')"><div class="icon-sq">¹</div>Poznámka</div>
+                </div>
+                <div class="group-label">Citace</div>
+            </div>
+        </div>
+
+        <div id="tab-revize" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Kontrola pravopisu spuštěna...')"><div class="icon-sq">✓</div>Pravopis</div>
+                    <div class="btn-icon" onclick="alert('Slovník synonym...')"><div class="icon-sq">📖</div>Tezaurus</div>
+                </div>
+                <div class="group-label">Kontrola</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Sledování změn aktivováno...')"><div class="icon-sq">📝</div>Sledovat</div>
+                    <div class="btn-icon" onclick="alert('Nový komentář...')"><div class="icon-sq">💬</div>Komentář</div>
+                </div>
+                <div class="group-label">Změny</div>
+            </div>
+        </div>
+
+        <div id="tab-lexisai" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleAIDrawer(true)"><div class="icon-sq">✨</div>Otevřít AI Bridge</div>
+                    <div class="btn-icon" onclick="alert('AI Analýza spuštěna...')"><div class="icon-sq">🔍</div>Analyzovat</div>
+                </div>
+                <div class="group-label">LexisAI</div>
+            </div>
+        </div>
+
         <div id="tab-view" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
@@ -330,9 +505,42 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Tmavý</div>
+                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Tmavý režim</div>
                 </div>
-                <div class="group-label">Zobrazení</div>
+                <div class="group-label">Režim</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Velikost:</span>
+                        <select onchange="applyPaper(this.value)" class="combo-box">
+                            <option value="a4">A4 (210x297)</option>
+                            <option value="letter">Letter (8.5x11)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Orientace:</span>
+                        <select onchange="applyOrientation(this.value)" class="combo-box">
+                            <option value="portrait">Na výšku</option>
+                            <option value="landscape">Na šířku</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Formát papíru</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Lupa:</span>
+                        <select onchange="applyZoom(this.value)" class="combo-box">
+                            <option value="0.75">75%</option>
+                            <option value="1" selected>100%</option>
+                            <option value="1.25">125%</option>
+                            <option value="1.5">150%</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Zvětšení</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -344,8 +552,55 @@
                 <div class="group-label">Vzhled stránky</div>
             </div>
         </div>
+
+        <div id="tab-settings" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Poskytovatel:</span>
+                        <select id="ai-provider" onchange="saveAISettings()" class="combo-box">
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai">OpenAI (Cloud)</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="lmstudio">LM Studio (Local)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Model:</span>
+                        <input type="text" id="ai-model" value="llama3" onchange="saveAISettings()" class="combo-box" style="width:80px">
+                    </div>
+                </div>
+                <div class="group-label">AI Engine</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Endpoint:</span>
+                        <input type="text" id="ai-endpoint" value="http://localhost:11434/api/generate" onchange="saveAISettings()" class="combo-box" style="width:180px">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>API Klíč:</span>
+                        <input type="password" id="ai-apikey" value="" onchange="saveAISettings()" class="combo-box" style="width:100px">
+                    </div>
+                </div>
+                <div class="group-label">Připojení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Nastavení ARES API...')"><div class="icon-sq">🏢</div>ARES</div>
+                    <div class="btn-icon" onclick="alert('Nastavení ISDS...')"><div class="icon-sq">📨</div>Datovky</div>
+                </div>
+                <div class="group-label">Konektivita</div>
+            </div>
+        </div>
     </div>
 
+    <div class="ai-side-tab" onclick="toggleAIDrawer(true)">
+        <span>✨ LEXIS AI</span>
+    </div>
+    
     <div class="workspace">
             <!-- Left Sidebar -->
             <div class="side-panels" id="sidebar">
@@ -353,16 +608,16 @@
                 <div class="panel-section">
                     <div class="panel-title">📚 Knihovna doložek</div>
                     <div class="category-header">Obchodní právo</div>
-                    <div class="clause-item" onclick="insertClause('arbitration')">⚖️ <i>Rozhodčí doložka</i></div>
-                    <div class="clause-item" onclick="insertClause('prorogation')">🏛️ <i>Prorogační doložka</i></div>
-                    <div class="clause-item" onclick="insertClause('interest')">💰 <i>Smluvní pokuta</i></div>
+                    <div class="clause-item" onclick="insertClause('arbitration')">⚖️ Rozhodčí doložka</div>
+                    <div class="clause-item" onclick="insertClause('prorogation')">🏛️ Prorogační doložka</div>
+                    <div class="clause-item" onclick="insertClause('interest')">💰 Smluvní pokuta</div>
                     
                     <div class="category-header">Ochrana dat & IT</div>
-                    <div class="clause-item" onclick="insertClause('gdpr')">🛡️ <i>GDPR ustanovení</i></div>
-                    <div class="clause-item" onclick="insertClause('confidentiality')">🤐 <i>Mlčenlivost (NDA)</i></div>
+                    <div class="clause-item" onclick="insertClause('gdpr')">🛡️ GDPR ustanovení</div>
+                    <div class="clause-item" onclick="insertClause('confidentiality')">🤐 Mlčenlivost (NDA)</div>
                     
                     <div class="category-header">Ostatní</div>
-                    <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ <i>Uložit vybrané...</i></div>
+                    <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ Uložit vybrané...</div>
                 </div>
                 
                 <div class="panel-section">
@@ -400,17 +655,6 @@
 
             <!-- Right Sidebar -->
             <div class="right-panels" id="right-sidebar">
-                <div class="ai-panel">
-                    <div class="ai-header"><span id="ai-header-text">✨ LexisAI Bridge</span></div>
-                    <div class="ai-body" id="ai-output">
-                        <div class="ai-bubble bot">Dobrý den, jsem připraven analyzovat váš právní text. Jak vám mohu pomoci?</div>
-                    </div>
-                    <div class="ai-input-area">
-                        <input type="text" id="ai-prompt" placeholder="Zeptejte se AI..." onkeypress="if(event.key==='Enter') sendAIQuery()">
-                        <button onclick="sendAIQuery()">➤</button>
-                    </div>
-                </div>
-                
                 <div class="panel-section" style="border-top: 1px solid var(--border); padding: 15px;">
                     <div class="panel-title">📚 Referenční materiály</div>
                     <div class="clause-item" style="cursor:default; background:#f8fafc;">
@@ -419,14 +663,43 @@
                     </div>
                 </div>
             </div>
+    </div>
+    
+    <div class="ai-overlay" id="ai-overlay" onclick="toggleAIDrawer(false)"></div>
+    <div class="ai-drawer" id="ai-drawer">
+        <div class="ai-header">
+            <span class="ai-header-close" onclick="toggleAIDrawer(false)">✕</span>
+            <span id="ai-header-text" style="font-weight: 700; letter-spacing: 0.5px;">✨ LEXIS AI BRIDGE</span>
         </div>
+        <div class="ai-body" id="ai-output" style="padding:15px;">
+            Dobrý den, jsem připraven analyzovat váš právní text. Jak vám mohu pomoci?
+        </div>
+        <div style="padding: 15px; border-top: 1px solid #eee; display: flex; gap: 8px;">
+            <input type="text" id="ai-prompt" placeholder="Zeptejte se AI..." 
+                   style="flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+            <button onclick="sendAIQuery()" style="background: var(--word-blue); color: white; border: none; padding: 0 12px; border-radius: 4px; cursor: pointer;">
+                ➤
+            </button>
+        </div>
+        
+        <div style="padding: 10px 15px; background: #f8fafc; border-top: 1px solid #eee;">
+            <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">📚 Referenční materiály</div>
+            <div id="reference-list">
+                <div style="padding: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 11px;">
+                    <div style="font-weight: 600; margin-bottom: 2px;">NS 23 Cdo 456/2021:</div>
+                    "Zhotovitel odpovídá za vady díla..."
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="status-bar">
-        <span>Strana 1 z 1</span>
-        <span id="word-count">0 slov</span>
-        <div style="flex-grow:1"></div>
-        <span>🤖 AI: Aktivní</span>
-        <span>✔️ Uloženo</span>
+        <span id="page-count">Strana 1 z 1</span>
+        <span id="word-count">Slova: 0</span>
+        <span id="char-count">Znaky: 0</span>
+        <div style="flex-grow: 1"></div>
+        <span>✨ AI: Aktivní</span>
+        <span id="save-status">✓ Uloženo</span>
     </div>
 
     <script>
@@ -437,6 +710,118 @@
             event.currentTarget.classList.add('active');
             document.querySelectorAll('.tool-groups-container').forEach(c => c.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
+        }
+
+        function toggleAIDrawer(open) {
+            const drawer = document.getElementById('ai-drawer');
+            const overlay = document.getElementById('ai-overlay');
+            if (open) {
+                drawer.classList.add('open');
+                overlay.classList.add('active');
+            } else {
+                drawer.classList.remove('open');
+                overlay.classList.remove('active');
+            }
+        }
+
+        // New Insert Functions
+        function insertLink() {
+            const range = quill.getSelection();
+            if (range && range.length > 0) {
+                const url = prompt("Zadejte URL adresu:");
+                if (url) quill.format('link', url);
+            } else {
+                const text = prompt("Zadejte text odkazu:");
+                const url = prompt("Zadejte URL adresu:");
+                if (text && url) {
+                    const r = quill.getSelection(true);
+                    quill.insertText(r.index, text, 'link', url);
+                }
+            }
+        }
+
+        function uploadImageWatermark(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const wrapper = document.getElementById('editor-wrapper');
+                    let wm = document.getElementById('watermark-overlay');
+                    if (!wm) {
+                        wm = document.createElement('div');
+                        wm.id = 'watermark-overlay';
+                        wm.style = "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; height: 70%; pointer-events: none; user-select: none; z-index: 1000; opacity: 0.15; background-size: contain; background-repeat: no-repeat; background-position: center;";
+                        wrapper.appendChild(wm);
+                    }
+                    wm.style.backgroundImage = `url(${e.target.result})`;
+                    wm.innerText = ""; // Clear text if image is used
+                    document.getElementById('watermark-select').value = 'NONE';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function changeCase(type) {
+            const range = quill.getSelection();
+            if (range && range.length > 0) {
+                const text = quill.getText(range.index, range.length);
+                const newText = type === 'upper' ? text.toUpperCase() : text.toLowerCase();
+                quill.deleteText(range.index, range.length);
+                quill.insertText(range.index, newText);
+                quill.setSelection(range.index, range.length);
+            }
+        }
+
+        function showFindReplace() {
+            const find = prompt("Hledat:");
+            if (!find) return;
+            const replace = prompt(`Nahradit "${find}" za:`);
+            if (replace === null) return;
+            
+            const text = quill.getText();
+            const newText = text.split(find).join(replace);
+            quill.setText(newText);
+            alert("Všechny výskyty byly nahrazeny.");
+        }
+
+        // Real-time stats
+        quill.on('text-change', () => {
+            const text = quill.getText().trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            const chars = text.length;
+            document.getElementById('word-count').innerText = `Slova: ${words}`;
+            document.getElementById('char-count').innerText = `Znaky: ${chars}`;
+        });
+
+        function insertTable() {
+            const range = quill.getSelection(true);
+            const tableModule = quill.getModule('table');
+            if (tableModule) {
+                tableModule.insertTable(3, 3);
+            } else {
+                quill.insertText(range.index, "\n[Tabulka 3x3]\n");
+            }
+        }
+
+        function insertImage() {
+            const url = prompt("Zadejte URL obrázku:");
+            if (url) {
+                const range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'image', url);
+            }
+        }
+
+        function insertDate() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('cs-CZ');
+            quill.insertText(quill.getSelection(true).index, dateStr);
+        }
+
+        function insertSymbol(sym) {
+            quill.insertText(quill.getSelection(true).index, sym);
+        }
+
+        function insertWatermark() {
+            // Deprecated by applyWatermark
         }
 
         // Typography Logic
@@ -497,7 +882,7 @@
 
         // Legal Tools
         function insertPara() { quill.insertText(quill.getSelection()?.index || 0, "§ "); }
-        function insertCite() { quill.insertText(quill.getSelection()?.index || 0, "[Citace: č. 89/2012 Sb.]", { color: '#2b579a', italic: true }); }
+        function insertCite() { quill.insertText(quill.getSelection()?.index || 0, "[Citace: č. 89/2012 Sb.]"); }
         function anonymize() { quill.setText(quill.getText().replace(/Jan Novák/g, "J. N.")); }
 
         function insertClause(type) {
@@ -512,26 +897,47 @@
             quill.insertText(range.index, clauses[type]);
         }
 
-        function saveSelectedAsClause() {
-            const range = quill.getSelection();
-            if (range && range.length > 0) {
-                const text = quill.getText(range.index, range.length);
-                const name = prompt("Zadejte název doložky:");
-                if (name) {
-                    const container = document.querySelector('.panel-section .category-header').parentElement;
-                    const div = document.createElement('div');
-                    div.className = 'clause-item';
-                    div.innerHTML = `📌 <i>${name}</i>`;
-                    div.onclick = () => { quill.insertText(quill.getSelection(true).index, text); };
-                    container.insertBefore(div, container.lastElementChild);
-                }
-            } else {
-                alert("Nejdříve v editoru vyberte text, který chcete uložit.");
-            }
+        function showFeeCalc() {
+            const amount = prompt("Zadejte žalovanou částku (Kč):");
+            if (!amount) return;
+            const val = parseFloat(amount.replace(/\s/g, ''));
+            let fee = 0;
+            if (val <= 20000) fee = 1000;
+            else if (val <= 40000000) fee = Math.ceil(val * 0.05);
+            else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
+            alert(`Soudní poplatek činí: ${fee.toLocaleString()} Kč`);
+        }
+
+        function showInterestCalc() {
+            const amount = prompt("Zadejte jistinu (Kč):");
+            if (!amount) return;
+            const repo = 5.25; // Aktuální REPO (přibližné)
+            const rate = repo + 8;
+            alert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\nRočně: ${(amount * rate / 100).toLocaleString()} Kč\nMěsíčně: ${(amount * rate / 1200).toLocaleString()} Kč`);
+        }
+
+        function insertSignBlock() {
+            const block = "\n\nV ..................... dne .....................\n\n\n..........................................          ..........................................\n      [Zmocnitel / Jméno]                        [Zmocněnec / Jméno]\n";
+            quill.insertText(quill.getSelection(true).index, block);
+        }
+
+        function checkHierarchy() {
+            const text = quill.getText();
+            const matches = [...text.matchAll(/§\s*(\d+)/g)];
+            let lastNum = 0;
+            let errors = [];
+            matches.forEach(m => {
+                const num = parseInt(m[1]);
+                if (num <= lastNum) errors.push(`Chyba v pořadí u § ${num}`);
+                if (num > lastNum + 1) errors.push(`Možná chybějící sekce mezi § ${lastNum} a § ${num}`);
+                lastNum = num;
+            });
+            if (errors.length > 0) alert("Kontrola hierarchie:\n" + errors.join('\n'));
+            else alert("Hierarchie paragrafů je v pořádku.");
         }
 
         function openPoweOfAttorneyDialog() {
-            document.getElementById('right-sidebar').classList.remove('collapsed');
+            toggleAIDrawer(true);
             document.getElementById('ai-header-text').innerText = "Generátor Plné moci";
             document.getElementById('ai-output').innerHTML = `
                 <div style="display:flex; flex-direction:column; gap:10px;">
@@ -558,6 +964,36 @@
         }
 
         // Page Layout Logic
+        function applyPaper(size) {
+            const wrapper = document.getElementById('editor-wrapper');
+            if (size === 'letter') {
+                wrapper.style.width = '215.9mm';
+                wrapper.style.minHeight = '279.4mm';
+            } else {
+                wrapper.style.width = '210mm';
+                wrapper.style.minHeight = '297mm';
+            }
+        }
+
+        function applyOrientation(mode) {
+            const wrapper = document.getElementById('editor-wrapper');
+            const w = wrapper.offsetWidth;
+            const h = wrapper.offsetHeight;
+            if (mode === 'landscape') {
+                wrapper.style.width = '297mm';
+                wrapper.style.minHeight = '210mm';
+            } else {
+                wrapper.style.width = '210mm';
+                wrapper.style.minHeight = '297mm';
+            }
+        }
+
+        function applyZoom(val) {
+            const wrapper = document.getElementById('editor-wrapper');
+            wrapper.style.transform = `scale(${val})`;
+            wrapper.style.transformOrigin = 'top center';
+        }
+
         function updateMargins() {
             const m = document.getElementById('margin-val').value;
             const editor = document.querySelector('.ql-editor');
@@ -672,6 +1108,39 @@
 
         // Initial UI load
         updateHistoryUI();
+        loadAISettings();
+
+        // AI Settings Persistence
+        function saveAISettings() {
+            const settings = {
+                provider: document.getElementById('ai-provider').value,
+                model: document.getElementById('ai-model').value,
+                endpoint: document.getElementById('ai-endpoint').value,
+                apiKey: document.getElementById('ai-apikey').value
+            };
+            localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
+            console.log('AI Settings saved:', settings);
+        }
+
+        function loadAISettings() {
+            const saved = localStorage.getItem('lexis_ai_settings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                document.getElementById('ai-provider').value = s.provider;
+                document.getElementById('ai-model').value = s.model;
+                document.getElementById('ai-endpoint').value = s.endpoint;
+                document.getElementById('ai-apikey').value = s.apiKey;
+            }
+        }
+
+        function getAIConfig() {
+            return {
+                provider: document.getElementById('ai-provider').value,
+                model: document.getElementById('ai-model').value,
+                endpoint: document.getElementById('ai-endpoint').value,
+                apiKey: document.getElementById('ai-apikey').value
+            };
+        }
         // ==========================================
         // ✨ LEXIS AI BRIDGE (Configurable)
         // ==========================================
@@ -688,6 +1157,8 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
+            const config = getAIConfig();
+
             // UI: Add User Bubble
             output.innerHTML += `<div class="ai-bubble user">${prompt}</div>`;
             input.value = '';
@@ -703,7 +1174,7 @@
             output.scrollTop = output.scrollHeight;
 
             try {
-                const response = await callAI(prompt);
+                const response = await callAI(prompt, config);
                 document.getElementById(thinkingId).innerHTML = response;
             } catch (err) {
                 document.getElementById(thinkingId).innerHTML = `<span style="color:red">Chyba připojení: ${err.message}</span>`;
@@ -711,24 +1182,79 @@
             output.scrollTop = output.scrollHeight;
         }
 
-        async function callAI(prompt) {
+        async function callAI(prompt, config) {
             // ZDE JE MÍSTO PRO VAŠE NAPOJENÍ
             // Aktuálně vrací simulovanou odpověď pro testování UI
             return new Promise((resolve) => {
                 setTimeout(() => {
-                    resolve("Toto je simulovaná odpověď z <b>LexisAI Bridge</b>. Rozhraní je připraveno pro napojení na " + AI_CONFIG.provider + " na adrese " + AI_CONFIG.endpoint + ".");
+                    resolve("Toto je simulovaná odpověď z <b>LexisAI Bridge</b>. Rozhraní je připraveno pro napojení na <b>" + config.provider + "</b> (" + config.model + ") na adrese " + config.endpoint + ".");
                 }, 1500);
             });
+        }
 
-            /* 
-            // PŘÍKLAD PRO OLLAMA:
-            const res = await fetch(AI_CONFIG.endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ model: AI_CONFIG.model, prompt: prompt, stream: false })
-            });
-            const data = await res.json();
-            return data.response;
-            */
+        function insertSubjectHeader(type) {
+            let html = "";
+            const baseStyle = "padding: 20px 25px; margin: 30px 0; background: #ffffff; border-radius: 12px; font-family: 'Inter', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; overflow: hidden;";
+            
+            if (type === 'person') {
+                html = `
+                    <div style="${baseStyle}">
+                        <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #3b82f6, #2563eb);"></div>
+                        <p style="margin-bottom: 8px; color: #3b82f6; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Fyzická osoba</p>
+                        <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                            <div><strong>Narozen(a):</strong> [DATUM]</div>
+                            <div><strong>ID DS:</strong> [ID DATOVÉ SCHRÁNKY]</div>
+                            <div style="grid-column: span 2;"><strong>Bytem:</strong> [ADRESA TRVALÉHO POBYTU]</div>
+                        </div>
+                    </div>
+                    <p><br></p>
+                `;
+            } else if (type === 'entrepreneur') {
+                html = `
+                    <div style="${baseStyle}">
+                        <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #f59e0b, #d97706);"></div>
+                        <p style="margin-bottom: 8px; color: #d97706; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Podnikající fyzická osoba</p>
+                        <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                            <div><strong>IČO:</strong> [IČO]</div>
+                            <div><strong>DIČ:</strong> [DIČ]</div>
+                            <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA MÍSTA PODNIKÁNÍ]</div>
+                            <div style="grid-column: span 2; font-size: 11px; color: #94a3b8;">Zapsán v živnostenském rejstříku vedeném [ÚŘAD]</div>
+                        </div>
+                    </div>
+                    <p><br></p>
+                `;
+            } else if (type === 'company') {
+                html = `
+                    <div style="${baseStyle}">
+                        <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #10b981, #059669);"></div>
+                        <p style="margin-bottom: 8px; color: #10b981; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Právnická osoba</p>
+                        <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[OBCHODNÍ FIRMA / NÁZEV]</strong></p>
+                        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                            <div><strong>IČO:</strong> [IČO]</div>
+                            <div><strong>DIČ:</strong> [DIČ]</div>
+                            <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA SÍDLA]</div>
+                            <div style="grid-column: span 2;"><strong>Zastoupená:</strong> [JMÉNO], [FUNKCE]</div>
+                            <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Zapsaná v obchodním rejstříku vedeném [SOUD] v [MĚSTO], oddíl [ODDÍL], vložka [VLOŽKA]</div>
+                        </div>
+                    </div>
+                    <p><br></p>
+                `;
+            }
+            
+            const range = quill.getSelection();
+            if (range) {
+                quill.clipboard.dangerouslyPasteHTML(range.index, html);
+            } else {
+                quill.clipboard.dangerouslyPasteHTML(quill.getLength(), html);
+            }
+        }
+
+        function sendViaEmail() {
+            const subject = "Dokument z LexisEditoru: " + (document.querySelector('.ql-editor h1')?.innerText || "Bez názvu");
+            const body = "V příloze naleznete vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
+            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
     </script>
 </body>
