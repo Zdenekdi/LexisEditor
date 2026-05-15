@@ -1087,7 +1087,7 @@
         <div id="tab-revize" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="toggleTrackChanges()"><div class="icon-sq">🕵️</div>Sledovat změny</div>
+                    <div class="btn-icon" id="track-changes-btn" onclick="toggleTrackChanges()"><div class="icon-sq">🕵️</div>Sledovat změny</div>
                     <div class="btn-icon" onclick="acceptAll()"><div class="icon-sq">✅</div>Přijmout vše</div>
                     <div class="btn-icon" onclick="rejectAll()"><div class="icon-sq">❌</div>Odmítnout vše</div>
                 </div>
@@ -1202,6 +1202,13 @@
         </div>
 
         <div id="tab-help" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Sledování změn (Redlining):\n1. Aktivujte funkci na kartě Revize.\n2. Všechno, co napíšete, bude zelené.\n3. Všechno, co smažete, se červeně přeškrtne.\n4. Poté můžete změny Přijmout nebo Odmítnout.')"><div class="icon-sq">🕵️</div>Jak revidovat?</div>
+                    <div class="btn-icon" onclick="alert('Porovnání verzí (Blackline):\n1. Klikněte na Srovnat na kartě Revize.\n2. Systém porovná aktuální text s poslední uloženou verzí.\n3. Nově přidané pasáže uvidíte zeleně zvýrazněné v náhledu.')"><div class="icon-sq">⚖️</div>Jak srovnat?</div>
+                </div>
+                <div class="group-label">Návody</div>
+            </div>
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="alert('Příručka v2.1.0 se otevírá...')"><div class="icon-sq">📖</div>Uživatelská příručka</div>
@@ -2166,17 +2173,17 @@
 
         function toggleTrackChanges() {
             isTrackChangesActive = !isTrackChangesActive;
-            const btn = document.getElementById('btn-track-changes');
+            const btn = document.getElementById('track-changes-btn'); // Unified ID
             if (btn) {
                 if (isTrackChangesActive) {
+                    btn.classList.add('active-feature');
                     btn.style.background = '#dcfce7';
                     btn.style.color = '#16a34a';
-                    btn.style.fontWeight = '700';
-                    customAlert("Sledování změn aktivováno. Úpravy budou barevně zvýrazněny.");
+                    customAlert("Sledování změn aktivováno.");
                 } else {
+                    btn.classList.remove('active-track');
                     btn.style.background = '';
                     btn.style.color = '';
-                    btn.style.fontWeight = '';
                     customAlert("Sledování změn vypnuto.");
                 }
             }
@@ -2223,6 +2230,20 @@
                         return false;
                     }
                     return true;
+                }
+            },
+            delete: {
+                key: 'Delete',
+                handler: function(range, context) {
+                    if (!isTrackChangesActive) return true;
+                    if (range.length > 0) {
+                        quill.formatText(range.index, range.length, 'deletion', true, 'user');
+                        quill.setSelection(range.index, 0);
+                        return false;
+                    } else {
+                        quill.formatText(range.index, 1, 'deletion', true, 'user');
+                        return false;
+                    }
                 }
             }
         };
@@ -3305,6 +3326,56 @@ V ........................ dne ...............     V ........................ dn
             if (v && confirm(`Opravdu chcete obnovit verzi ze dne ${v.timestamp}? Aktuální změny budou přepsány.`)) {
                 quill.setContents(v.content);
             }
+        }
+
+        function compareVersions() {
+            if (history.length === 0) {
+                customAlert("Historie je prázdná. Není s čím porovnávat.");
+                return;
+            }
+            
+            const currentText = quill.getText();
+            const lastVersion = history[0]; // Předpokládáme, že index 0 je poslední verze
+            
+            // Pro jednoduchost použijeme virtuální Quill pro získání textu z Delty
+            const tempQuill = document.createElement('div');
+            const tq = new Quill(tempQuill);
+            tq.setContents(lastVersion.content);
+            const oldText = tq.getText();
+            
+            // Velmi jednoduchý word-level diff
+            const oldWords = oldText.split(/\s+/);
+            const newWords = currentText.split(/\s+/);
+            
+            let diffHtml = '';
+            // Poznámka: Toto je pouze ukázkový lineární diff, pro produkci v3.0 
+            // ve Fázi 6.2 implementujeme plnohodnotný DiffMatchPatch.
+            newWords.forEach(word => {
+                if (oldWords.includes(word)) {
+                    diffHtml += `<span>${word} </span>`;
+                } else {
+                    diffHtml += `<span style="background:#dcfce7; color:#16a34a; font-weight:700;">${word} </span>`;
+                }
+            });
+
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;padding:40px;";
+            overlay.innerHTML = `
+                <div style="background:white; width:100%; max-width:900px; height:80vh; display:flex; flex-direction:column; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+                    <div style="padding:20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="margin:0; font-size:16px;">Vizuální porovnání verzí (Blackline)</h3>
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="padding:8px 16px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:700;">Zavřít</button>
+                    </div>
+                    <div style="flex:1; padding:30px; overflow-y:auto; font-family:'Inter',serif; line-height:1.6; font-size:14px; color:#1e293b;">
+                        <div style="margin-bottom:20px; padding:10px; background:#f0f9ff; border-radius:6px; border:1px solid #bae6fd; font-size:12px; color:#0369a1;">
+                            <b>Zobrazeno:</b> Porovnání aktuálního textu oproti verzi <b>${lastVersion.name} (${lastVersion.timestamp})</b>. <br>
+                            Zelené zvýraznění značí nové/změněné pasáže.
+                        </div>
+                        <div id="diff-content">${diffHtml}</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
         }
 
         // Auto-save každých 5 minut
