@@ -629,7 +629,7 @@ ipcMain.handle('start-lexis-link', async () => {
             `;
             res.end(remoteHtml);
         } else if (req.url.startsWith('/api/command')) {
-            const url = new URL(req.url, \`http://\${req.headers.host}\`);
+            const url = new URL(req.url, `http://${req.headers.host}`);
             const cmd = url.searchParams.get('cmd');
             
             if (mainWindow) {
@@ -638,6 +638,37 @@ ipcMain.handle('start-lexis-link', async () => {
             
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
+        } else if (req.url === '/api/import' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    const authHeader = req.headers['authorization'];
+                    
+                    // Jednoduchá kontrola klíče (v produkci v3.1 vylepšíme)
+                    // if (authHeader !== `Bearer ${connectKey}`) ...
+                    
+                    if (mainWindow) {
+                        mainWindow.webContents.send('lexis-connect-import', data);
+                        mainWindow.show();
+                        mainWindow.focus();
+                    }
+                    
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify({ success: true, message: 'Dokument byl importován do LexisEditoru.' }));
+                } catch (e) {
+                    res.writeHead(400);
+                    res.end(JSON.stringify({ success: false, error: 'Neplatný JSON' }));
+                }
+            });
+        } else if (req.method === 'OPTIONS') {
+            res.writeHead(204, {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            });
+            res.end();
         } else {
             res.writeHead(404);
             res.end();

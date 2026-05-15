@@ -809,8 +809,15 @@
                     <div class="btn-icon" onclick="window.print()"><div class="icon-sq">📄</div>Export PDF</div>
                     <div class="btn-icon" onclick="sendViaEmail()"><div class="icon-sq">📧</div>E-mail</div>
                     <div class="btn-icon" onclick="saveAsTemplateDialog()"><div class="icon-sq">💾</div>Uložit jako Šablonu</div>
+                    <div class="btn-icon" onclick="exportWebPreview()"><div class="icon-sq">🌐</div>Webový náhled</div>
                 </div>
                 <div class="group-label">Dokument</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('LexisConnect API je aktivní na portu 3300.\nExterní aplikace mohou posílat data.')"><div class="icon-sq">🔗</div>API Status</div>
+                </div>
+                <div class="group-label">LexisConnect</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -1206,6 +1213,7 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="alert('Sledování změn (Redlining):\n1. Aktivujte funkci na kartě Revize.\n2. Všechno, co napíšete, bude zelené.\n3. Všechno, co smažete, se červeně přeškrtne.\n4. Poté můžete změny Přijmout nebo Odmítnout.')"><div class="icon-sq">🕵️</div>Jak revidovat?</div>
                     <div class="btn-icon" onclick="alert('Porovnání verzí (Blackline):\n1. Klikněte na Srovnat na kartě Revize.\n2. Systém porovná aktuální text s poslední uloženou verzí.\n3. Nově přidané pasáže uvidíte zeleně zvýrazněné v náhledu.')"><div class="icon-sq">⚖️</div>Jak srovnat?</div>
+                    <div class="btn-icon" onclick="alert('LexisConnect (Integrace):\nLexisEditor naslouchá na portu 3300.\nVývojáři mohou poslat POST na /api/import s JSONem {html: \"...\"}.\nTo umožní propojení s Evolio, SingleCase atd.')"><div class="icon-sq">🔗</div>LexisConnect</div>
                 </div>
                 <div class="group-label">Návody</div>
             </div>
@@ -3562,6 +3570,55 @@ V ........................ dne ...............     V ........................ dn
                     switchAITab('research', document.getElementById('tab-ai-research'));
                 }
             });
+        }
+
+        // LexisConnect Import Listener (Fáze 7)
+        if (window.electronAPI && window.electronAPI.onLexisConnectImport) {
+            window.electronAPI.onLexisConnectImport((data) => {
+                console.log('LexisConnect Import:', data);
+                if (data.html) {
+                    quill.root.innerHTML = data.html;
+                } else if (data.text) {
+                    quill.setText(data.text);
+                }
+                if (data.title) {
+                    // Můžeme aktualizovat název souboru nebo záhlaví
+                    document.getElementById('header-area').innerHTML = `<div>${data.title}</div><div style="text-align: right;">Importováno z LexisConnect</div>`;
+                }
+                customAlert(`Dokument byl úspěšně importován z externí aplikace.`);
+            });
+        }
+
+        function exportWebPreview() {
+            const html = quill.root.innerHTML;
+            const fullHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>LexisEditor - Web Preview</title>
+                    <style>
+                        body { background: #f1f5f9; padding: 40px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; }
+                        .paper { background: white; width: 210mm; min-height: 297mm; padding: 25mm; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); font-family: serif; font-size: 14pt; line-height: 1.5; }
+                        h1, h2, h3 { font-family: sans-serif; }
+                        .ql-align-center { text-align: center; }
+                        .ql-align-right { text-align: right; }
+                        .ql-align-justify { text-align: justify; }
+                    </style>
+                </head>
+                <body>
+                    <div class="paper">${html}</div>
+                </body>
+                </html>
+            `;
+            
+            const blob = new Blob([fullHtml], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "LexisWebPreview.html";
+            a.click();
+            customAlert("Webový náhled byl stažen.");
         }
 
         async function sendAIQuery() {
