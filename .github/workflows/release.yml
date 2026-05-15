@@ -1,0 +1,27 @@
+name: Build/Release LexisEditor
+
+on:
+  push:
+    tags:
+      - 'v*' # Spustí se při pushnutí tagu začínajícího na 'v' (např. v1.7.29)
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build & Publish Electron App
+        run: npm run dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
