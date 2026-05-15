@@ -7,5 +7,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getTemplates: () => ipcRenderer.invoke('get-templates'),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
     resetTemplates: () => ipcRenderer.invoke('reset-templates'),
-    getAppVersion: () => ipcRenderer.invoke('get-version')
+    getAppVersion: () => ipcRenderer.invoke('get-version'),
+    onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_event, value) => callback(value)),
+    installUpdate: () => ipcRenderer.send('install-update'),
+    exportBundle: (html, css) => ipcRenderer.invoke('export-bundle', html, css),
+    saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
+    getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
+    savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
+    getPostConfig: () => ipcRenderer.invoke('get-post-config')
 });

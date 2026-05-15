@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
 const HTMLToDOCX = require('html-to-docx');
@@ -29,6 +30,32 @@ app.whenReady().then(() => {
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
+
+    // --- AUTO-UPDATER LOGIC ---
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    
+    // Disable strict SSL in case of local testing proxies, but usually fine
+    // Nastavení logování pro lepší debug (pokud by bylo potřeba)
+    
+    autoUpdater.checkForUpdatesAndNotify().catch(e => console.error("Update error: ", e));
+
+    autoUpdater.on('update-available', () => {
+        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'available' });
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+        let percent = Math.round(progressObj.percent);
+        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'progress', percent: percent });
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'downloaded' });
+    });
+});
+
+ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
 });
 
 // IPC Handler pro získání verze aplikace z package.json
@@ -146,4 +173,153 @@ ipcMain.handle('reset-templates', () => {
     } catch (e) {
         return { success: false, error: e.message };
     }
+});
+
+ipcMain.handle('export-bundle', async (event, htmlContent, cssContent) => {
+    try {
+        const { filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Exportovat Bundle (DOCX + PDF)',
+            defaultPath: 'Dokument_LexisEditor',
+            filters: [
+                { name: 'Dokumenty', extensions: ['docx', 'pdf'] }
+            ]
+        });
+
+        if (filePath) {
+            // Odstranění přípony pro získání základu jména
+            const basePath = filePath.replace(/\.(docx|pdf)$/i, '');
+            const docxPath = basePath + '.docx';
+            const pdfPath = basePath + '.pdf';
+
+            // 1. Export DOCX
+            const docxBuffer = await HTMLToDOCX(htmlContent, null, {
+                table: { row: { cantSplit: true } },
+                footer: true,
+                pageNumber: true,
+            });
+            fs.writeFileSync(docxPath, docxBuffer);
+
+            // 2. Export PDF přes skryté okno
+            const printWindow = new BrowserWindow({ 
+                show: false,
+                webPreferences: {
+                    offscreen: true
+                }
+            });
+            
+            const fullHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        ${cssContent}
+                        body { margin: 0; padding: 0; background: white; }
+                        .ql-editor { padding: 20mm 25mm !important; }
+                        @media print {
+                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="ql-container ql-snow" style="border:none;">
+                        <div class="ql-editor">${htmlContent}</div>
+                    </div>
+                </body>
+                </html>
+            `;
+            
+            await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+            
+            const pdfBuffer = await printWindow.webContents.printToPDF({
+                marginsType: 1, // No margins (handled by CSS)
+                pageSize: 'A4',
+                printBackground: true,
+                landscape: false
+            });
+            
+            fs.writeFileSync(pdfPath, pdfBuffer);
+            printWindow.destroy();
+
+            return { success: true, docxPath, pdfPath };
+        }
+        return { success: false, canceled: true };
+    } catch (error) {
+        console.error('Chyba při generování Bundlu:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// --- ISDS BRIDGE (Datové schránky) ---
+const isdsConfigPath = path.join(app.getPath('userData'), 'isds_config.json');
+
+ipcMain.handle('save-isds-config', async (event, config) => {
+    try {
+        // Šifrování hesla pomocí systému (Windows DPAPI / Mac Keychain)
+        const encryptedPassword = safeStorage.encryptString(config.password);
+        const configToSave = {
+            login: config.login,
+            password: encryptedPassword.toString('base64'),
+            environment: config.environment || 'production'
+        };
+        fs.writeFileSync(isdsConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
+        return { success: true };
+    } catch (e) {
+        console.error('Chyba při ukládání ISDS konfigurace:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('get-isds-config', async () => {
+    try {
+        if (fs.existsSync(isdsConfigPath)) {
+            const rawData = JSON.parse(fs.readFileSync(isdsConfigPath, 'utf-8'));
+            // Dešifrování hesla zpět pro použití v API
+            const decryptedPassword = safeStorage.decryptString(Buffer.from(rawData.password, 'base64'));
+            return {
+                login: rawData.login,
+                password: decryptedPassword,
+                environment: rawData.environment,
+                hasConfig: true
+            };
+        }
+    } catch (e) {
+        console.error('Chyba při načítání ISDS konfigurace:', e);
+    }
+    return { hasConfig: false };
+});
+
+// --- DOPIS ONLINE BRIDGE (Česká pošta) ---
+const postConfigPath = path.join(app.getPath('userData'), 'post_config.json');
+
+ipcMain.handle('save-post-config', async (event, config) => {
+    try {
+        const encryptedPassword = safeStorage.encryptString(config.password);
+        const configToSave = {
+            login: config.login,
+            password: encryptedPassword.toString('base64')
+        };
+        fs.writeFileSync(postConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
+        return { success: true };
+    } catch (e) {
+        console.error('Chyba při ukládání Post konfigurace:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('get-post-config', async () => {
+    try {
+        if (fs.existsSync(postConfigPath)) {
+            const rawData = JSON.parse(fs.readFileSync(postConfigPath, 'utf-8'));
+            const decryptedPassword = safeStorage.decryptString(Buffer.from(rawData.password, 'base64'));
+            return {
+                login: rawData.login,
+                password: decryptedPassword,
+                hasConfig: true
+            };
+        }
+    } catch (e) {
+        console.error('Chyba při načítání Post konfigurace:', e);
+    }
+    return { hasConfig: false };
 });
