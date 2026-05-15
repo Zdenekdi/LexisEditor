@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
     startLexisLink: () => ipcRenderer.invoke('start-lexis-link'),
     onLexisLinkCommand: (callback) => ipcRenderer.on('lexis-link-command', (event, cmd) => callback(cmd)),
-    onLexisConnectImport: (callback) => ipcRenderer.on('lexis-connect-import', (event, data) => callback(data))
+    onLexisConnectImport: (callback) => ipcRenderer.on('lexis-connect-import', (event, data) => callback(data)),
+    onLexisLinkScan: (callback) => ipcRenderer.on('lexis-link-scan', (event, base64) => callback(base64))
 });

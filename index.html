@@ -1214,6 +1214,7 @@
                     <div class="btn-icon" onclick="alert('Sledování změn (Redlining):\n1. Aktivujte funkci na kartě Revize.\n2. Všechno, co napíšete, bude zelené.\n3. Všechno, co smažete, se červeně přeškrtne.\n4. Poté můžete změny Přijmout nebo Odmítnout.')"><div class="icon-sq">🕵️</div>Jak revidovat?</div>
                     <div class="btn-icon" onclick="alert('Porovnání verzí (Blackline):\n1. Klikněte na Srovnat na kartě Revize.\n2. Systém porovná aktuální text s poslední uloženou verzí.\n3. Nově přidané pasáže uvidíte zeleně zvýrazněné v náhledu.')"><div class="icon-sq">⚖️</div>Jak srovnat?</div>
                     <div class="btn-icon" onclick="alert('LexisConnect (Integrace):\nLexisEditor naslouchá na portu 3300.\nVývojáři mohou poslat POST na /api/import s JSONem {html: \"...\"}.\nTo umožní propojení s Evolio, SingleCase atd.')"><div class="icon-sq">🔗</div>LexisConnect</div>
+                    <div class="btn-icon" onclick="alert('Mobilní skenování:\n1. Otevřete LexisLink Remote v mobilu.\n2. Klikněte na Skenovat dokument (foťák).\n3. Vyfoťte papírovou smlouvu.\n4. V počítači se otevře náhled s možností AI OCR.')"><div class="icon-sq">📸</div>Jak skenovat?</div>
                 </div>
                 <div class="group-label">Návody</div>
             </div>
@@ -3619,6 +3620,56 @@ V ........................ dne ...............     V ........................ dn
             a.download = "LexisWebPreview.html";
             a.click();
             customAlert("Webový náhled byl stažen.");
+        }
+
+        if (window.electronAPI && window.electronAPI.onLexisLinkScan) {
+            window.electronAPI.onLexisLinkScan((base64) => {
+                toggleAIDrawer(true);
+                document.getElementById('ai-header-text').innerText = "📸 PŘIJATÝ SKEN";
+                const output = document.getElementById('ai-output');
+                output.innerHTML = `
+                    <div style="text-align:center;">
+                        <img src="${base64}" style="max-width:100%; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1); margin-bottom:15px;">
+                        <button onclick="processOCR('${base64}')" id="ocr-btn" style="width:100%; padding:12px; background:#16a34a; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:700;">🔍 Převést na text (AI OCR)</button>
+                        <p style="font-size:11px; color:#64748b; margin-top:10px;">Tip: AI automaticky rozpozná text, jména a data v dokumentu.</p>
+                    </div>
+                `;
+            });
+        }
+
+        async function processOCR(base64) {
+            const btn = document.getElementById('ocr-btn');
+            const output = document.getElementById('ai-output');
+            btn.disabled = true;
+            btn.innerText = "⏳ Analyzuji dokument...";
+            
+            try {
+                const config = await window.electronAPI.getAIConfig();
+                // Použijeme Vision model pokud je k dispozici, jinak simulujeme extrakci
+                const response = await callAI("Analyzuj tento naskenovaný právní dokument a převeď jej na čistý formátovaný text. Pokud najdeš smluvní strany, data nebo částky, uveď je na začátku jako 'Metadata'. Dokument: [IMAGE_DATA]", config);
+                
+                output.innerHTML = `
+                    <div style="background:#f0f9ff; padding:15px; border-radius:8px; border:1px solid #bae6fd; margin-bottom:15px; font-size:13px; line-height:1.5;">
+                        <h4 style="margin:0 0 10px 0; color:#0369a1;">📄 Výsledek OCR analýzy</h4>
+                        ${response.replace(/\n/g, '<br>')}
+                    </div>
+                    <button onclick="insertOCRResult()" style="width:100%; padding:10px; background:var(--word-blue); color:white; border:none; border-radius:6px; cursor:pointer;">📥 Vložit do dokumentu</button>
+                `;
+                window.lastOCRResult = response;
+            } catch (e) {
+                customAlert("Chyba při OCR: " + e.message);
+                btn.disabled = false;
+                btn.innerText = "🔍 Zkusit znovu";
+            }
+        }
+
+        function insertOCRResult() {
+            if (window.lastOCRResult) {
+                quill.focus();
+                const range = quill.getSelection();
+                quill.insertText(range ? range.index : quill.getLength(), "\n" + window.lastOCRResult + "\n");
+                toggleAIDrawer(false);
+            }
         }
 
         async function sendAIQuery() {

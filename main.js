@@ -611,7 +611,8 @@ ipcMain.handle('start-lexis-link', async () => {
                         <p style="font-size:14px; color:#64748b">Vzdálené ovládání AI Agenta</p>
                         <button onclick="sendCommand('summarize')">✨ Shrnot dokument</button>
                         <button onclick="sendCommand('logic')">🧠 Kontrola logiky</button>
-                        <button onclick="sendCommand('research')">📚 Právní rešerše</button>
+                        <button onclick="document.getElementById('camera-input').click()" style="background:#16a34a">📸 Skenovat dokument</button>
+                        <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" onchange="uploadImage(this)">
                     </div>
                     <div class="status" id="status">Připojeno k LexisEditoru</div>
                     <script>
@@ -622,6 +623,23 @@ ipcMain.handle('start-lexis-link', async () => {
                                 .then(data => {
                                     document.getElementById('status').innerText = 'Hotovo: ' + (data.success ? 'OK' : 'Chyba');
                                 });
+                        }
+                        function uploadImage(input) {
+                            if (!input.files || !input.files[0]) return;
+                            document.getElementById('status').innerText = 'Nahrávám sken...';
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                fetch('/api/upload', { 
+                                    method: 'POST', 
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ image: e.target.result }) 
+                                })
+                                .then(r => r.json())
+                                .then(data => {
+                                    document.getElementById('status').innerText = 'Sken odeslán do PC';
+                                });
+                            };
+                            reader.readAsDataURL(input.files[0]);
                         }
                     <\/script>
                 </body>
@@ -660,6 +678,23 @@ ipcMain.handle('start-lexis-link', async () => {
                 } catch (e) {
                     res.writeHead(400);
                     res.end(JSON.stringify({ success: false, error: 'Neplatný JSON' }));
+                }
+            });
+        } else if (req.url === '/api/upload' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    if (mainWindow && data.image) {
+                        mainWindow.webContents.send('lexis-link-scan', data.image);
+                        mainWindow.show();
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.end(JSON.stringify({ success: true }));
+                } catch (e) {
+                    res.writeHead(400);
+                    res.end(JSON.stringify({ success: false }));
                 }
             });
         } else if (req.method === 'OPTIONS') {
