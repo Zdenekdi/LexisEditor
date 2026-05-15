@@ -1,7 +1,7 @@
 {
   "name": "lexiseditor",
   "productName": "LexisEditor",
-  "version": "1.7.29",
+  "version": "1.8.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Zdenekdi/LexisEditor.git"
@@ -16,6 +16,9 @@
   },
   "build": {
     "appId": "com.lexiseditor.app",
+    "directories": {
+      "output": "dist"
+    },
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
