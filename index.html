@@ -1201,6 +1201,7 @@
 
         <div class="context-menu-item" onclick="askAIAboutSelection()"><span class="icon">✨</span> LexisAI: Analyzovat</div>
         <div class="context-menu-item" onclick="anonymizeSelection()"><span class="icon">🛡️</span> Anonymizovat</div>
+        <div class="context-menu-item" onclick="makePlaceholder()"><span class="icon"><b>[ ]</b></span> Vytvořit pole</div>
         
         <div class="context-menu-sep"></div>
         
@@ -1418,7 +1419,79 @@
             }
         }
 
-        function finishInit() {
+        // --- PLACEHOLDER MANAGER LOGIC ---
+    function makePlaceholder() {
+        const range = quill.getSelection();
+        if (range && range.length > 0) {
+            const selectedText = quill.getText(range.index, range.length);
+            quill.deleteText(range.index, range.length);
+            quill.insertText(range.index, `[${selectedText}]`, 'bold', true);
+            hideContextMenu();
+            refreshPlaceholders();
+        } else {
+            customAlert("Nejdříve označte text, ze kterého chcete vytvořit pole.");
+        }
+    }
+
+    function refreshPlaceholders() {
+        const text = quill.getText();
+        const placeholderRegex = /\[(.*?)\]/g;
+        const matches = [...text.matchAll(placeholderRegex)];
+        const listContainer = document.getElementById('placeholders-list');
+        
+        // Získání unikátních názvů polí
+        const uniqueNames = [...new Set(matches.map(m => m[1]))];
+        
+        if (uniqueNames.length === 0) {
+            listContainer.innerHTML = '<p style="font-size: 11px; color: #64748b; font-style: italic;">Žádná pole [ ] nebyla detekována.</p>';
+            return;
+        }
+
+        listContainer.innerHTML = '';
+        uniqueNames.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'placeholder-item';
+            item.style.marginBottom = '8px';
+            item.innerHTML = `
+                <div style="font-size: 10px; color: #64748b; margin-bottom: 2px; font-weight: bold;">${name.toUpperCase()}</div>
+                <input type="text" class="placeholder-input" placeholder="Doplnit hodnotu..." 
+                    onchange="updatePlaceholderValue('${name}', this.value)"
+                    style="width: 100%; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px;">
+            `;
+            listContainer.appendChild(item);
+        });
+    }
+
+    function updatePlaceholderValue(originalName, newValue) {
+        if (!newValue) return;
+        
+        const fullContent = quill.root.innerHTML;
+        const target = `[${originalName}]`;
+        
+        // Hromadné nahrazení v HTML (aby se zachovalo formátování okolí)
+        // Používáme globální nahrazení pro všechny výskyty
+        const updatedHtml = fullContent.split(target).join(newValue);
+        
+        if (fullContent !== updatedHtml) {
+            quill.root.innerHTML = updatedHtml;
+            refreshPlaceholders(); // Aktualizace seznamu (pole zmizelo, bylo nahrazeno)
+            customAlert(`Pole [${originalName}] bylo nahrazeno v celém dokumentu.`);
+        }
+    }
+
+    // Automatická aktualizace seznamu polí při změně v editoru (s debouncem)
+    let scanTimeout;
+    quill.on('text-change', () => {
+        clearTimeout(scanTimeout);
+        scanTimeout = setTimeout(refreshPlaceholders, 1500);
+    });
+
+    // Exportujeme funkce do globálního prostoru pro volání z HTML
+    window.makePlaceholder = makePlaceholder;
+    window.refreshPlaceholders = refreshPlaceholders;
+    window.updatePlaceholderValue = updatePlaceholderValue;
+
+    function finishInit() {
             loadDynamicTemplates();
             if (typeof renderDeadlines === 'function') renderDeadlines();
             if (typeof loadIntegrationSettings === 'function') loadIntegrationSettings();
