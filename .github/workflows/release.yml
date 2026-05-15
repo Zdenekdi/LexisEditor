@@ -7,7 +7,12 @@ on:
 
 jobs:
   release:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,7 +27,13 @@ jobs:
         run: npm install
 
       - name: Build Electron App
-        run: npx electron-builder --mac --arm64
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            npx electron-builder --win --x64
+          else
+            npx electron-builder --mac --arm64
+          fi
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
