@@ -1121,7 +1121,7 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="toggleAIDrawer(true)"><div class="icon-sq">✨</div>Otevřít AI Bridge</div>
-                    <div class="btn-icon" onclick="alert('AI Analýza spuštěna...')"><div class="icon-sq">🔍</div>Analyzovat</div>
+                    <div class="btn-icon" onclick="openLexisLink()"><div class="icon-sq">📱</div>LexisLink Remote</div>
                 </div>
                 <div class="group-label">LexisAI</div>
             </div>
@@ -3301,19 +3301,38 @@ V ........................ dne ...............     V ........................ dn
         updateHistoryUI();
         loadAISettings();
 
-        // AI Settings Persistence
-        function saveAISettings() {
+        // AI Settings Persistence (v3.0 Secure Migration)
+        async function saveAISettings() {
             const settings = {
                 provider: document.getElementById('ai-provider').value,
                 model: document.getElementById('ai-model').value,
                 endpoint: document.getElementById('ai-endpoint').value,
                 apiKey: document.getElementById('ai-apikey').value
             };
-            localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
-            console.log('AI Settings saved:', settings);
+            
+            if (window.electronAPI) {
+                await window.electronAPI.saveAIConfig(settings);
+                // Clear insecure legacy storage
+                localStorage.removeItem('lexis_ai_settings');
+            } else {
+                localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
+            }
+            console.log('AI Settings saved securely');
         }
 
-        function loadAISettings() {
+        async function loadAISettings() {
+            if (window.electronAPI) {
+                const s = await window.electronAPI.getAIConfig();
+                if (s.hasConfig) {
+                    document.getElementById('ai-provider').value = s.provider;
+                    document.getElementById('ai-model').value = s.model;
+                    document.getElementById('ai-endpoint').value = s.endpoint;
+                    document.getElementById('ai-apikey').value = s.apiKey;
+                    return;
+                }
+            }
+            
+            // Fallback to legacy or defaults
             const saved = localStorage.getItem('lexis_ai_settings');
             if (saved) {
                 const s = JSON.parse(saved);
@@ -3322,6 +3341,17 @@ V ........................ dne ...............     V ........................ dn
                 document.getElementById('ai-endpoint').value = s.endpoint;
                 document.getElementById('ai-apikey').value = s.apiKey;
             }
+        }
+
+        async function saveAIConfig() {
+            if (!window.electronAPI) return;
+            const config = {
+                provider: document.getElementById('ai-provider').value,
+                model: document.getElementById('ai-model').value,
+                endpoint: document.getElementById('ai-endpoint').value,
+                apiKey: document.getElementById('ai-apikey').value
+            };
+            await window.electronAPI.saveAIConfig(config);
         }
 
         function getAIConfig() {
@@ -3409,6 +3439,40 @@ V ........................ dne ...............     V ........................ dn
                     </div>
                 `;
             }, 2500);
+        }
+
+        async function openLexisLink() {
+            if (!window.electronAPI) return;
+            const result = await window.electronAPI.startLexisLink();
+            if (result.success) {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(result.url)}`;
+                toggleAIDrawer(true);
+                document.getElementById('ai-header-text').innerText = "📱 LEXISLINK PÁROVÁNÍ";
+                document.getElementById('ai-output').innerHTML = `
+                    <div style="text-align:center; padding:20px;">
+                        <p style="font-size:13px; color:#1e293b; margin-bottom:20px;">Naskenujte tento kód mobilem pro vzdálené ovládání AI Agenta.</p>
+                        <img src="${qrUrl}" style="border:10px solid white; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); border-radius:8px;">
+                        <p style="margin-top:20px; font-size:11px; color:#64748b; font-family:monospace;">${result.url}</p>
+                        <div style="margin-top:20px; padding:10px; background:#f0f9ff; border-radius:6px; border:1px solid #bae6fd; font-size:11px; color:#0369a1;">
+                            <b>Poznámka:</b> Mobil musí být na stejné Wi-Fi síti jako tento počítač.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('ai-input-container').style.display = 'none';
+            }
+        }
+
+        // LexisLink Command Listener
+        if (window.electronAPI && window.electronAPI.onLexisLinkCommand) {
+            window.electronAPI.onLexisLinkCommand((cmd) => {
+                console.log('LexisLink Remote Command:', cmd);
+                if (cmd === 'summarize') runSummarization();
+                if (cmd === 'logic') runLogicAudit();
+                if (cmd === 'research') {
+                    toggleAIDrawer(true);
+                    switchAITab('research', document.getElementById('tab-ai-research'));
+                }
+            });
         }
 
         async function sendAIQuery() {

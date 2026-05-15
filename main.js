@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const HTMLToDOCX = require('html-to-docx');
 const axios = null; // Removed in favor of native fetch
 const pdf = require('pdf-parse');
@@ -522,4 +523,127 @@ ipcMain.handle('import-pdf-base64', async (event, base64) => {
     } catch (error) {
         return { success: false, error: error.message };
     }
+});
+
+// --- AI CONFIG BRIDGE ---
+const aiConfigPath = path.join(app.getPath('userData'), 'ai_config.json');
+
+ipcMain.handle('save-ai-config', async (event, config) => {
+    try {
+        let encryptedKey = '';
+        if (config.apiKey) {
+            encryptedKey = safeStorage.encryptString(config.apiKey).toString('base64');
+        }
+        const configToSave = {
+            provider: config.provider,
+            model: config.model,
+            endpoint: config.endpoint,
+            apiKey: encryptedKey
+        };
+        fs.writeFileSync(aiConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
+        return { success: true };
+    } catch (e) {
+        console.error('Chyba při ukládání AI konfigurace:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('get-ai-config', async () => {
+    try {
+        if (fs.existsSync(aiConfigPath)) {
+            const rawData = JSON.parse(fs.readFileSync(aiConfigPath, 'utf-8'));
+            let decryptedKey = '';
+            if (rawData.apiKey) {
+                decryptedKey = safeStorage.decryptString(Buffer.from(rawData.apiKey, 'base64'));
+            }
+            return {
+                provider: rawData.provider,
+                model: rawData.model,
+                endpoint: rawData.endpoint,
+                apiKey: decryptedKey,
+                hasConfig: true
+            };
+        }
+    } catch (e) {
+        console.error('Chyba při načítání AI konfigurace:', e);
+    }
+    return { hasConfig: false };
+});
+
+// --- LEXISLINK SERVER (v3.0 Office Mode) ---
+let lexisLinkServer = null;
+const LEXIS_LINK_PORT = 3300;
+
+function getLocalIp() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+
+ipcMain.handle('start-lexis-link', async () => {
+    if (lexisLinkServer) return { success: true, url: `http://${getLocalIp()}:${LEXIS_LINK_PORT}/remote` };
+
+    lexisLinkServer = http.createServer((req, res) => {
+        if (req.url === '/remote') {
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+            const remoteHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title>LexisLink Remote</title>
+                    <style>
+                        body { font-family: sans-serif; background: #f8fafc; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+                        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 300px; text-align: center; }
+                        button { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; background: #0078d4; color: white; font-weight: bold; cursor: pointer; }
+                        .status { font-size: 12px; color: #64748b; margin-top: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2 style="color:#0078d4">🤖 LexisLink</h2>
+                        <p style="font-size:14px; color:#64748b">Vzdálené ovládání AI Agenta</p>
+                        <button onclick="sendCommand('summarize')">✨ Shrnot dokument</button>
+                        <button onclick="sendCommand('logic')">🧠 Kontrola logiky</button>
+                        <button onclick="sendCommand('research')">📚 Právní rešerše</button>
+                    </div>
+                    <div class="status" id="status">Připojeno k LexisEditoru</div>
+                    <script>
+                        function sendCommand(cmd) {
+                            document.getElementById('status').innerText = 'Odesílám: ' + cmd;
+                            fetch('/api/command?cmd=' + cmd, { method: 'POST' })
+                                .then(r => r.json())
+                                .then(data => {
+                                    document.getElementById('status').innerText = 'Hotovo: ' + (data.success ? 'OK' : 'Chyba');
+                                });
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `;
+            res.end(remoteHtml);
+        } else if (req.url.startsWith('/api/command')) {
+            const url = new URL(req.url, \`http://\${req.headers.host}\`);
+            const cmd = url.searchParams.get('cmd');
+            
+            if (mainWindow) {
+                mainWindow.webContents.send('lexis-link-command', cmd);
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+        } else {
+            res.writeHead(404);
+            res.end();
+        }
+    });
+
+    lexisLinkServer.listen(LEXIS_LINK_PORT);
+    return { success: true, url: \`http://\${getLocalIp()}:\${LEXIS_LINK_PORT}/remote\` };
 });

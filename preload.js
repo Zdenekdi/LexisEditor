@@ -20,5 +20,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     authenticateBiometric: (reason) => ipcRenderer.invoke('authenticate-biometric', reason),
     importPdf: () => ipcRenderer.invoke('import-pdf'),
     importZfo: () => ipcRenderer.invoke('import-zfo'),
-    importPdfBase64: (base64) => ipcRenderer.invoke('import-pdf-base64', base64)
+    importPdfBase64: (base64) => ipcRenderer.invoke('import-pdf-base64', base64),
+    saveAIConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
+    getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
+    startLexisLink: () => ipcRenderer.invoke('start-lexis-link'),
+    onLexisLinkCommand: (callback) => ipcRenderer.on('lexis-link-command', (event, cmd) => callback(cmd))
 });
