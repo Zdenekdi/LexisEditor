@@ -147,6 +147,13 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
         .btn-icon:hover .icon-sq { border-color: var(--word-blue); background: #fcfaff; }
+        
+        @media (max-width: 1000px) {
+            .ribbon-tabs { gap: 10px; padding: 0 10px; }
+            .tab { padding: 8px 12px; font-size: 12px; }
+            .tool-groups-container { padding: 8px 15px; gap: 15px; }
+            .group-label { font-size: 9px; }
+        }
 
         /* Typography Controls */
         .combo-box {
@@ -154,11 +161,26 @@
         }
 
         /* Workspace & Panels */
-        .workspace { flex-grow: 1; display: flex; overflow: hidden; background: var(--bg-workspace); }
+        .workspace { 
+            flex-grow: 1; display: flex; overflow: hidden; background: var(--bg-workspace); 
+            width: 100%;
+        }
         
-        .side-panels { 
-            width: 280px; background: white; border-right: 1px solid var(--border); 
-            display: flex; flex-direction: column; overflow-y: auto; 
+        .side-panels, .right-panels { 
+            width: 280px; min-width: 220px; max-width: 30%; 
+            background: white; border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; overflow-y: auto;
+            flex-shrink: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .right-panels { border-right: none; border-left: 1px solid var(--border); width: 320px; }
+        
+        .side-panels.collapsed, .right-panels.collapsed { 
+            width: 0 !important; min-width: 0 !important; padding: 0 !important; 
+            margin: 0 !important; overflow: hidden; border: none !important;
+        }
+        .editor-area { 
+            flex-grow: 1; overflow-x: auto; display: flex; justify-content: center; 
+            padding: 20px; position: relative;
         }
         .panel-section { padding: 15px; border-bottom: 1px solid var(--border); }
         .panel-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 10px; }
@@ -168,8 +190,13 @@
         .category-header { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94a3b8; padding: 15px 15px 5px 15px; letter-spacing: 0.5px; }
 
         .editor-scroll { 
-            flex-grow: 1; overflow-y: auto; padding: 60px 0; display: flex; flex-direction: column; align-items: center; 
+            flex-grow: 1; overflow-y: auto; overflow-x: auto; padding: 60px 20px; display: flex; flex-direction: column; align-items: center; 
             background: var(--bg-workspace); transition: background 0.3s; 
+        }
+
+        @media (max-width: 1200px) {
+            .side-panels { display: none; }
+            .editor-scroll { padding: 20px 10px; }
         }
         
         #editor-wrapper {
@@ -231,29 +258,57 @@
         .ai-header-close:hover { opacity: 1; background: rgba(255,255,255,0.1); border-radius: 50%; }
         
         /* Floating Tabs */
-        .ai-side-tab, .comment-side-tab {
-            position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+        .ai-side-tab, .comment-side-tab, .sidebar-side-tab, .reference-side-tab {
+            position: fixed; top: 50%; transform: translateY(-50%);
             width: 32px; height: 120px; 
             color: white; display: flex; align-items: center; justify-content: center;
-            writing-mode: vertical-rl; text-orientation: mixed; border-radius: 12px 0 0 12px;
-            cursor: pointer; z-index: 1000; box-shadow: -2px 0 15px rgba(0,0,0,0.15);
+            writing-mode: vertical-rl; text-orientation: mixed;
+            cursor: pointer; z-index: 1000; box-shadow: 0 0 15px rgba(0,0,0,0.15);
             font-size: 10px; font-weight: 800; letter-spacing: 1.5px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3);
-            border-right: none;
+            display: none; /* Skryté, pokud je panel otevřen */
         }
-        .ai-side-tab {
-            transform: translateY(-130%);
-            background: linear-gradient(to bottom, var(--ai-color), #7c3aed);
-        }
-        .comment-side-tab {
-            transform: translateY(10%);
-            background: linear-gradient(to bottom, #f59e0b, #d97706);
-        }
-        .ai-side-tab:hover, .comment-side-tab:hover { width: 42px; padding-right: 8px; }
+        
+        /* Pravé štítky */
+        .ai-side-tab, .comment-side-tab, .reference-side-tab { right: 0; border-radius: 12px 0 0 12px; border-right: none; }
+        
+        /* Levé štítky */
+        .sidebar-side-tab { left: 0; border-radius: 0 12px 12px 0; border-left: none; }
+
+        .sidebar-side-tab { background: linear-gradient(to bottom, #3b82f6, #1d4ed8); transform: translateY(-50%); }
+        .ai-side-tab { transform: translateY(-160%); background: linear-gradient(to bottom, var(--ai-color), #7c3aed); }
+        .reference-side-tab { transform: translateY(-40%); background: linear-gradient(to bottom, #10b981, #047857); }
+        .comment-side-tab { transform: translateY(80%); background: linear-gradient(to bottom, #f59e0b, #d97706); }
+        
+        .ai-side-tab:hover, .comment-side-tab:hover, .reference-side-tab:hover { width: 42px; padding-right: 8px; }
+        .sidebar-side-tab:hover { width: 42px; padding-left: 8px; }
 
         .thinking { display: flex; gap: 4px; padding: 10px; }
         .dot { width: 6px; height: 6px; background: #cbd5e1; border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } }
+
+        /* Context Menu & QAT Menu */
+        .custom-context-menu, .qat-custom-menu {
+            position: fixed; background: white; border: 1px solid #cbd5e1; border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 10001; min-width: 180px;
+            padding: 5px 0; display: none; font-family: 'Inter', sans-serif;
+        }
+        .context-menu-item {
+            padding: 8px 15px; font-size: 13px; color: #334155; cursor: pointer;
+            display: flex; align-items: center; gap: 10px; transition: background 0.2s;
+        }
+        .context-menu-item:hover { background: #f1f5f9; color: var(--word-blue); }
+        .context-menu-sep { height: 1px; background: #e2e8f0; margin: 5px 0; }
+        .context-menu-item .icon { font-size: 14px; width: 20px; text-align: center; }
+        .qat-custom-menu { right: auto; top: auto; }
+        .qat-item-check { width: 16px; font-size: 10px; }
+        
+        .btn-icon-sq {
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; cursor: pointer; transition: all 0.2s; border: 1px solid transparent;
+            font-size: 14px;
+        }
+        .btn-icon-sq:hover { background: #f1f5f9; border-color: #cbd5e1; color: var(--word-blue); }
 
         .editor-scroll.has-grid {
             background-image: 
@@ -529,15 +584,23 @@
 </head>
 <body id="main-body">
 
-    <!-- Biometrický Zámek (v1.7.21) -->
+    <!-- Biometrický Zámek (v1.7.22) -->
     <div id="lock-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:99999; display:none; align-items:center; justify-content:center; flex-direction:column; font-family:'Inter',sans-serif;">
-        <div style="font-size:60px; margin-bottom:20px;">🔒</div>
-        <div style="font-weight:700; font-size:24px; color:#1e293b; margin-bottom:10px;">LexisEditor je uzamčen</div>
-        <div style="color:#64748b; margin-bottom:30px; text-align:center; max-width:400px; line-height:1.5;">
-            Pro přístup k Vašim dokumentům použijte Touch ID.<br>
-            <span style="font-size:11px; color:#94a3b8; display:block; margin-top:15px;">(Pokud Mac zobrazí šedý dialog Klíčenky, klikněte na <b>"Vždy povolit"</b> pro trvalé skrytí)</span>
+        <div style="background: #f8fafc; padding: 40px; border-radius: 24px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+            <div style="font-size:48px; margin-bottom:24px;">🛡️</div>
+            <div style="font-weight:700; font-size:22px; color:#1e293b; margin-bottom:12px;">Soukromí je aktivní</div>
+            <div style="color:#64748b; margin-bottom:32px; text-align:center; max-width:320px; line-height:1.6; font-size: 14px;">
+                Pro otevření editoru a přístup k dokumentům se prosím ověřte.
+            </div>
+            <button id="unlock-btn" onclick="requestStartupUnlock()" style="padding:14px 32px; background:#2563eb; color:white; border:none; border-radius:14px; font-weight:600; cursor:pointer; box-shadow:0 10px 20px rgba(37,99,235,0.2); transition: all 0.2s; font-size: 15px;">
+                Odemknout prstem ☝️
+            </button>
+            <div style="margin-top: 40px; padding: 15px; background: #fff; border-radius: 12px; border: 1px dashed #e2e8f0; max-width: 300px; text-align: center;">
+                <span style="font-size:11px; color:#94a3b8; display:block;">
+                    💡 <b>Tip pro Mac:</b> Pokud uvidíte šedé systémové okno, klikněte na <b>"Vždy povolit"</b>. Už se pak nikdy neobjeví a zůstane jen tento rychlý Touch ID zámek.
+                </span>
+            </div>
         </div>
-        <button id="unlock-btn" onclick="requestStartupUnlock()" style="padding:12px 24px; background:#2563eb; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; box-shadow:0 10px 20px rgba(37,99,235,0.2); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Odemknout prstem ☝️</button>
     </div>
 
     <!-- Úvodní Rozcestník -->
@@ -584,11 +647,12 @@
                 <span>AutoSave</span>
             </div>
             <div class="quick-access">
-                <div class="qa-btn" onclick="saveDocument()" title="Uložit (Cmd+S)">💾</div>
-                <div class="qa-separator"></div>
-                <div class="qa-btn" onclick="exec('undo')" title="Zpět (Cmd+Z)">↩️</div>
-                <div class="qa-btn" onclick="exec('redo')" title="Vpřed (Cmd+Shift+Z)">↪️</div>
-                <div class="qa-btn" title="Přizpůsobit">▾</div>
+                <div id="qat-save" class="qa-btn" onclick="saveDocument()" title="Uložit (Cmd+S)">💾</div>
+                <div id="qat-undo" class="qa-btn" onclick="exec('undo')" title="Zpět (Cmd+Z)">↩️</div>
+                <div id="qat-redo" class="qa-btn" onclick="exec('redo')" title="Vpřed (Cmd+Shift+Z)">↪️</div>
+                <div id="qat-print" class="qa-btn" onclick="window.print()" title="Tisk" style="display:none;">🖨️</div>
+                <div id="qat-new" class="qa-btn" onclick="openStartDocument('blank')" title="Nový dokument" style="display:none;">📄</div>
+                <div class="qa-btn" onclick="showQATMenu(event)" title="Přizpůsobit">▾</div>
             </div>
 
             <div class="doc-title-center">
@@ -1098,11 +1162,63 @@
         </div>
     </div>
 
-    <div class="ai-side-tab" onclick="toggleAIDrawer(true)">
+    <div id="sidebar-tab" class="sidebar-side-tab" onclick="toggleSidebar('sidebar')">
+        <span>📚 KNIHOVNA</span>
+    </div>
+    <div id="reference-tab" class="reference-side-tab" onclick="toggleSidebar('right-sidebar')">
+        <span>📖 REFERENCE</span>
+    </div>
+    <div class="ai-side-tab" id="ai-tab" onclick="toggleAIDrawer(true)">
         <span>✨ LEXIS AI</span>
     </div>
-    <div class="comment-side-tab" onclick="toggleCommentDrawer(true)">
+    <div class="comment-side-tab" id="comment-tab" onclick="toggleCommentDrawer(true)">
         <span>💬 REVIZE</span>
+    </div>
+
+    <!-- Custom Context Menu -->
+    <div id="editor-context-menu" class="custom-context-menu" style="min-width: 220px;">
+        <div class="context-menu-item" onclick="exec('copy')"><span class="icon">📋</span> Kopírovat <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+C</span></div>
+        <div class="context-menu-item" onclick="exec('paste')"><span class="icon">📥</span> Vložit <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+V</span></div>
+        <div class="context-menu-item" onclick="exec('cut')"><span class="icon">✂️</span> Vyjmout <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+X</span></div>
+        
+        <div class="context-menu-sep"></div>
+        
+        <div style="display: flex; padding: 5px 10px; gap: 5px; justify-content: space-around; border-bottom: 1px solid #f1f5f9;">
+            <div class="btn-icon-sq" onclick="exec('bold')" title="Tučné"><b>B</b></div>
+            <div class="btn-icon-sq" onclick="exec('italic')" title="Kurzíva"><i>I</i></div>
+            <div class="btn-icon-sq" onclick="exec('underline')" title="Podtržené"><u>U</u></div>
+            <div class="btn-icon-sq" onclick="exec('strike')" title="Přeškrtnuté"><s>S</s></div>
+        </div>
+
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="exec('list', 'bullet')"><span class="icon">•</span> Odrážky</div>
+        <div class="context-menu-item" onclick="exec('list', 'ordered')"><span class="icon">1.</span> Číslování</div>
+        
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="exec('align', '')"><span class="icon">≡</span> Zarovnat doleva</div>
+        <div class="context-menu-item" onclick="exec('align', 'center')"><span class="icon">↔</span> Zarovnat na střed</div>
+        <div class="context-menu-item" onclick="exec('align', 'justify')"><span class="icon">≣</span> Zarovnat do bloku</div>
+
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="askAIAboutSelection()"><span class="icon">✨</span> LexisAI: Analyzovat</div>
+        <div class="context-menu-item" onclick="anonymizeSelection()"><span class="icon">🛡️</span> Anonymizovat</div>
+        
+        <div class="context-menu-sep"></div>
+        
+        <div class="context-menu-item" onclick="showFindReplace()"><span class="icon">🔍</span> Najít v dokumentu</div>
+    </div>
+
+    <!-- QAT Customization Menu -->
+    <div id="qat-custom-menu" class="qat-custom-menu">
+        <div class="context-menu-item" onclick="toggleQATItem('qat-save')"><span class="qat-item-check" id="check-qat-save">✓</span> Uložit</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-undo')"><span class="qat-item-check" id="check-qat-undo">✓</span> Zpět</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-redo')"><span class="qat-item-check" id="check-qat-redo">✓</span> Vpřed</div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-print')"><span class="qat-item-check" id="check-qat-print"></span> Tisk</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-new')"><span class="qat-item-check" id="check-qat-new"></span> Nový dokument</div>
     </div>
     
     <div class="workspace">
@@ -1310,6 +1426,8 @@
             loadDynamicTemplates();
             if (typeof renderDeadlines === 'function') renderDeadlines();
             if (typeof loadIntegrationSettings === 'function') loadIntegrationSettings();
+            if (typeof loadQATSettings === 'function') loadQATSettings();
+            if (typeof initContextMenu === 'function') initContextMenu();
         }
 
         window.addEventListener('DOMContentLoaded', initApp);
@@ -1611,6 +1729,7 @@
                 drawer.classList.remove('open');
                 overlay.classList.remove('active');
             }
+            updateTabVisibility();
         }
 
         // New Insert Functions
@@ -1733,6 +1852,15 @@
         }
 
         function exec(format, value = true) {
+            if (format === 'copy') { document.execCommand('copy'); return; }
+            if (format === 'cut') { document.execCommand('cut'); return; }
+            if (format === 'paste') { 
+                navigator.clipboard.readText().then(text => {
+                    const range = quill.getSelection();
+                    if (range) quill.insertText(range.index, text);
+                });
+                return; 
+            }
             if (format === 'undo') {
                 if (quill.history) quill.history.undo();
                 return;
@@ -2151,8 +2279,120 @@ V ........................ dne ...............     V ........................ dn
             document.getElementById('footer-area').style.paddingRight = `${m}mm`;
         }
         function toggleSidebar(id) {
-            document.getElementById(id).classList.toggle('collapsed');
+            const panel = document.getElementById(id);
+            panel.classList.toggle('collapsed');
+            
+            // Aktualizace tabů
+            updateTabVisibility();
         }
+
+        function updateTabVisibility() {
+            const leftCollapsed = document.getElementById('sidebar').classList.contains('collapsed');
+            const rightCollapsed = document.getElementById('right-sidebar').classList.contains('collapsed');
+            
+            document.getElementById('sidebar-tab').style.display = leftCollapsed ? 'flex' : 'none';
+            document.getElementById('reference-tab').style.display = rightCollapsed ? 'flex' : 'none';
+            
+            // AI a Revize jsou speciální drawery
+            const aiOpen = document.getElementById('ai-drawer').classList.contains('open');
+            const commOpen = document.getElementById('comment-sidebar').classList.contains('open');
+            
+            document.getElementById('ai-tab').style.display = aiOpen ? 'none' : 'flex';
+            document.getElementById('comment-tab').style.display = commOpen ? 'none' : 'flex';
+        }
+
+        // --- QUICK ACCESS TOOLBAR (QAT) LOGIC ---
+        function showQATMenu(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const menu = document.getElementById('qat-custom-menu');
+            menu.style.display = 'block';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY + 10}px`;
+        }
+
+        function toggleQATItem(id) {
+            const btn = document.getElementById(id);
+            const check = document.getElementById(`check-${id}`);
+            const isHidden = btn.style.display === 'none';
+            
+            btn.style.display = isHidden ? 'flex' : 'none';
+            check.innerText = isHidden ? '✓' : '';
+            
+            // Save to localStorage
+            const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+            settings[id] = isHidden;
+            localStorage.setItem('lexis-qat-settings', JSON.stringify(settings));
+        }
+
+        function loadQATSettings() {
+            const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+            const defaults = { 'qat-save': true, 'qat-undo': true, 'qat-redo': true, 'qat-print': false, 'qat-new': false };
+            
+            const finalSettings = { ...defaults, ...settings };
+            
+            for (const [id, visible] of Object.entries(finalSettings)) {
+                const btn = document.getElementById(id);
+                const check = document.getElementById(`check-${id}`);
+                if (btn) btn.style.display = visible ? 'flex' : 'none';
+                if (check) check.innerText = visible ? '✓' : '';
+            }
+        }
+
+        // --- CONTEXT MENU LOGIC ---
+        function initContextMenu() {
+            const editorEl = document.querySelector('.ql-editor');
+            const contextMenu = document.getElementById('editor-context-menu');
+
+            editorEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                contextMenu.style.display = 'block';
+                contextMenu.style.left = `${e.clientX}px`;
+                contextMenu.style.top = `${e.clientY}px`;
+            });
+
+            document.addEventListener('click', () => {
+                contextMenu.style.display = 'none';
+                document.getElementById('qat-custom-menu').style.display = 'none';
+            });
+        }
+
+        // Mock functions for context menu actions
+        function anonymizeSelection() {
+            const range = quill.getSelection();
+            if (range) {
+                const text = quill.getText(range.index, range.length);
+                quill.deleteText(range.index, range.length);
+                quill.insertText(range.index, "[ANONYMIZOVÁNO]", { color: 'red', background: '#fee2e2' });
+            }
+        }
+
+        function askAIAboutSelection() {
+            const range = quill.getSelection();
+            if (range && range.length > 0) {
+                const text = quill.getText(range.index, range.length);
+                toggleAIDrawer(true);
+                document.getElementById('ai-input').value = `Analyzuj tento právní text: ${text}`;
+                // Optional: trigger AI automatically
+            } else {
+                customAlert("Pro analýzu nejprve vyberte text.");
+            }
+        }
+
+        // Automatické schovávání při malém okně
+        window.addEventListener('resize', () => {
+            if (window.innerWidth < 1200) {
+                document.getElementById('sidebar').classList.add('collapsed');
+                document.getElementById('right-sidebar').classList.add('collapsed');
+            } else {
+                document.getElementById('sidebar').classList.remove('collapsed');
+                document.getElementById('right-sidebar').classList.remove('collapsed');
+            }
+            updateTabVisibility();
+        });
+        
+        // Inicializace viditelnosti tabů
+        setTimeout(updateTabVisibility, 500);
 
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
@@ -2750,6 +2990,7 @@ V ........................ dne ...............     V ........................ dn
                 drawer.classList.remove('open');
                 overlay.classList.remove('active');
             }
+            updateTabVisibility();
         }
 
         function addComment() {
