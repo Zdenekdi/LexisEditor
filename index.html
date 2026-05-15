@@ -767,51 +767,52 @@
                 <div class="group-label">Úpravy</div>
             </div>
         </div>
+
         <div id="tab-insert" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertTableOfContents()"><div class="icon-sq">📑</div>Vložit Obsah</div>
-                    <div class="btn-icon" onclick="insertTodayDate()"><div class="icon-sq">📅</div>Dnešní datum</div>
-                    <div class="btn-icon" onclick="alert('Vkládám titulní stranu...')"><div class="icon-sq">📄</div>Titulní str.</div>
+                    <div class="btn-icon" onclick="insertTOC()"><div class="icon-sq">📖</div>Vložit Obsah</div>
+                    <div class="btn-icon" onclick="insertCurrentDate()"><div class="icon-sq">📆</div>Dnešní datum</div>
+                    <div class="btn-icon" onclick="insertTitlePage()"><div class="icon-sq">🗂️</div>Titulní str.</div>
                 </div>
                 <div class="group-label">Stránky & Obsah</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertStamp('pravni-moc')"><div class="icon-sq">⚖️</div>Právní moc</div>
-                    <div class="btn-icon" onclick="insertStamp('shoda')"><div class="icon-sq">📄</div>Shoda</div>
-                    <div class="btn-icon" onclick="insertStamp('prevzal')"><div class="icon-sq">✍️</div>Převzal</div>
+                    <div class="btn-icon" onclick="insertClause('pravni_moc')"><div class="icon-sq">🖋️</div>Právní moc</div>
+                    <div class="btn-icon" onclick="insertClause('shoda')"><div class="icon-sq">📎</div>Shoda</div>
+                    <div class="btn-icon" onclick="insertClause('prevzal')"><div class="icon-sq">🤝</div>Převzal</div>
                 </div>
                 <div class="group-label">Právní doložky</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">👤</div>Fyzická osoba</div>
-                    <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">💼</div>Podnikatel</div>
-                    <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏢</div>Firma</div>
+                    <div class="btn-icon" onclick="insertEntity('fyzicka')"><div class="icon-sq">🧍</div>Fyzická osoba</div>
+                    <div class="btn-icon" onclick="insertEntity('podnikatel')"><div class="icon-sq">🏢</div>Podnikatel</div>
+                    <div class="btn-icon" onclick="insertEntity('firma')"><div class="icon-sq">🏭</div>Firma</div>
                 </div>
                 <div class="group-label">Identifikace</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📅</div>Tabulka</div>
-                    <div class="btn-icon" onclick="customAlert('Grafy a SmartArt...')"><div class="icon-sq">📊</div>Ilustrace</div>
+                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📊</div>Tabulka</div>
+                    <div class="btn-icon" onclick="insertIllustration()"><div class="icon-sq">🖼️</div>Ilustrace</div>
                 </div>
                 <div class="group-label">Objekty</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">🖼️</div>Obrázek</div>
+                    <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">📸</div>Obrázek</div>
                     <div class="btn-icon" onclick="insertLink()"><div class="icon-sq">🔗</div>Odkaz</div>
-                    <div class="btn-icon" onclick="customAlert('Záložky a křížové odkazy...')"><div class="icon-sq">🔖</div>Záložka</div>
+                    <div class="btn-icon" onclick="insertBookmark()"><div class="icon-sq">🔖</div>Záložka</div>
                 </div>
                 <div class="group-label">Propojení</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="customAlert('Editace záhlaví...')"><div class="icon-sq">🔝</div>Záhlaví</div>
-                    <div class="btn-icon" onclick="customAlert('Editace zápatí...')"><div class="icon-sq">🔙</div>Zápatí</div>
-                    <div class="btn-icon" onclick="customAlert('Číslování stránek...')"><div class="icon-sq">🔢</div>Číslo str.</div>
+                    <div class="btn-icon" onclick="editHeader()"><div class="icon-sq">🔼</div>Záhlaví</div>
+                    <div class="btn-icon" onclick="editFooter()"><div class="icon-sq">🔽</div>Zápatí</div>
+                    <div class="btn-icon" onclick="insertPageNumber()"><div class="icon-sq">🔟</div>Číslo str.</div>
                 </div>
                 <div class="group-label">Záhlaví & Zápatí</div>
             </div>
@@ -846,66 +847,61 @@
                 <div class="group-label">Pozadí stránky</div>
             </div>
         </div>
+
         <div id="tab-legal" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="searchAres()"><div class="icon-sq">🏢</div>ARES</div>
-                    <div class="btn-icon" onclick="showTariffCalc()"><div class="icon-sq">💰</div>Tarif</div>
-                    <div class="btn-icon" onclick="showFeeCalc()"><div class="icon-sq">📊</div>Poplatek</div>
+                    <div class="btn-icon" onclick="calculateFee()"><div class="icon-sq">🏷️</div>Poplatek</div>
+                    <div class="btn-icon" onclick="openDeadlineCalc()"><div class="icon-sq">⏳</div>Lhůtník</div>
+                    <div class="btn-icon" onclick="calculateInterests()"><div class="icon-sq">💹</div>Úroky</div>
                 </div>
-                <div class="group-label">Registry & Výpočty</div>
+                <div class="group-label">Soudy & Výpočty</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="showDeadlineCalc()"><div class="icon-sq">📅</div>Lhůtník</div>
-                    <div class="btn-icon" onclick="showInterestCalc()"><div class="icon-sq">📈</div>Úroky</div>
-                </div>
-                <div class="group-label">Termíny & Sankce</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
-                    <div class="btn-icon" onclick="insertSignBlock()"><div class="icon-sq">✒️</div>Blok podpisů</div>
-                    <div class="btn-icon" onclick="insertVisualSignature()"><div class="icon-sq" style="color:#2563eb;">✍️</div>Můj podpis</div>
-                    <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anonym</div>
+                    <div class="btn-icon" onclick="insertSignatureBlock()"><div class="icon-sq">✒️</div>Blok podpisů</div>
+                    <div class="btn-icon" onclick="insertMySignature()"><div class="icon-sq">✍️</div>Můj podpis</div>
+                    <div class="btn-icon" onclick="anonymizeSelection()"><div class="icon-sq">🛡️</div>Anonym</div>
                 </div>
                 <div class="group-label">Validace & Bezpečí</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="formatLegal('article')"><div class="icon-sq">📜</div>Článek</div>
-                    <div class="btn-icon" onclick="formatLegal('section')"><div class="icon-sq">§</div>Paragraf</div>
+                    <div class="btn-icon" onclick="insertArticle()"><div class="icon-sq">📑</div>Článek</div>
+                    <div class="btn-icon" onclick="insertParagraph()"><div class="icon-sq">❡</div>Paragraf</div>
                 </div>
                 <div class="group-label">Právní číslování</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertCite()"><div class="icon-sq">⚖️</div>Citace</div>
-                    <div class="btn-icon" onclick="formatLegal('section')"><div class="icon-sq">§</div>Znak §</div>
+                    <div class="btn-icon" onclick="insertCitation()"><div class="icon-sq">💬</div>Citace</div>
+                    <div class="btn-icon" onclick="insertSectionSign()"><div class="icon-sq">⚖️</div>Znak §</div>
                 </div>
                 <div class="group-label">Rychlé prvky</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="linkCaseLaw()"><div class="icon-sq">🔗</div>Judikatura</div>
+                    <div class="btn-icon" onclick="lookupCaseLaw()"><div class="icon-sq">🏛️</div>Judikatura</div>
                 </div>
                 <div class="group-label">Rešerše</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="sendToISDS()"><div class="icon-sq" style="color:#2563eb;">📬</div>Datová schránka</div>
-                    <div class="btn-icon" onclick="sendToPost()"><div class="icon-sq" style="color:#f59e0b;">📯</div>Dopis Online</div>
-                    <div class="btn-icon" onclick="requestESign()"><div class="icon-sq" style="color:#10b981;">✍️</div>E-podpis</div>
+                    <div class="btn-icon" onclick="openISDS()"><div class="icon-sq">📮</div>Datová schránka</div>
+                    <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Dopis Online</div>
+                    <div class="btn-icon" onclick="signDigital()"><div class="icon-sq">🔑</div>E-podpis</div>
                 </div>
                 <div class="group-label">Distribuce</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="showWorklog()"><div class="icon-sq">📊</div>Zapsat úkon</div>
-                    <div class="btn-icon" onclick="downloadWorklog()"><div class="icon-sq">📥</div>Exportovat</div>
+                    <div class="btn-icon" onclick="logTime()"><div class="icon-sq">⏰</div>Zapsat úkon</div>
+                    <div class="btn-icon" onclick="exportTimesheet()"><div class="icon-sq">📤</div>Exportovat</div>
                 </div>
                 <div class="group-label">Evidence práce</div>
             </div>
         </div>
+
         <div id="tab-layout" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
@@ -957,32 +953,32 @@
         <div id="tab-revize" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" id="btn-track-changes" onclick="toggleTrackChanges()"><div class="icon-sq">✍️</div>Sledovat změny</div>
-                    <div class="btn-icon" onclick="acceptAllChanges()"><div class="icon-sq" style="color:#10b981;">✅</div>Přijmout vše</div>
-                    <div class="btn-icon" onclick="rejectAllChanges()"><div class="icon-sq" style="color:#ef4444;">❌</div>Odmítnout vše</div>
+                    <div class="btn-icon" onclick="toggleTrackChanges()"><div class="icon-sq">🕵️</div>Sledovat změny</div>
+                    <div class="btn-icon" onclick="acceptAll()"><div class="icon-sq">✅</div>Přijmout vše</div>
+                    <div class="btn-icon" onclick="rejectAll()"><div class="icon-sq">❌</div>Odmítnout vše</div>
                 </div>
                 <div class="group-label">Sledování změn</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="showRedlines()"><div class="icon-sq" style="color:#ef4444;">🔍</div>Srovnat</div>
-                    <div class="btn-icon" onclick="showHistoryManager()"><div class="icon-sq">📜</div>Historie verzí</div>
-                    <div class="btn-icon" onclick="toggleCommentDrawer(true)"><div class="icon-sq">💬</div>Komentáře</div>
+                    <div class="btn-icon" onclick="compareVersions()"><div class="icon-sq">⚖️</div>Srovnat</div>
+                    <div class="btn-icon" onclick="showHistory()"><div class="icon-sq">🕰️</div>Historie verzí</div>
+                    <div class="btn-icon" onclick="toggleCommentDrawer(true)"><div class="icon-sq">🗨️</div>Komentáře</div>
                 </div>
                 <div class="group-label">Verze & Kontrola</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="validateDocument()"><div class="icon-sq" style="color:#2563eb;">🛡️</div>Prověřit text</div>
-                    <div class="btn-icon" onclick="scrubMetadata()"><div class="icon-sq" style="color:#f59e0b;">🧼</div>Vyčistit metadata</div>
+                    <div class="btn-icon" onclick="auditDocument()"><div class="icon-sq">🕵️‍♂️</div>Prověřit text</div>
+                    <div class="btn-icon" onclick="scrubMetadata()"><div class="icon-sq">🧽</div>Vyčistit metadata</div>
                     <div class="btn-icon" onclick="clearHighlights()"><div class="icon-sq">🧹</div>Vyčistit</div>
                 </div>
                 <div class="group-label">Závěrečná kontrola</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Kontrola pravopisu...')"><div class="icon-sq">✓</div>Pravopis</div>
-                    <div class="btn-icon" onclick="alert('Slovník synonym...')"><div class="icon-sq">📖</div>Tezaurus</div>
+                    <div class="btn-icon" onclick="alert('Kontrola pravopisu...')"><div class="icon-sq">🔤</div>Pravopis</div>
+                    <div class="btn-icon" onclick="alert('Slovník synonym...')"><div class="icon-sq">📚</div>Tezaurus</div>
                 </div>
                 <div class="group-label">Jazyk</div>
             </div>
