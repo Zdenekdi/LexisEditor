@@ -480,16 +480,46 @@ ipcMain.handle('import-zfo', async () => {
 
         // Extrakce základních metadat (jednoduchý regex pro demo/v3.5)
         const senderMatch = xmlContent.match(/<dmSender>(.*?)<\/dmSender>/);
+        const senderIdMatch = xmlContent.match(/<dbIDSender>(.*?)<\/dbIDSender>/);
         const subjectMatch = xmlContent.match(/<dmAnnotation>(.*?)<\/dmAnnotation>/);
         
+        // Extrakce příloh (jednoduchá verze pro demo)
+        const attachments = [];
+        const fileRegex = /<dmFile>([\s\S]*?)<\/dmFile>/g;
+        let fileMatch;
+        while ((fileMatch = fileRegex.exec(xmlContent)) !== null) {
+            const fileXml = fileMatch[1];
+            const nameMatch = fileXml.match(/<dmFileDescr>(.*?)<\/dmFileDescr>/);
+            const contentMatch = fileXml.match(/<dmEncodedContent>(.*?)<\/dmEncodedContent>/);
+            if (nameMatch && contentMatch) {
+                attachments.push({
+                    name: nameMatch[1],
+                    content: contentMatch[1], // Base64
+                    type: nameMatch[1].toLowerCase().endsWith('.pdf') ? 'pdf' : 'other'
+                });
+            }
+        }
+
         return { 
             success: true, 
             xml: xmlContent,
             sender: senderMatch ? senderMatch[1] : 'Neznámý odesílatel',
-            subject: subjectMatch ? subjectMatch[1] : 'Bez předmětu'
+            senderId: senderIdMatch ? senderIdMatch[1] : '',
+            subject: subjectMatch ? subjectMatch[1] : 'Bez předmětu',
+            attachments: attachments
         };
     } catch (error) {
         console.error('ZFO Import Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('import-pdf-base64', async (event, base64) => {
+    try {
+        const dataBuffer = Buffer.from(base64, 'base64');
+        const data = await pdf(dataBuffer);
+        return { success: true, text: data.text, pages: data.numpages };
+    } catch (error) {
         return { success: false, error: error.message };
     }
 });
