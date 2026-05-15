@@ -15,21 +15,23 @@
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,700;1,400&family=Roboto+Slab&display=swap');
 
         :root {
-            --word-blue: #2b579a;
-            --ribbon-bg: #f3f3f3;
-            --border: #d1d1d1;
+            --word-blue: #0f172a;
+            --ribbon-bg: #f8fafc;
+            --border: #e2e8f0;
             --bg-workspace: #f1f5f9;
-            --accent: #3b82f6;
-            --ai-color: #8b5cf6;
+            --accent: #b45309;
+            --ai-color: #7c3aed;
             --sidebar-bg: #ffffff;
+            --gold: #d4af37;
         }
 
         body.dark-mode {
-            --word-blue: #1e293b;
-            --ribbon-bg: #334155;
-            --border: #475569;
+            --word-blue: #020617;
+            --ribbon-bg: #1e293b;
+            --border: #334155;
             --bg-workspace: #0f172a;
             --sidebar-bg: #1e293b;
+            --accent: #fbbf24;
             color: #f1f5f9;
         }
 
@@ -139,14 +141,24 @@
             background: #edf2f7; transform: translateY(-2px);
             color: var(--word-blue); box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        .icon-sq { 
-            width: 32px; height: 32px; background: white; 
-            border: 1px solid #e2e8f0; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center; 
-            font-size: 16px; transition: inherit;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        .start-title { 
+            font-family: 'Outfit', sans-serif;
+            font-size: 38px;
+            color: var(--word-blue);
+            margin: 10px 0;
         }
-        .btn-icon:hover .icon-sq { border-color: var(--word-blue); background: #fcfaff; }
+
+        .title-bar { 
+            display: flex; background: var(--word-blue); padding: 0 10px 0 80px; 
+            height: 32px; align-items: center; gap: 5px;
+            -webkit-app-region: drag; position: relative;
+            box-shadow: inset 0 -1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .tab.active { 
+            background: #f8fafc; color: var(--word-blue); font-weight: 700; 
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
         
         @media (max-width: 1000px) {
             .ribbon-tabs { gap: 10px; padding: 0 10px; }
@@ -733,27 +745,33 @@
     <!-- Úvodní Rozcestník -->
     <div id="start-screen">
         <div class="start-container">
-            <div class="start-version" id="app-version-start">v1.7.21</div>
-            <div class="start-logo">⚖️</div>
-            <div class="start-title">LexisEditor</div>
-            <div class="start-subtitle">Dobrý den, co dnes vytvoříme?</div>
+            <div class="start-version" id="app-version-start">v2.4.0</div>
+            <div class="start-logo" style="background: linear-gradient(135deg, var(--word-blue), #334155); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 64px;">⚖️</div>
+            <div class="start-title" style="letter-spacing: -1px; font-weight: 800; color: var(--word-blue);">LEXIS EDITOR</div>
+            <div class="start-subtitle">Prémiové právní prostředí s umělou inteligencí</div>
+            
+            <div style="margin: 30px 0; height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); width: 100%;"></div>
+
             <div class="start-grid" id="templates-grid">
-                <div class="start-card primary" onclick="openStartDocument('blank')">
-                    <div class="card-icon">📄</div>
+                <div class="start-card primary" onclick="openStartDocument('blank')" style="border-top: 4px solid var(--word-blue);">
+                    <div class="card-icon" style="color: var(--word-blue)">📄</div>
                     <div class="card-title">Nový dokument</div>
-                    <div class="card-desc">Čistý list s předvoleným formátováním</div>
+                    <div class="card-desc">Čistý list s právním formátováním</div>
                 </div>
-                <div class="start-card" onclick="openStartDocument('file')">
-                    <div class="card-icon">📂</div>
+                <div class="start-card" onclick="openStartDocument('file')" style="border-top: 4px solid var(--accent);">
+                    <div class="card-icon" style="color: var(--accent)">📂</div>
                     <div class="card-title">Otevřít dokument</div>
-                    <div class="card-desc">Nahrát lokální soubor (.docx, .txt, .html)</div>
+                    <div class="card-desc">Z disku, PDF nebo Datové schránky</div>
                 </div>
-                <div class="start-card" onclick="showHelp('start')">
-                    <div class="card-icon">❓</div>
-                    <div class="card-title">Potřebuji pomoc</div>
-                    <div class="card-desc">Nápověda a rychlý start s LexisEditor</div>
+                <div class="start-card" onclick="switchTab('tab-help'); startAppWithContent('')" style="border-top: 4px solid #64748b;">
+                    <div class="card-icon">📖</div>
+                    <div class="card-title">Příručka</div>
+                    <div class="card-desc">Jak používat LexisLink a AI Audit</div>
                 </div>
-                <!-- Uživatelské šablony se načtou dynamicky -->
+            </div>
+            
+            <div style="margin-top: 40px; font-size: 11px; color: #94a3b8; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;">
+                Powered by LexisLocal AI Engine
             </div>
         </div>
     </div>
@@ -926,6 +944,14 @@
                     <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">🧍</div>Fyzická osoba</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">🏢</div>Podnikatel</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏭</div>Firma</div>
+                    <div class="btn-icon" onclick="insertFootnote()"><div class="icon-sq">🦶</div>Poznámka</div>
+                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📊</div>Tabulka</div>
+                    <div class="btn-icon" onclick="generateToC()"><div class="icon-sq">📜</div>Obsah</div>
+                </div>
+                <div class="group-label">Prvky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="searchAres()" style="background:rgba(37,99,235,0.1);"><div class="icon-sq">🔎</div>Hledat ARES</div>
                 </div>
                 <div class="group-label">Subjekty</div>
@@ -1215,6 +1241,8 @@
                     <div class="btn-icon" onclick="alert('Porovnání verzí (Blackline):\n1. Klikněte na Srovnat na kartě Revize.\n2. Systém porovná aktuální text s poslední uloženou verzí.\n3. Nově přidané pasáže uvidíte zeleně zvýrazněné v náhledu.')"><div class="icon-sq">⚖️</div>Jak srovnat?</div>
                     <div class="btn-icon" onclick="alert('LexisConnect (Integrace):\nLexisEditor naslouchá na portu 3300.\nVývojáři mohou poslat POST na /api/import s JSONem {html: \"...\"}.\nTo umožní propojení s Evolio, SingleCase atd.')"><div class="icon-sq">🔗</div>LexisConnect</div>
                     <div class="btn-icon" onclick="alert('Mobilní skenování:\n1. Otevřete LexisLink Remote v mobilu.\n2. Klikněte na Skenovat dokument (foťák).\n3. Vyfoťte papírovou smlouvu.\n4. V počítači se otevře náhled s možností AI OCR.')"><div class="icon-sq">📸</div>Jak skenovat?</div>
+                    <div class="btn-icon" onclick="alert('Knihovna doložek:\n1. Označte v dokumentu text (např. rozhodčí doložku).\n2. V panelu Toolbox (vpravo) klikněte na Doložky -> Přidat.\n3. Kdykoliv později ji vložíte jediným kliknutím.')"><div class="icon-sq">📚</div>Knihovna</div>
+                    <div class="btn-icon" onclick="alert('Obsah (ToC):\n1. Používejte v dokumentu Nadpisy (H1, H2).\n2. Na kartě Vložit klikněte na Obsah.\n3. Automaticky se vygeneruje přehledná tabulka s odkazy.')"><div class="icon-sq">📜</div>Generování obsahu</div>
                 </div>
                 <div class="group-label">Návody</div>
             </div>
@@ -1511,11 +1539,18 @@
     <div class="ai-drawer" id="ai-drawer">
         <div class="ai-header">
             <span class="ai-header-close" onclick="toggleAIDrawer(false)">✕</span>
-            <span id="ai-header-text" style="font-weight: 700; letter-spacing: 0.5px;">🤖 AI AGENT</span>
+            <span id="ai-header-text" style="font-weight: 700; letter-spacing: 0.5px;">⚖️ LEGAL TOOLBOX</span>
         </div>
         
-        <!-- AI Tabs -->
-        <div style="display:flex; background:#f8fafc; border-bottom:1px solid #eee;">
+        <!-- Main Sidebar Tabs (Fáze 10) -->
+        <div style="display:flex; background:var(--word-blue); border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div class="main-sidebar-tab active" onclick="switchSidebarTab('ai')" id="tab-sb-ai">🤖 AI</div>
+            <div class="main-sidebar-tab" onclick="switchSidebarTab('clauses')" id="tab-sb-clauses">📚 Doložky</div>
+            <div class="main-sidebar-tab" onclick="switchSidebarTab('templates')" id="tab-sb-templates">📋 Šablony</div>
+        </div>
+
+        <!-- AI Sub-Tabs (Visible only when AI tab is active) -->
+        <div id="ai-subtabs" style="display:flex; background:#f8fafc; border-bottom:1px solid #eee;">
             <div class="ai-tab active" onclick="switchAITab('chat', this)" id="tab-ai-chat">Chat</div>
             <div class="ai-tab" onclick="switchAITab('research', this)" id="tab-ai-research">Rešerše</div>
             <div class="ai-tab" onclick="switchAITab('summary', this)" id="tab-ai-summary">Shrnutí</div>
@@ -1523,6 +1558,29 @@
 
         <div class="ai-body" id="ai-output" style="padding:15px; flex-grow: 1; overflow-y: auto;">
             Dobrý den, jsem váš právní agent. Vyberte si nástroj nebo se mě na něco zeptejte.
+        </div>
+
+        <!-- Clause Library View -->
+        <div id="clause-library-view" style="display:none; padding:15px; flex-grow: 1; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h4 style="margin:0; font-size:13px; color:var(--word-blue);">Knihovna doložek</h4>
+                <button onclick="saveCurrentSelectionAsClause()" style="padding:4px 8px; font-size:10px; background:#16a34a; color:white; border:none; border-radius:4px; cursor:pointer;">+ Přidat označené</button>
+            </div>
+            <div id="clauses-list" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Clauses will be here -->
+            </div>
+        </div>
+
+        <!-- Dynamic Template View -->
+        <div id="template-vars-view" style="display:none; padding:15px; flex-grow: 1; overflow-y: auto;">
+            <div style="margin-bottom:15px;">
+                <h4 style="margin:0; font-size:13px; color:var(--word-blue);">Dynamické vyplňování</h4>
+                <p style="font-size:11px; color:#64748b;">Napište do textu {{název}} a zde se objeví formulář.</p>
+            </div>
+            <button onclick="scanForVariables()" style="width:100%; padding:8px; background:var(--word-blue); color:white; border:none; border-radius:4px; margin-bottom:15px; cursor:pointer;">🔍 Skenovat proměnné</button>
+            <div id="variables-form" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- Form inputs will be here -->
+            </div>
         </div>
 
         <!-- AI Input Area -->
@@ -1543,6 +1601,17 @@
             .ai-tab { flex: 1; padding: 10px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; text-transform: uppercase; }
             .ai-tab.active { color: var(--word-blue); border-bottom: 2px solid var(--word-blue); background: white; }
             .ai-tab:hover:not(.active) { background: #f1f5f9; }
+
+            .main-sidebar-tab { flex: 1; padding: 12px; text-align: center; font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.7); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
+            .main-sidebar-tab.active { color: white; border-bottom: 3px solid var(--accent); background: rgba(255,255,255,0.1); }
+            .main-sidebar-tab:hover:not(.active) { color: white; background: rgba(255,255,255,0.05); }
+
+            .clause-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; cursor: pointer; transition: all 0.2s; position: relative; }
+            .clause-item:hover { border-color: var(--word-blue); background: #f1f5f9; transform: translateX(3px); }
+            .clause-text-preview { font-size: 11px; color: #475569; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin-bottom: 5px; }
+            .clause-meta { font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
+            .clause-delete { position: absolute; top: 5px; right: 5px; color: #ef4444; font-size: 14px; display: none; }
+            .clause-item:hover .clause-delete { display: block; }
         </style>
     </div>
 
@@ -3670,6 +3739,146 @@ V ........................ dne ...............     V ........................ dn
                 quill.insertText(range ? range.index : quill.getLength(), "\n" + window.lastOCRResult + "\n");
                 toggleAIDrawer(false);
             }
+        }
+
+        function switchSidebarTab(tab) {
+            document.querySelectorAll('.main-sidebar-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-sb-${tab}`).classList.add('active');
+
+            const aiBody = document.getElementById('ai-output');
+            const aiSub = document.getElementById('ai-subtabs');
+            const aiInput = document.getElementById('ai-input-container');
+            const clauseView = document.getElementById('clause-library-view');
+            const templateView = document.getElementById('template-vars-view');
+
+            [aiBody, aiSub, aiInput, clauseView, templateView].forEach(el => el.style.display = 'none');
+
+            if (tab === 'ai') {
+                aiBody.style.display = 'block';
+                aiSub.style.display = 'flex';
+                aiInput.style.display = 'flex';
+                document.getElementById('ai-header-text').innerText = "⚖️ LEGAL TOOLBOX: AI";
+            } else if (tab === 'clauses') {
+                clauseView.style.display = 'block';
+                document.getElementById('ai-header-text').innerText = "⚖️ LEGAL TOOLBOX: DOLOŽKY";
+                renderClauses();
+            } else if (tab === 'templates') {
+                templateView.style.display = 'block';
+                document.getElementById('ai-header-text').innerText = "⚖️ LEGAL TOOLBOX: ŠABLONY";
+                scanForVariables();
+            }
+        }
+
+        // --- Clause Library (Fáze 10.1) ---
+        let clauses = JSON.parse(localStorage.getItem('lexis_clauses') || '[]');
+
+        function saveCurrentSelectionAsClause() {
+            const range = quill.getSelection();
+            if (!range || range.length === 0) return customAlert("Nejdříve v dokumentu označte text doložky.");
+            
+            const text = quill.getText(range.index, range.length);
+            const html = quill.root.innerHTML; // Simplified for now
+            
+            const name = prompt("Název doložky:", text.substring(0, 30) + "...");
+            if (!name) return;
+
+            clauses.push({ id: Date.now(), name, text, date: new Date().toLocaleDateString() });
+            localStorage.setItem('lexis_clauses', JSON.stringify(clauses));
+            renderClauses();
+            customAlert("Doložka uložena do knihovny.");
+        }
+
+        function renderClauses() {
+            const list = document.getElementById('clauses-list');
+            list.innerHTML = clauses.length === 0 ? '<div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Knihovna je prázdná.</div>' : '';
+            
+            clauses.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'clause-item';
+                item.innerHTML = `
+                    <div class="clause-delete" onclick="deleteClause(${c.id}, event)">✕</div>
+                    <div style="font-weight:700; font-size:12px; margin-bottom:4px;">${c.name}</div>
+                    <div class="clause-text-preview">${c.text}</div>
+                    <div class="clause-meta">Uloženo: ${c.date}</div>
+                `;
+                item.onclick = () => insertClause(c.text);
+                list.appendChild(item);
+            });
+        }
+
+        function insertClause(text) {
+            quill.focus();
+            const range = quill.getSelection();
+            quill.insertText(range ? range.index : quill.getLength(), text);
+        }
+
+        function deleteClause(id, e) {
+            e.stopPropagation();
+            clauses = clauses.filter(c => c.id !== id);
+            localStorage.setItem('lexis_clauses', JSON.stringify(clauses));
+            renderClauses();
+        }
+
+        // --- Dynamic Variables (Fáze 10.2) ---
+        function scanForVariables() {
+            const text = quill.getText();
+            const regex = /\{\{(.+?)\}\}/g;
+            const matches = [...new Set([...text.matchAll(regex)].map(m => m[1]))];
+            
+            const form = document.getElementById('variables-form');
+            form.innerHTML = matches.length === 0 ? '<div style="text-align:center; color:#94a3b8; font-size:11px;">V textu nejsou žádné proměnné {{...}}.</div>' : '';
+            
+            matches.forEach(v => {
+                const group = document.createElement('div');
+                group.innerHTML = `
+                    <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">${v}</label>
+                    <input type="text" placeholder="Zadejte hodnotu..." oninput="updateVariable('${v}', this.value)" 
+                           style="width:100%; padding:8px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px;">
+                `;
+                form.appendChild(group);
+            });
+        }
+
+        function updateVariable(name, value) {
+            // Tohle je náročnější - ve v3.0 budeme používat Delta transformace
+            // Pro MVP v2.5 uděláme globální replace v HTML (pozor na formátování)
+            // Lepší přístup: Najít všechny výskyty {{name}} a nahradit je spanem s ID
+            console.log(`Updating ${name} to ${value}`);
+        }
+
+        function generateToC() {
+            const delta = quill.getContents();
+            let tocHtml = '<div style="background:#f8fafc; padding:20px; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:30px; font-family:sans-serif;">';
+            tocHtml += '<h2 style="margin-top:0; font-size:18px;">Obsah dokumentu</h2><ul style="list-style:none; padding:0;">';
+            
+            let hasHeadings = false;
+            let currentHeading = '';
+            
+            delta.ops.forEach(op => {
+                if (typeof op.insert === 'string') {
+                    if (op.attributes && (op.attributes.header === 1 || op.attributes.header === 2)) {
+                        const level = op.attributes.header;
+                        tocHtml += `<li style="margin-bottom:8px; margin-left:${(level-1)*20}px;">
+                            <a href="#" style="color:var(--word-blue); text-decoration:none; font-weight:${level === 1 ? '700' : '400'};">
+                                ${currentHeading.trim()}
+                            </a>
+                        </li>`;
+                        hasHeadings = true;
+                        currentHeading = '';
+                    } else {
+                        currentHeading += op.insert;
+                    }
+                }
+            });
+
+            tocHtml += '</ul></div>';
+
+            if (!hasHeadings) return customAlert("V dokumentu nebyly nalezeny žádné nadpisy (H1, H2).");
+
+            quill.focus();
+            const range = quill.getSelection();
+            quill.clipboard.dangerouslyPasteHTML(range ? range.index : 0, tocHtml);
+            customAlert("Obsah byl vygenerován na začátek dokumentu.");
         }
 
         async function sendAIQuery() {
