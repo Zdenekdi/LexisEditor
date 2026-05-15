@@ -645,6 +645,62 @@
             white-space: nowrap;
             user-select: none;
         }
+        /* Audit Panel Styles */
+        .audit-item {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            transition: transform 0.1s;
+            cursor: pointer;
+            position: relative;
+        }
+        .audit-item:hover {
+            transform: translateX(3px);
+            border-color: var(--word-blue);
+        }
+        .audit-item-error {
+            border-left: 4px solid #ef4444;
+            background: #fffafb;
+        }
+        .audit-item-warning {
+            border-left: 4px solid #f59e0b;
+            background: #fffdfa;
+        }
+        .audit-item-info {
+            border-left: 4px solid #3b82f6;
+            background: #f8fbff;
+        }
+        .audit-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 10px;
+            color: #64748b;
+        }
+        .audit-fix-btn {
+            background: var(--word-blue);
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        #audit-count-badge {
+            background: #ef4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 5px;
+            display: none;
+        }
+
         /* --- ERROR HIGHLIGHTING --- */
         .error-highlight {
             background: #fef08a;
@@ -1345,6 +1401,18 @@
                     <div id="footnotes-list" style="padding: 5px 0;">
                         <p style="font-size: 11px; color: #64748b; font-style: italic;">Žádné poznámky pod čarou.</p>
                     </div>
+                </div>
+
+
+                <!-- Audit & Linter Section (v2.0 Phase 2) -->
+                <div class="panel-section" id="audit-section">
+                    <div class="panel-title" style="display:flex; align-items:center;">
+                        🔎 PRÁVNÍ LINTER <span id="audit-count-badge">0</span>
+                    </div>
+                    <div id="audit-list" style="padding: 5px 0;">
+                        <p style="font-size: 11px; color: #64748b; font-style: italic; text-align: center;">Žádné chyby nenalezeny. Spusťte hloubkovou kontrolu.</p>
+                    </div>
+                    <button onclick="runFinalAudit()" style="width:100%; padding:8px; background:white; border:1px solid var(--word-blue); color:var(--word-blue); border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='var(--word-blue)'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='var(--word-blue)';">⚡ Spustit hloubkovou kontrolu</button>
                 </div>
 
                 <div class="panel-section">
@@ -2751,15 +2819,19 @@ V ........................ dne ...............     V ........................ dn
 
         function checkHierarchy() {
             const text = quill.getText();
+            let results = [];
             
             // 1. Kontrola pořadí §
             const matches = [...text.matchAll(/§\s*(\d+)/g)];
             let lastNum = 0;
-            let errors = [];
             matches.forEach(m => {
                 const num = parseInt(m[1]);
-                if (num <= lastNum) errors.push(`⚠️ Chyba v pořadí u § ${num}`);
-                if (num > lastNum + 1) errors.push(`❓ Možná chybějící sekce mezi § ${lastNum} a § ${num}`);
+                if (num <= lastNum) {
+                    results.push({ type: 'error', msg: `Chyba v pořadí u § ${num}`, index: m.index, length: m[0].length });
+                }
+                if (num > lastNum + 1) {
+                    results.push({ type: 'warning', msg: `Možná chybějící sekce mezi § ${lastNum} a § ${num}`, index: m.index, length: m[0].length });
+                }
                 lastNum = num;
             });
 
@@ -2770,44 +2842,39 @@ V ........................ dne ...............     V ........................ dn
             refMatches.forEach(m => {
                 const refNum = m[1].toUpperCase();
                 if (!existingArticles.includes(refNum)) {
-                    errors.push(`❌ Odkaz na neexistující ${m[0]}`);
+                    results.push({ type: 'error', msg: `Odkaz na neexistující ${m[0]}`, index: m.index, length: m[0].length });
                 }
             });
 
-            if (errors.length > 0) {
-                customAlert("🔍 Kontrola dokumentu nalezla nedostatky:\n\n" + errors.join('\n'));
-            } else {
-                customAlert("✅ Dokument je vnitřně konzistentní. Všechny paragrafy i odkazy na články jsou v pořádku.");
-            }
+            return results;
         }
 
         function checkTerminology() {
             const text = quill.getText();
+            let results = [];
             // Najdeme pojmy v uvozovkách (např. "Prodávající")
             const definitionMatches = [...text.matchAll(/["„“]([A-Z][a-z-ěščřžýáíéůú]+)["„“]/g)];
             const definedTerms = [...new Set(definitionMatches.map(m => m[1]))];
             
-            if (definedTerms.length === 0) {
-                return customAlert("V dokumentu nebyly nalezeny žádné definované pojmy (slova v uvozovkách začínající velkým písmenem).");
-            }
+            if (definedTerms.length === 0) return [];
 
-            let issues = [];
             definedTerms.forEach(term => {
                 // Hledáme výskyty stejného slova, ale s malým písmenem na začátku
                 const lowerTerm = term.charAt(0).toLowerCase() + term.slice(1);
                 const regex = new RegExp(`\\b${lowerTerm}\\b`, 'g');
-                const matches = text.match(regex);
-                
-                if (matches) {
-                    issues.push(`⚠️ Pojem "${term}" se vyskytuje ${matches.length}x s malým písmenem ("${lowerTerm}").`);
+                let match;
+                while ((match = regex.exec(text)) !== null) {
+                    results.push({ 
+                        type: 'warning', 
+                        msg: `Pojem "${term}" by měl začínat velkým písmenem.`, 
+                        index: match.index, 
+                        length: match[0].length,
+                        fix: term
+                    });
                 }
             });
 
-            if (issues.length > 0) {
-                customAlert("🔍 Terminologická kontrola nalezla nekonzistence:\n\n" + issues.join('\n') + "\n\nPrávní dokumenty by měly definované pojmy používat vždy s velkým písmenem.");
-            } else {
-                customAlert(`✅ Terminologie je v pořádku. Všech ${definedTerms.length} definovaných pojmů je používáno konzistentně s velkým písmenem.`);
-            }
+            return results;
         }
 
         window.checkTerminology = checkTerminology;
@@ -2844,22 +2911,96 @@ V ........................ dne ...............     V ........................ dn
         window.startMailMerge = startMailMerge;
 
         function runFinalAudit() {
-            document.getElementById('loader-text').innerText = "Provádím hloubkovou analýzu dokumentu...";
-            document.getElementById('loader-overlay').style.display = 'flex';
+            const loaderOverlay = document.getElementById('loader-overlay');
+            const loaderText = document.getElementById('loader-text');
+            
+            if (loaderOverlay) {
+                loaderText.innerText = "Provádím hloubkovou analýzu dokumentu...";
+                loaderOverlay.style.display = 'flex';
+            }
             
             setTimeout(() => {
-                document.getElementById('loader-overlay').style.display = 'none';
+                if (loaderOverlay) loaderOverlay.style.display = 'none';
                 
-                // Zde bychom mohli zachytit výstupy z jednotlivých funkcí
-                // Pro demo jen spustíme po sobě nebo ukážeme sumář
-                customAlert("🔍 FINÁLNÍ AUDIT DOKONČEN\n\n- Hierarchie a odkazy: OK\n- Terminologie: 2 upozornění\n- Lhůty: 1 nově detekovaná\n\nPodrobnosti naleznete v sidebaru.");
-                checkHierarchy();
-                checkTerminology();
-                scanDeadlines();
-            }, 1200);
+                let allResults = [];
+                allResults = allResults.concat(checkHierarchy());
+                allResults = allResults.concat(checkTerminology());
+                
+                // Add typo checks from previous version logic
+                const text = quill.getText();
+                const typoTerms = [
+                    { reg: /směnka/gi, msg: 'Obsahuje slovo "směnka". Ověřte náležitosti dle zákona.' },
+                    { reg: /rozhodčí doložka/gi, msg: 'Obsahuje rozhodčí doložku. Doporučujeme doložku Lexis.' }
+                ];
+                typoTerms.forEach(item => {
+                    let match;
+                    while ((match = item.reg.exec(text)) !== null) {
+                        allResults.push({ type: 'info', msg: item.msg, index: match.index, length: match[0].length });
+                    }
+                });
+
+                renderAuditResults(allResults);
+                
+                if (allResults.length > 0) {
+                    customAlert(`🔍 Finální audit dokončen. Nalezeno ${allResults.length} upozornění. Podrobnosti v levém panelu.`);
+                } else {
+                    customAlert("✅ Finální audit: Dokument je v perfektním stavu.");
+                }
+            }, 800);
+        }
+
+        function renderAuditResults(results) {
+            const list = document.getElementById('audit-list');
+            const badge = document.getElementById('audit-count-badge');
+            
+            if (results.length === 0) {
+                list.innerHTML = '<p style="font-size: 11px; color: #64748b; font-style: italic; text-align: center;">Žádné chyby nenalezeny.</p>';
+                badge.style.display = 'none';
+                return;
+            }
+
+            badge.innerText = results.length;
+            badge.style.display = 'inline-block';
+
+            list.innerHTML = results.map((res, i) => `
+                <div class="audit-item audit-item-${res.type}" onclick="jumpToAuditError(${res.index}, ${res.length})">
+                    <div style="font-weight:700; margin-bottom:2px;">${res.type === 'error' ? '❌' : (res.type === 'warning' ? '⚠️' : 'ℹ️')} ${res.type.toUpperCase()}</div>
+                    <div style="color:#1e293b;">${res.msg}</div>
+                    ${res.fix ? `<button class="audit-fix-btn" onclick="event.stopPropagation(); applyAuditFix(${i}, ${res.index}, ${res.length}, '${res.fix}')">Opravit na "${res.fix}"</button>` : ''}
+                    <div class="audit-meta">
+                        <span>Pozice: ${res.index}</span>
+                        <span>Klikněte pro přechod</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Save results to window for the fix button
+            window.currentAuditResults = results;
+        }
+
+        function jumpToAuditError(index, length) {
+            quill.setSelection(index, length, 'user');
+            // Zvýraznění na chvíli
+            quill.formatText(index, length, { 'background': '#fde68a' });
+            setTimeout(() => {
+                quill.formatText(index, length, { 'background': false });
+            }, 2000);
+        }
+
+        function applyAuditFix(resultIndex, index, length, fixText) {
+            quill.deleteText(index, length);
+            quill.insertText(index, fixText);
+            
+            // Remove from list and re-render
+            window.currentAuditResults.splice(resultIndex, 1);
+            renderAuditResults(window.currentAuditResults);
+            
+            customAlert("Oprava byla aplikována.");
         }
 
         window.runFinalAudit = runFinalAudit;
+        window.jumpToAuditError = jumpToAuditError;
+        window.applyAuditFix = applyAuditFix;
 
         function openPoweOfAttorneyDialog() {
             toggleAIDrawer(true);
@@ -3941,6 +4082,7 @@ V ........................ dne ...............     V ........................ dn
                     <p><b>3. Tvorba polí:</b> Označte jakýkoliv text a stiskněte <b>Cmd/Ctrl + Shift + P</b> pro vytvoření nového pole.</p>
                     <p><b>4. Právní preciznost:</b> V záložce <b>Právní nástroje</b> použijte 'Odkazovat zákony' pro automatické prolinkování citací (§, zákony) na portál Zákony pro lidi.</p>
                     <p><b>5. Rejstříky:</b> V záložce <b>Reference</b> můžete vygenerovat profesionální 'Rejstřík citací' rozdělený na předpisy a judikaturu.</p>
+                    <p><b>6. Inteligentní Linter:</b> V levém panelu v sekci <b>Právní Linter</b> najdete automatickou kontrolu terminologie a vnitřních odkazů. Kliknutím na 'Opravit' systém sám sjednotí psaní pojmů.</p>
                 </div>`;
             } else if (topic === 'keys') {
                 title = "⌨️ Klávesové zkratky";
