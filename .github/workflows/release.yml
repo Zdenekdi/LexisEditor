@@ -31,12 +31,15 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Run tests
+        run: npm test
+
       - name: Build and Publish Electron App
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            npx electron-builder --win --x64 --publish always
+            npx electron-builder --win --x64 --publish always -c.releaseInfo.releaseNotes=""
           else
-            npx electron-builder --mac --arm64 --publish always
+            npx electron-builder --mac --arm64 --publish always -c.releaseInfo.releaseNotes=""
           fi
         shell: bash
         env:
