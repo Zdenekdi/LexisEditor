@@ -1,7 +1,7 @@
 {
   "name": "lexiseditor",
   "productName": "LexisEditor",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Zdenekdi/LexisEditor.git"
