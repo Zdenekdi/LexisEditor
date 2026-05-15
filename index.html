@@ -111,13 +111,17 @@
         .tool-groups-container { 
             display: none; padding: 12px 20px; gap: 30px; background: #f8fafc;
             min-height: 95px; border-bottom: 1px solid var(--border);
+            overflow-x: auto; white-space: nowrap;
+            -ms-overflow-style: none; scrollbar-width: none;
         }
+        .tool-groups-container::-webkit-scrollbar { display: none; }
         .tool-groups-container.active { display: flex; animation: fadeIn 0.2s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
         .tool-group { 
             display: flex; flex-direction: column; align-items: center; 
             border-right: 1px solid #e2e8f0; padding-right: 25px;
+            flex-shrink: 0;
         }
         .tool-group:last-child { border-right: none; }
         .icons { display: flex; gap: 12px; align-items: center; flex-grow: 1; }
@@ -422,11 +426,15 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 9999; font-family: 'Inter', sans-serif;
             transition: opacity 0.5s ease;
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
         }
         .start-container {
             background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px);
             padding: 50px; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05);
             text-align: center; max-width: 800px; width: 90%; border: 1px solid rgba(255,255,255,0.4);
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
         }
         .start-logo {
             font-size: 48px; margin-bottom: 20px;
@@ -448,6 +456,8 @@
             background: white; padding: 30px 20px; border-radius: 16px; border: 1px solid #e2e8f0;
             cursor: pointer; transition: all 0.2s ease;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
         }
         .start-card:hover {
             transform: translateY(-5px); box-shadow: 0 10px 25px rgba(37, 99, 235, 0.15);
@@ -519,10 +529,21 @@
 </head>
 <body id="main-body">
 
+    <!-- Biometrický Zámek (v1.7.21) -->
+    <div id="lock-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:99999; display:none; align-items:center; justify-content:center; flex-direction:column; font-family:'Inter',sans-serif;">
+        <div style="font-size:60px; margin-bottom:20px;">🔒</div>
+        <div style="font-weight:700; font-size:24px; color:#1e293b; margin-bottom:10px;">LexisEditor je uzamčen</div>
+        <div style="color:#64748b; margin-bottom:30px; text-align:center; max-width:400px; line-height:1.5;">
+            Pro přístup k Vašim dokumentům použijte Touch ID.<br>
+            <span style="font-size:11px; color:#94a3b8; display:block; margin-top:15px;">(Pokud Mac zobrazí šedý dialog Klíčenky, klikněte na <b>"Vždy povolit"</b> pro trvalé skrytí)</span>
+        </div>
+        <button id="unlock-btn" onclick="requestStartupUnlock()" style="padding:12px 24px; background:#2563eb; color:white; border:none; border-radius:12px; font-weight:600; cursor:pointer; box-shadow:0 10px 20px rgba(37,99,235,0.2); transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Odemknout prstem ☝️</button>
+    </div>
+
     <!-- Úvodní Rozcestník -->
     <div id="start-screen">
         <div class="start-container">
-            <div class="start-version" id="app-version-start">v1.3.0</div>
+            <div class="start-version" id="app-version-start">v1.7.21</div>
             <div class="start-logo">⚖️</div>
             <div class="start-title">LexisEditor</div>
             <div class="start-subtitle">Dobrý den, co dnes vytvoříme?</div>
@@ -1226,6 +1247,7 @@
 
     <script>
         let customTemplatesCache = {};
+        let isTrackChangesActive = false;
 
         async function loadDynamicTemplates() {
             if (!window.electronAPI || !window.electronAPI.getTemplates) return;
@@ -1233,8 +1255,8 @@
             
             try {
                 customTemplatesCache = await window.electronAPI.getTemplates();
-                // Vyčistíme staré šablony (necháme jen první dvě statické karty)
-                const staticCards = Array.from(grid.children).slice(0, 2);
+                // Vyčistíme staré šablony (necháme první tři statické karty: Nový, Otevřít, Pomoc)
+                const staticCards = Array.from(grid.children).slice(0, 3);
                 grid.innerHTML = '';
                 staticCards.forEach(c => grid.appendChild(c));
 
@@ -1261,6 +1283,30 @@
                 const verEl = document.getElementById('app-version-start');
                 if (verEl) verEl.innerText = `v${ver}`;
             }
+            
+            // Biometrický zámek při startu
+            if (window.electronAPI && window.electronAPI.authenticateBiometric) {
+                const lock = document.getElementById('lock-screen');
+                lock.style.display = 'flex';
+                requestStartupUnlock();
+            } else {
+                finishInit();
+            }
+        }
+
+        async function requestStartupUnlock() {
+            const result = await window.electronAPI.authenticateBiometric("Odemčení aplikace LexisEditor");
+            if (result.success) {
+                const lock = document.getElementById('lock-screen');
+                lock.style.opacity = '0';
+                setTimeout(() => {
+                    lock.style.display = 'none';
+                    finishInit();
+                }, 400);
+            }
+        }
+
+        function finishInit() {
             loadDynamicTemplates();
             if (typeof renderDeadlines === 'function') renderDeadlines();
             if (typeof loadIntegrationSettings === 'function') loadIntegrationSettings();
@@ -1438,8 +1484,6 @@
         Quill.register(InsertionBlot);
         Quill.register(DeletionBlot);
 
-        let isTrackChangesActive = false;
-
         function toggleTrackChanges() {
             isTrackChangesActive = !isTrackChangesActive;
             const btn = document.getElementById('btn-track-changes');
@@ -1545,8 +1589,6 @@
                 quill.formatLine(range.index, range.length, formatName, true);
             }
         }
-
-        var quill = new Quill('#editor', { theme: 'snow', modules: { toolbar: false } });
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab').forEach(t => {
@@ -1838,6 +1880,7 @@
                 }
             };
         }
+        function sendToSigni() {
             customPrompt("Zadejte e-mail klienta pro elektronický podpis:", "", async (email) => {
                 if (!email || !email.includes('@')) return customAlert("Neplatný e-mail.");
                 
@@ -3789,7 +3832,8 @@ V ........................ dne ...............     V ........................ dn
                             <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-pos" ${profile.h_pos !== false ? 'checked' : ''}> Pozice</label>
                             <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-office" ${profile.h_office !== false ? 'checked' : ''}> Kancelář</label>
                             <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-addr" ${profile.h_addr !== false ? 'checked' : ''}> Adresa</label>
-                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-ico" ${profile.h_ico !== false ? 'checked' : ''}> IČO a ČAK</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-ico" ${profile.h_ico !== false ? 'checked' : ''}> IČO</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-cak" ${profile.h_cak !== false ? 'checked' : ''}> Ev. č. ČAK</label>
                         </div>
                     <div style="margin-bottom:20px;">
                         <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:8px;">Vizuální Podpis / Razítko</label>
@@ -3807,8 +3851,15 @@ V ........................ dne ...............     V ........................ dn
                         <div style="background:#f0f9ff; padding:15px; border-radius:8px; border:1px solid #bae6fd;">
                             <div style="display:flex; gap:10px; margin-bottom:10px;">
                                 <input type="text" id="isds-login" placeholder="Přihlašovací jméno (Login)" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                                <input type="password" id="isds-pass" placeholder="Heslo" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                                <div style="flex:1; position:relative;">
+                                    <input type="password" id="isds-pass" placeholder="Heslo" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+                                    <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:8px; align-items:center;">
+                                        <button onclick="useTouchID('isds-pass', 'isds')" title="Vyplnit pomocí Touch ID" style="border:none; background:none; cursor:pointer; font-size:16px; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">☝️</button>
+                                        <button onclick="togglePassword('isds-pass')" style="border:none; background:none; cursor:pointer; font-size:16px;">👁️</button>
+                                    </div>
+                                </div>
                             </div>
+                            <div id="isds-status" style="font-size:11px; margin-bottom:10px; display:none;"></div>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <select id="isds-env" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:white;">
                                     <option value="production">Produkční prostředí (Ostré)</option>
@@ -3825,9 +3876,20 @@ V ........................ dne ...............     V ........................ dn
                         <div style="background:#fff7ed; padding:15px; border-radius:8px; border:1px solid #ffedd5;">
                             <div style="display:flex; gap:10px; margin-bottom:10px;">
                                 <input type="text" id="post-login" placeholder="Klientské číslo / Login" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
-                                <input type="password" id="post-pass" placeholder="API Heslo" style="flex:1; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                                <div style="flex:1; position:relative;">
+                                    <input type="password" id="post-pass" placeholder="API Heslo" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+                                    <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:8px; align-items:center;">
+                                        <button onclick="useTouchID('post-pass', 'post')" title="Vyplnit pomocí Touch ID" style="border:none; background:none; cursor:pointer; font-size:16px; opacity:0.7; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">☝️</button>
+                                        <button onclick="togglePassword('post-pass')" style="border:none; background:none; cursor:pointer; font-size:16px;">👁️</button>
+                                    </div>
+                                </div>
                             </div>
-                            <div style="display:flex; justify-content:flex-end;">
+                            <div id="post-status" style="font-size:11px; margin-bottom:10px; display:none;"></div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <select id="post-env" style="padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:white;">
+                                    <option value="production">Produkční prostředí</option>
+                                    <option value="sandbox">Testovací (Sandbox ČP)</option>
+                                </select>
                                 <button id="btn-test-post" style="padding:8px 16px; background:#f59e0b; color:white; border:none; border-radius:6px; cursor:pointer; font-size:11px; font-weight:600;">Ověřit účet u ČP</button>
                             </div>
                         </div>
@@ -3849,12 +3911,36 @@ V ........................ dne ...............     V ........................ dn
             document.getElementById('close-profile').onclick = close;
             document.getElementById('prof-cancel').onclick = close;
 
+            window.useTouchID = async (inputId, type) => {
+                if (!window.electronAPI || !window.electronAPI.authenticateBiometric) return;
+                
+                const result = await window.electronAPI.authenticateBiometric(`Ověření pro automatické vyplnění hesla k ${type === 'isds' ? 'Datové schránce' : 'České poště'}`);
+                if (result.success) {
+                    const configFunc = type === 'isds' ? window.electronAPI.getIsdsConfig : window.electronAPI.getPostConfig;
+                    const config = await configFunc();
+                    if (config.hasConfig) {
+                        document.getElementById(inputId).value = config.password;
+                        const statusEl = document.getElementById(`${type}-status`);
+                        if (statusEl) {
+                            statusEl.style.display = 'block';
+                            statusEl.style.color = '#16a34a';
+                            statusEl.innerText = "✨ Heslo úspěšně vyplněno pomocí Touch ID";
+                            setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                        }
+                    } else {
+                        customAlert("Zatím nemáte uloženo žádné heslo. Zadejte ho ručně a uložte profil.");
+                    }
+                } else if (result.error !== 'User canceled') {
+                    customAlert(`Chyba Touch ID: ${result.error}`);
+                }
+            };
+
             // Načtení ISDS konfigurace z backendu
             if (window.electronAPI && window.electronAPI.getIsdsConfig) {
                 window.electronAPI.getIsdsConfig().then(config => {
                     if (config.hasConfig) {
                         document.getElementById('isds-login').value = config.login;
-                        document.getElementById('isds-pass').value = config.password;
+                        // Heslo schválně nevyplňujeme automaticky, ale nabízíme Touch ID
                         document.getElementById('isds-env').value = config.environment;
                     }
                 });
@@ -3865,7 +3951,8 @@ V ........................ dne ...............     V ........................ dn
                 window.electronAPI.getPostConfig().then(config => {
                     if (config.hasConfig) {
                         document.getElementById('post-login').value = config.login;
-                        document.getElementById('post-pass').value = config.password;
+                        // Heslo schválně nevyplňujeme automaticky, ale nabízíme Touch ID
+                        if (document.getElementById('post-env')) document.getElementById('post-env').value = config.environment || 'production';
                     }
                 });
             }
@@ -3900,6 +3987,55 @@ V ........................ dne ...............     V ........................ dn
                 customAlert(`✅ Účet '${login}' u České pošty byl úspěšně ověřen.\\n\\nNyní můžete odesílat fyzické dopisy přímo z editoru.`);
             };
 
+            window.togglePassword = (id) => {
+                const el = document.getElementById(id);
+                el.type = el.type === 'password' ? 'text' : 'password';
+            };
+
+            document.getElementById('btn-test-isds').onclick = async () => {
+                const login = document.getElementById('isds-login').value;
+                const pass = document.getElementById('isds-pass').value;
+                const env = document.getElementById('isds-env').value;
+                const statusEl = document.getElementById('isds-status');
+                
+                if (!login || !pass) return customAlert("Zadejte jméno a heslo.");
+                
+                statusEl.style.display = 'block';
+                statusEl.style.color = '#2563eb';
+                statusEl.innerText = "⏳ Ověřování spojení...";
+                
+                const result = await window.electronAPI.testIsdsConnection({ login, pass, env });
+                if (result.success) {
+                    statusEl.style.color = '#16a34a';
+                    statusEl.innerText = `✅ Spojení OK: ${result.owner || 'Uživatel ověřen'}`;
+                } else {
+                    statusEl.style.color = '#dc2626';
+                    statusEl.innerText = `❌ Chyba: ${result.error}`;
+                }
+            };
+
+            document.getElementById('btn-test-post').onclick = async () => {
+                const login = document.getElementById('post-login').value;
+                const pass = document.getElementById('post-pass').value;
+                const env = document.getElementById('post-env').value;
+                const statusEl = document.getElementById('post-status');
+                
+                if (!login || !pass) return customAlert("Zadejte klientské číslo a API heslo.");
+                
+                statusEl.style.display = 'block';
+                statusEl.style.color = '#f59e0b';
+                statusEl.innerText = "⏳ Ověřování účtu u ČP...";
+                
+                const result = await window.electronAPI.testPostConnection({ login, pass, env });
+                if (result.success) {
+                    statusEl.style.color = '#16a34a';
+                    statusEl.innerText = `✅ Účet ČP aktivní: ${result.info || 'Ověřeno'}`;
+                } else {
+                    statusEl.style.color = '#dc2626';
+                    statusEl.innerText = `❌ Chyba: ${result.error}`;
+                }
+            };
+
             document.getElementById('prof-save').onclick = async () => {
                 const data = {
                     name: document.getElementById('prof-name').value,
@@ -3913,7 +4049,8 @@ V ........................ dne ...............     V ........................ dn
                     h_pos: document.getElementById('h-pos').checked,
                     h_office: document.getElementById('h-office').checked,
                     h_addr: document.getElementById('h-addr').checked,
-                    h_ico: document.getElementById('h-ico').checked
+                    h_ico: document.getElementById('h-ico').checked,
+                    h_cak: document.getElementById('h-cak').checked
                 };
                 
                 // If a new signature was uploaded, save it. Otherwise keep the old one.
@@ -3940,7 +4077,8 @@ V ........................ dne ...............     V ........................ dn
                 if (window.electronAPI && window.electronAPI.savePostConfig) {
                     await window.electronAPI.savePostConfig({
                         login: document.getElementById('post-login').value,
-                        password: document.getElementById('post-pass').value
+                        password: document.getElementById('post-pass').value,
+                        environment: document.getElementById('post-env').value
                     });
                 }
 
@@ -3964,12 +4102,10 @@ V ........................ dne ...............     V ........................ dn
                 if (document.getElementById('h-name').checked && p.name) lines.push(`${p.title ? p.title + ' ' : ''}${p.name}`);
                 if (document.getElementById('h-pos').checked && p.position) lines.push(`<span style="font-size:12px; color:#64748b;">${p.position}</span>`);
                 if (document.getElementById('h-addr').checked && p.address) lines.push(p.address);
-                if (document.getElementById('h-ico').checked) {
-                    let icoLine = [];
-                    if (p.ico) icoLine.push(`IČO: ${p.ico}`);
-                    if (p.cak) icoLine.push(`ev. č. ČAK: ${p.cak}`);
-                    if (icoLine.length > 0) lines.push(icoLine.join(', '));
-                }
+                let icoParts = [];
+                if (document.getElementById('h-ico').checked && p.ico) icoParts.push(`IČO: ${p.ico}`);
+                if (document.getElementById('h-cak').checked && p.cak) icoParts.push(`ev. č. ČAK: ${p.cak}`);
+                if (icoParts.length > 0) lines.push(icoParts.join(', '));
 
                 const html = `
                     <div style="border-bottom: 2px solid var(--word-blue); padding-bottom: 10px; margin-bottom: 20px; font-family: 'Inter', sans-serif;">

@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
     getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
     savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
-    getPostConfig: () => ipcRenderer.invoke('get-post-config')
+    getPostConfig: () => ipcRenderer.invoke('get-post-config'),
+    testIsdsConnection: (creds) => ipcRenderer.invoke('test-isds-connection', creds),
+    testPostConnection: (creds) => ipcRenderer.invoke('test-post-connection', creds),
+    authenticateBiometric: (reason) => ipcRenderer.invoke('authenticate-biometric', reason)
 });

@@ -1,10 +1,32 @@
-const { app, BrowserWindow, ipcMain, dialog, safeStorage } = require('electron');
-const { autoUpdater } = require('electron-updater');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const HTMLToDOCX = require('html-to-docx');
+const axios = null; // Removed in favor of native fetch
 
 let mainWindow;
+
+// --- BIOMETRIC / TOUCH ID SUPPORT ---
+ipcMain.handle('authenticate-biometric', async (event, reason) => {
+    if (process.platform !== 'darwin') return { success: false, error: 'Biometrika je dostupná pouze na macOS.' };
+    
+    try {
+        if (!systemPreferences.canPromptTouchID()) {
+            return { success: false, error: 'Touch ID není na tomto zařízení dostupné nebo nastavené.' };
+        }
+        
+        await systemPreferences.promptTouchID(reason || 'Ověření pro přístup k zabezpečeným údajům');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+let autoUpdater;
+try {
+    autoUpdater = require('electron-updater').autoUpdater;
+} catch (e) {
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -32,30 +54,29 @@ app.whenReady().then(() => {
     });
 
     // --- AUTO-UPDATER LOGIC ---
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    
-    // Disable strict SSL in case of local testing proxies, but usually fine
-    // Nastavení logování pro lepší debug (pokud by bylo potřeba)
-    
-    autoUpdater.checkForUpdatesAndNotify().catch(e => console.error("Update error: ", e));
+    if (autoUpdater) {
+        autoUpdater.autoDownload = true;
+        autoUpdater.autoInstallOnAppQuit = true;
+        
+        autoUpdater.checkForUpdatesAndNotify().catch(e => console.error("Update error: ", e));
 
-    autoUpdater.on('update-available', () => {
-        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'available' });
-    });
+        autoUpdater.on('update-available', () => {
+            if (mainWindow) mainWindow.webContents.send('update-message', { type: 'available' });
+        });
 
-    autoUpdater.on('download-progress', (progressObj) => {
-        let percent = Math.round(progressObj.percent);
-        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'progress', percent: percent });
-    });
+        autoUpdater.on('download-progress', (progressObj) => {
+            let percent = Math.round(progressObj.percent);
+            if (mainWindow) mainWindow.webContents.send('update-message', { type: 'progress', percent: percent });
+        });
 
-    autoUpdater.on('update-downloaded', () => {
-        if (mainWindow) mainWindow.webContents.send('update-message', { type: 'downloaded' });
-    });
+        autoUpdater.on('update-downloaded', () => {
+            if (mainWindow) mainWindow.webContents.send('update-message', { type: 'downloaded' });
+        });
+    }
 });
 
 ipcMain.on('install-update', () => {
-    autoUpdater.quitAndInstall();
+    if (autoUpdater) autoUpdater.quitAndInstall();
 });
 
 // IPC Handler pro získání verze aplikace z package.json
@@ -297,7 +318,8 @@ ipcMain.handle('save-post-config', async (event, config) => {
         const encryptedPassword = safeStorage.encryptString(config.password);
         const configToSave = {
             login: config.login,
-            password: encryptedPassword.toString('base64')
+            password: encryptedPassword.toString('base64'),
+            environment: config.environment || 'production'
         };
         fs.writeFileSync(postConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
         return { success: true };
@@ -315,6 +337,7 @@ ipcMain.handle('get-post-config', async () => {
             return {
                 login: rawData.login,
                 password: decryptedPassword,
+                environment: rawData.environment || 'production',
                 hasConfig: true
             };
         }
@@ -322,4 +345,70 @@ ipcMain.handle('get-post-config', async () => {
         console.error('Chyba při načítání Post konfigurace:', e);
     }
     return { hasConfig: false };
+});
+
+// --- ISDS CONNECTION TEST ---
+ipcMain.handle('test-isds-connection', async (event, creds) => {
+    try {
+        const url = creds.env === 'production' 
+            ? 'https://www.mojedatovaschranka.cz/asws/ds' 
+            : 'https://ws.mojedatovaschranka.cz/asws/ds';
+            
+        const soapRequest = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:isds="http://isds.czechpoint.cz/v20">
+  <soap:Body>
+    <isds:GetOwnerInfoFromLogin/>
+  </soap:Body>
+</soap:Envelope>`;
+
+        const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/xml; charset=utf-8',
+                'Authorization': `Basic ${auth}`
+            },
+            body: soapRequest
+        });
+
+        const data = await response.text();
+
+        if (data.includes('dbID')) {
+            const nameMatch = data.match(/<dbName>(.*?)<\/dbName>/);
+            return { success: true, owner: nameMatch ? nameMatch[1] : 'Ověřeno' };
+        } else if (data.includes('dmErrMessage')) {
+            const errMsg = data.match(/<dmErrMessage>(.*?)<\/dmErrMessage>/);
+            return { success: false, error: errMsg ? errMsg[1] : 'Chyba přihlášení' };
+        }
+        
+        return { success: false, error: 'Neočekávaná odpověď serveru' };
+    } catch (error) {
+        console.error('ISDS Test Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// --- POST CONNECTION TEST (Dopis Online) ---
+ipcMain.handle('test-post-connection', async (event, creds) => {
+    try {
+        const url = 'https://online2.postservis.cz/pds/xml/getsenders';
+        const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
+            
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Basic ${auth}`
+            }
+        });
+
+        if (response.status === 200) {
+            return { success: true, info: 'Účet u ČP je aktivní' };
+        }
+        if (response.status === 401) return { success: false, error: 'Chybné klientské číslo nebo heslo' };
+        return { success: false, error: `Server vrátil kód ${response.status}` };
+    } catch (error) {
+        console.error('Post Test Error:', error);
+        return { success: false, error: error.message };
+    }
 });
