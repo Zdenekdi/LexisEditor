@@ -2,8 +2,12 @@ name: Build/Release LexisEditor
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'package.json'
     tags:
-      - 'v*' # Spustí se při pushnutí tagu začínajícího na 'v' (např. v1.7.29)
+      - 'v*'
 
 jobs:
   release:

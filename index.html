@@ -300,6 +300,19 @@
         .context-menu-item:hover { background: #f1f5f9; color: var(--word-blue); }
         .context-menu-sep { height: 1px; background: #e2e8f0; margin: 5px 0; }
         
+        /* Citation Styling */
+        .citation-highlight {
+            color: #2563eb;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .citation-highlight:hover {
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+        
         /* Footnote Styling */
         .footnote-ref {
             color: #2563eb;
@@ -1644,7 +1657,7 @@
 
     // --- FOOTNOTE MANAGEMENT ---
     function updateFootnoteNumbers() {
-        const refs = document.querySelectorAll('.footnote-ref');
+        const refs = Array.from(document.querySelectorAll('.footnote-ref'));
         const listContainer = document.getElementById('footnotes-list');
         const previewArea = document.getElementById('footnotes-preview-area');
         const previewList = document.getElementById('footnotes-preview-list');
@@ -1658,6 +1671,13 @@
         previewArea.style.display = 'block';
         listContainer.innerHTML = '';
         previewList.innerHTML = '';
+
+        // Seřadíme podle pozice v DOM (aby bylo číslování chronologické)
+        refs.sort((a, b) => {
+            const rangeA = Quill.find(a).offset(quill.scroll);
+            const rangeB = Quill.find(b).offset(quill.scroll);
+            return rangeA - rangeB;
+        });
 
         refs.forEach((node, index) => {
             const num = index + 1;
@@ -1681,7 +1701,7 @@
                     <span style="cursor:pointer; color:#ef4444;" onclick="deleteFootnote('${id}')">🗑️</span>
                 </div>
                 <textarea onchange="updateFootnoteText('${id}', this.value)" 
-                    style="width:100%; border:1px solid #e2e8f0; border-radius:4px; padding:4px; font-family:inherit; font-size:11px;">${text}</textarea>
+                    style="width:100%; border:1px solid #e2e8f0; border-radius:4px; padding:4px; font-family:inherit; font-size:11px; height: 50px;">${text}</textarea>
             `;
             listContainer.appendChild(item);
 
@@ -1693,12 +1713,101 @@
         });
     }
 
+    function autoLinkLaws() {
+        const text = quill.getText();
+        // Komplexnější regex pro české citace
+        // Podporuje: § 1, § 123, čl. 1, čl. I, zák. č. 89/2012 Sb.
+        const lawRegex = /(§\s*\d+|čl\.\s*[IVXLCDM\d]+|zák\.\s*č\.\s*\d+\/\d+\s*Sb\.)/g;
+        let match;
+        let offset = 0;
+        let count = 0;
+
+        // Projdeme text a vložíme interaktivní Citation Bloty
+        while ((match = lawRegex.exec(text)) !== null) {
+            const trigger = match[0];
+            const index = match.index;
+            
+            // Zkontrolujeme, zda už na této pozici není blot (abychom se nezacyklili)
+            const formats = quill.getFormat(index, trigger.length);
+            if (formats.citation) continue;
+
+            let url = `https://www.zakonyprolidi.cz/hledat?q=${encodeURIComponent(trigger)}`;
+            if (trigger.includes('Sb.')) {
+                const numMatch = trigger.match(/\d+\/\d+/);
+                if (numMatch) url = `https://www.zakonyprolidi.cz/cs/${numMatch[0]}`;
+            }
+
+            quill.deleteText(index, trigger.length);
+            quill.insertEmbed(index, 'citation', {
+                text: trigger,
+                url: url
+            });
+            count++;
+        }
+
+        if (count > 0) {
+            customAlert(`⚖️ Právní citace (${count}x) byly automaticky rozpoznány a prolinkovány.`);
+            refreshTableOfAuthorities();
+        } else {
+            customAlert("V dokumentu nebyly nalezeny žádné citace k propojení.");
+        }
+    }
+
+    function generateTableOfAuthorities() {
+        const text = quill.getText();
+        const citations = [];
+        const nodes = document.querySelectorAll('.citation-highlight');
+        
+        nodes.forEach(node => {
+            citations.push({
+                text: node.innerText,
+                url: node.getAttribute('data-url')
+            });
+        });
+
+        if (citations.length === 0) {
+            return customAlert("V dokumentu nebyly nalezeny žádné citované zdroje.");
+        }
+
+        // Třídění
+        const categories = {
+            "Právní předpisy": [],
+            "Judikatura": [],
+            "Ostatní zdroje": []
+        };
+
+        citations.forEach(c => {
+            if (c.text.includes('Sb.') || c.text.includes('§')) categories["Právní předpisy"].push(c.text);
+            else if (c.text.match(/[A-Z]\d+\/\d+/)) categories["Judikatura"].push(c.text);
+            else categories["Ostatní zdroje"].push(c.text);
+        });
+
+        let toaHtml = '<div style="margin: 20px 0; padding: 20px; border: 1.5px solid #1e293b; border-radius: 8px; font-family: \'Inter\', sans-serif;">';
+        toaHtml += '<div style="font-weight: 800; font-size: 18px; text-transform: uppercase; border-bottom: 2px solid #1e293b; padding-bottom: 8px; margin-bottom: 15px;">Rejstřík citovaných zdrojů</div>';
+
+        Object.entries(categories).forEach(([name, items]) => {
+            if (items.length === 0) return;
+            const uniqueItems = [...new Set(items)].sort();
+            toaHtml += `<div style="font-weight: 700; font-size: 13px; margin: 15px 0 8px 0; color: #475569;">${name.toUpperCase()}</div>`;
+            toaHtml += '<ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6;">';
+            uniqueItems.forEach(item => {
+                toaHtml += `<li>${item}</li>`;
+            });
+            toaHtml += '</ul>';
+        });
+        toaHtml += '</div><p><br></p>';
+
+        const range = quill.getSelection(true);
+        quill.clipboard.dangerouslyPasteHTML(range.index, toaHtml);
+        customAlert("✅ Profesionální rejstřík citací byl vložen.");
+    }
+
     function updateFootnoteText(id, newText) {
         const node = document.querySelector(`.footnote-ref[data-id="${id}"]`);
         if (node) {
             node.setAttribute('data-text', newText);
             node.setAttribute('title', newText);
-            // Pro jistotu aktualizujeme i v Quillu přes update/format, ale data-atributy v DOM stačí pro render
+            updateFootnoteNumbers();
         }
     }
 
@@ -1714,17 +1823,13 @@
         }
     }
 
-    window.updateFootnoteNumbers = updateFootnoteNumbers;
-    window.updateFootnoteText = updateFootnoteText;
-    window.deleteFootnote = deleteFootnote;
-
     // --- DEADLINE GUARD LOGIC ---
     function scanDeadlines() {
         const text = quill.getText();
         const detectedSection = document.getElementById('detected-deadlines-section');
         const detectedList = document.getElementById('detected-list');
+        if (!detectedSection || !detectedList) return;
         
-        // Regexy pro detekci (zjednodušené pro demo)
         const dateRegex = /\b\d{1,2}\.\s*\d{1,2}\.\s*\d{4}\b/g;
         const periodRegex = /lhůt[aě]\s+(\d+)\s+(dnů|dní|pracovních dnů)/gi;
         
@@ -1739,117 +1844,47 @@
         detectedSection.style.display = 'block';
         detectedList.innerHTML = '';
 
-        dates.forEach(m => {
-            addDetectedItem(m[0], 'Datum');
-        });
-        periods.forEach(m => {
-            addDetectedItem(m[0], 'Lhůta');
-        });
+        dates.forEach(m => addDetectedItem(m[0], 'Datum'));
+        periods.forEach(m => addDetectedItem(m[0], 'Lhůta'));
     }
 
     function addDetectedItem(text, type) {
         const detectedList = document.getElementById('detected-list');
         const div = document.createElement('div');
         div.style = "display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px; border-radius:4px; margin-bottom:5px; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.1);";
-        div.innerHTML = `
-            <span><b>${type}:</b> ${text}</span>
-            <button onclick="addToLhutnik('${text}')" style="background:#2563eb; color:white; border:none; padding:2px 6px; border-radius:3px; cursor:pointer;">➕</button>
-        `;
+        div.innerHTML = `<span><b>${type}:</b> ${text}</span><button onclick="addToLhutnik('${text}')" style="background:#2563eb; color:white; border:none; padding:2px 6px; border-radius:3px; cursor:pointer;">➕</button>`;
         detectedList.appendChild(div);
     }
 
     function addToLhutnik(value) {
-        // Zde by byla logika pro skutečný lhůtník
         customAlert(`Lhůta "${value}" byla přidána do vašeho Lhůtníku.`);
-        if (typeof renderDeadlines === 'function') {
-            // Simulace přidání
-            const list = document.getElementById('deadlines-list');
+        const list = document.getElementById('deadlines-list');
+        if (list) {
             const item = document.createElement('div');
-            item.style = "background:#dcfce7; color:#166534; padding:8px; border-radius:6px; font-size:11px; border:1px solid #bbf7d0;";
+            item.style = "background:#dcfce7; color:#166534; padding:8px; border-radius:6px; font-size:11px; border:1px solid #bbf7d0; margin-bottom:5px;";
             item.innerHTML = `🔔 <b>${value}</b> - Sledováno`;
             list.prepend(item);
         }
     }
 
-    window.addToLhutnik = addToLhutnik;
-
-    // Přidáme automatický update při změně textu
+    // --- RE-INITIALIZE SCANNER ---
     quill.on('text-change', () => {
-        // Debounce pro všechnu logiku skenování
         clearTimeout(scanTimeout); 
         scanTimeout = setTimeout(() => {
-            refreshPlaceholders();
+            if (typeof refreshPlaceholders === 'function') refreshPlaceholders();
             updateFootnoteNumbers();
-            scanDeadlines(); // Nové skenování lhůt
+            scanDeadlines();
         }, 1500);
     });
 
-    function autoLinkLaws() {
-        const text = quill.root.innerHTML;
-        // Detekce paragrafů: § 123
-        let updated = text.replace(/§\s*(\d+)/g, (match, p1) => {
-            return `<a href="https://www.zakonyprolidi.cz/hledat?q=${encodeURIComponent(match)}" target="_blank" style="color:#2563eb; text-decoration:underline;">${match}</a>`;
-        });
-        
-        // Detekce zákonů: zák. č. 89/2012 Sb.
-        updated = updated.replace(/zák\.\s*č\.\s*(\d+\/\d+)\s*Sb\./g, (match, p1) => {
-            return `<a href="https://www.zakonyprolidi.cz/cs/${p1}" target="_blank" style="color:#2563eb; text-decoration:underline;">${match}</a>`;
-        });
-
-        if (text !== updated) {
-            quill.root.innerHTML = updated;
-            customAlert("⚖️ Právní citace byly automaticky propojeny s portálem Zákony pro lidi.");
-        } else {
-            customAlert("V dokumentu nebyly nalezeny žádné citace k propojení.");
-        }
-    }
-
+    // --- EXPORTS ---
+    window.updateFootnoteNumbers = updateFootnoteNumbers;
+    window.updateFootnoteText = updateFootnoteText;
+    window.deleteFootnote = deleteFootnote;
     window.autoLinkLaws = autoLinkLaws;
-
-    function generateTableOfAuthorities() {
-        const text = quill.root.innerHTML;
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        const links = Array.from(doc.querySelectorAll('a'));
-        
-        const laws = [];
-        const cases = [];
-        
-        links.forEach(link => {
-            const url = link.getAttribute('href');
-            const label = link.innerText;
-            if (url.includes('zakonyprolidi.cz')) {
-                laws.push(label);
-            } else if (url.includes('judikatura') || url.includes('nsoud.cz')) {
-                cases.push(label);
-            }
-        });
-
-        const uniqueLaws = [...new Set(laws)].sort();
-        const uniqueCases = [...new Set(cases)].sort();
-
-        if (uniqueLaws.length === 0 && uniqueCases.length === 0) {
-            return customAlert("V dokumentu nebyly nalezeny žádné citace k vytvoření rejstříku.");
-        }
-
-        let toaHtml = '<br><hr><h3>REJSTŘÍK CITACÍ</h3>';
-        if (uniqueLaws.length > 0) {
-            toaHtml += '<h4>Právní předpisy:</h4><ul>';
-            uniqueLaws.forEach(law => toaHtml += `<li>${law}</li>`);
-            toaHtml += '</ul>';
-        }
-        if (uniqueCases.length > 0) {
-            toaHtml += '<h4>Judikatura:</h4><ul>';
-            uniqueCases.forEach(c => toaHtml += `<li>${c}</li>`);
-            toaHtml += '</ul>';
-        }
-
-        quill.insertEmbed(quill.getLength(), 'html', toaHtml);
-        quill.setSelection(quill.getLength());
-        customAlert("✅ Rejstřík citací byl vygenerován na konec dokumentu.");
-    }
-
     window.generateTableOfAuthorities = generateTableOfAuthorities;
+    window.addToLhutnik = addToLhutnik;
+    window.scanDeadlines = scanDeadlines;
 
     function finishInit() {
             loadDynamicTemplates();
@@ -2117,9 +2152,49 @@
         PlaceholderBlot.tagName = 'span';
         Quill.register(PlaceholderBlot);
 
-        // --- FOOTNOTE BLOT DEFINITION ---
+        // --- CITATION BLOT DEFINITION ---
+        class CitationBlot extends Inline {
+            static create(value) {
+                let node = super.create();
+                node.setAttribute('data-url', value.url);
+                node.classList.add('citation-highlight');
+                node.innerText = value.text;
+                node.onclick = () => window.open(value.url, '_blank');
+                return node;
+            }
+            static value(node) {
+                return {
+                    url: node.getAttribute('data-url'),
+                    text: node.innerText
+                };
+            }
+        }
+        CitationBlot.blotName = 'citation';
+        CitationBlot.tagName = 'span';
+        Quill.register(CitationBlot);
 
-        var quill = new Quill('#editor', { 
+        // --- FOOTNOTE BLOT DEFINITION ---
+        class FootnoteBlot extends Inline {
+            static create(value) {
+                let node = super.create();
+                node.setAttribute('data-id', value.id || 'fn-' + Date.now());
+                node.setAttribute('data-text', value.text || '');
+                node.setAttribute('title', value.text || '');
+                node.classList.add('footnote-ref');
+                node.innerText = value.number || '?';
+                return node;
+            }
+            static value(node) {
+                return {
+                    id: node.getAttribute('data-id'),
+                    text: node.getAttribute('data-text'),
+                    number: node.innerText
+                };
+            }
+        }
+        FootnoteBlot.blotName = 'footnote';
+        FootnoteBlot.tagName = 'sup';
+        Quill.register(FootnoteBlot);
             theme: 'snow', 
             modules: { 
                 toolbar: false,
@@ -3864,7 +3939,8 @@ V ........................ dne ...............     V ........................ dn
                     <p><b>1. Výběr šablony:</b> Na úvodní obrazovce zvolte vzor nebo otevřete .docx.</p>
                     <p><b>2. Vyplnění údajů:</b> Pokud jsou v textu pole jako [JMÉNO], objeví se vlevo v panelu. Vyplňte je tam a přepíší se v celém dokumentu.</p>
                     <p><b>3. Tvorba polí:</b> Označte jakýkoliv text a stiskněte <b>Cmd/Ctrl + Shift + P</b> pro vytvoření nového pole.</p>
-                    <p><b>4. ARES:</b> V záložce Právní nástroje zadejte IČO pro bleskovou identifikaci strany.</p>
+                    <p><b>4. Právní preciznost:</b> V záložce <b>Právní nástroje</b> použijte 'Odkazovat zákony' pro automatické prolinkování citací (§, zákony) na portál Zákony pro lidi.</p>
+                    <p><b>5. Rejstříky:</b> V záložce <b>Reference</b> můžete vygenerovat profesionální 'Rejstřík citací' rozdělený na předpisy a judikaturu.</p>
                 </div>`;
             } else if (topic === 'keys') {
                 title = "⌨️ Klávesové zkratky";
