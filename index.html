@@ -8,6 +8,7 @@
     <!-- Libraries -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff-match-patch/1.0.5/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
     
     <style>
@@ -53,16 +54,49 @@
         }
         .ribbon-tabs { 
             display: flex; background: var(--word-blue); padding: 0 10px 0 80px; 
-            height: 34px; align-items: flex-end; gap: 2px;
-            -webkit-app-region: drag;
+            height: 40px; align-items: center; gap: 5px;
+            -webkit-app-region: drag; position: relative;
         }
+        .quick-access {
+            display: flex; gap: 2px; align-items: center; margin-right: 10px; -webkit-app-region: no-drag;
+        }
+        .qa-btn {
+            color: white; font-size: 16px; cursor: pointer; padding: 6px; 
+            border-radius: 4px; transition: background 0.2s; display: flex; align-items: center;
+        }
+        .qa-btn:hover { background: rgba(255,255,255,0.15); }
+        .qa-separator { width: 1px; height: 16px; background: rgba(255,255,255,0.3); margin: 0 5px; }
+        
+        .autosave-toggle {
+            display: flex; align-items: center; gap: 6px; margin-right: 15px;
+            font-size: 11px; color: white; font-weight: 500; -webkit-app-region: no-drag;
+        }
+        .toggle-pill {
+            width: 28px; height: 14px; background: #10b981; border-radius: 10px;
+            position: relative; cursor: pointer;
+        }
+        .toggle-pill::after {
+            content: ''; position: absolute; right: 2px; top: 2px; width: 10px; height: 10px;
+            background: white; border-radius: 50%;
+        }
+
+        .doc-title-center {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            color: white; font-size: 12px; font-weight: 500; opacity: 0.9;
+            white-space: nowrap; pointer-events: none;
+        }
+
+        .title-right-tools {
+            margin-left: auto; display: flex; gap: 5px; -webkit-app-region: no-drag;
+        }
+
         .tab { 
-            padding: 8px 20px; color: rgba(255,255,255,0.8); cursor: pointer; 
+            padding: 10px 18px; color: rgba(255,255,255,0.9); cursor: pointer; 
             font-size: 13px; font-weight: 500; transition: all 0.2s;
-            border-radius: 4px 4px 0 0; position: relative;
+            border-radius: 4px 4px 0 0; position: relative; margin-top: 6px;
             -webkit-app-region: no-drag;
         }
-        .tab:hover { color: white; background: rgba(255,255,255,0.1); }
+        .tab:hover { background: rgba(255,255,255,0.1); }
         .tab.active { 
             background: #f8fafc; color: var(--word-blue); font-weight: 600; 
         }
@@ -394,6 +428,60 @@
             border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+        /* --- DARK MODE --- */
+        body.dark-mode {
+            background-color: #0f172a;
+            color: #f1f5f9;
+        }
+        body.dark-mode .ribbon { background: #1e293b; border-bottom: 1px solid #334155; }
+        body.dark-mode .tab { color: #94a3b8; }
+        body.dark-mode .tab.active { background: #334155; color: #fff; border-bottom: 3px solid #3b82f6; }
+        body.dark-mode .tool-group { border-right: 1px solid #334155; }
+        body.dark-mode .group-label { color: #64748b; }
+        body.dark-mode .btn-icon { color: #cbd5e1; }
+        body.dark-mode .btn-icon:hover { background: #334155; }
+        body.dark-mode .workspace { background: #0f172a; }
+        body.dark-mode .editor-paper { background: #1e293b; color: #f1f5f9; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); }
+        body.dark-mode .ql-editor { color: #f1f5f9 !important; }
+        body.dark-mode .sidebar { background: #1e293b; border-right: 1px solid #334155; }
+
+        /* --- WATERMARK --- */
+        #watermark-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+            z-index: 5;
+            opacity: 0.1;
+            display: none;
+        }
+        #watermark-text {
+            font-size: 120px;
+            font-weight: 900;
+            color: #000;
+            transform: rotate(-45deg);
+            white-space: nowrap;
+            user-select: none;
+        }
+        /* --- ERROR HIGHLIGHTING --- */
+        .error-highlight {
+            background: #fef08a;
+            border-bottom: 2px solid #eab308;
+            cursor: help;
+        }
+
+        /* Vodoznaky */
+        .editor-container { position: relative; }
+        .watermark-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; z-index: 10; overflow: hidden;
+            opacity: 0.1; font-size: 120px; font-weight: 900; color: #000;
+            text-transform: uppercase; transform: rotate(-45deg);
+            user-select: none; display: none;
+        }
+        .has-watermark .watermark-overlay { display: flex; }
     </style>
 </head>
 <body id="main-body">
@@ -437,18 +525,34 @@
 
     <div class="ribbon">
         <div class="ribbon-tabs">
+            <div class="autosave-toggle">
+                <div class="toggle-pill"></div>
+                <span>AutoSave</span>
+            </div>
+            <div class="quick-access">
+                <div class="qa-btn" onclick="saveDocument()" title="Uložit (Cmd+S)">💾</div>
+                <div class="qa-separator"></div>
+                <div class="qa-btn" onclick="exec('undo')" title="Zpět (Cmd+Z)">↩️</div>
+                <div class="qa-btn" onclick="exec('redo')" title="Vpřed (Cmd+Shift+Z)">↪️</div>
+                <div class="qa-btn" title="Přizpůsobit">▾</div>
+            </div>
+
+            <div class="doc-title-center">
+                LexisEditor - <span id="window-doc-title">Nepojmenovaný dokument</span>
+            </div>
+
             <div class="tab" onclick="switchTab('tab-file')" id="tab-file-btn" data-i18n="tab_file">Soubor</div>
             <div class="tab active" onclick="switchTab('tab-home')" data-i18n="tab_home">Domů</div>
             <div class="tab" onclick="switchTab('tab-insert')" data-i18n="tab_insert">Vložit</div>
-            <div class="tab" onclick="switchTab('tab-design')" data-i18n="tab_design">Návrh</div>
-            <div class="tab" onclick="switchTab('tab-layout')" data-i18n="tab_layout">Rozložení</div>
-            <div class="tab" onclick="switchTab('tab-reference')" data-i18n="tab_reference">Reference</div>
-            <div class="tab" onclick="switchTab('tab-revize')" data-i18n="tab_revize">Revize</div>
             <div class="tab" onclick="switchTab('tab-legal')" data-i18n="tab_legal">Právní nástroje</div>
-            <div class="tab" onclick="switchTab('tab-lexisai')" data-i18n="tab_lexisai">LexisAI</div>
+            <div class="tab" onclick="switchTab('tab-revize')" data-i18n="tab_revize">Revize</div>
+            <div class="tab" onclick="switchTab('tab-lexisai')" style="color: #c4b5fd; font-weight: 700;">LexisAI</div>
             <div class="tab" onclick="switchTab('tab-view')" data-i18n="tab_view">Zobrazení</div>
-            <div class="tab" onclick="switchTab('tab-settings')" data-i18n="tab_settings">Nastavení</div>
-            <div class="tab" onclick="switchTab('tab-help')">Nápověda</div>
+
+            <div class="title-right-tools">
+                <div class="qa-btn" title="Hledat v dokumentu" onclick="showFindReplace()">🔍</div>
+                <div class="qa-btn" title="Profil právníka" onclick="showProfileModal()">👤</div>
+            </div>
         </div>
 
         <div id="tab-file" class="tool-groups-container">
@@ -470,13 +574,21 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="exportToDocx()"><div class="icon-sq">💾</div>Uložit do DOCX</div>
+                    <div class="btn-icon" onclick="exportToDocx()"><div class="icon-sq">💾</div>DOCX</div>
+                    <div class="btn-icon" onclick="exportToMarkdown()"><div class="icon-sq">📝</div>Markdown</div>
                 </div>
-                <div class="group-label">Správa</div>
+                <div class="group-label">Export</div>
             </div>
         </div>
 
         <div id="tab-home" class="tool-groups-container active">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="document.execCommand('copy')"><div class="icon-sq">📋</div>Kopírovat</div>
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Najít</div>
+                </div>
+                <div class="group-label">Úpravy & Schránka</div>
+            </div>
             <div class="tool-group">
                 <div class="icons">
                     <select id="font-family" class="combo-box" onchange="applyFont(this.value)">
@@ -492,36 +604,44 @@
                         <option value="18px">18</option>
                         <option value="24px">24</option>
                     </select>
-                </div>
-                <div class="group-label">Písmo & Velikost</div>
-            </div>
-            <div class="tool-group">
-                <div class="icons">
                     <div class="btn-icon" onclick="exec('bold')"><div class="icon-sq"><b>B</b></div></div>
                     <div class="btn-icon" onclick="exec('italic')"><div class="icon-sq"><i>I</i></div></div>
                     <div class="btn-icon" onclick="exec('underline')"><div class="icon-sq"><u>U</u></div></div>
-                    <div class="btn-icon" onclick="exec('strike')"><div class="icon-sq">S</div></div>
+                    <input type="color" id="font-color" onchange="applyColor(this.value)" style="width:30px; height:30px; border:none; padding:0; cursor:pointer;">
+                    <div class="btn-icon" onclick="applyHighlight('#ffff00')"><div class="icon-sq" style="background:#ffff00; color:#000;">🖍️</div></div>
                 </div>
-                <div class="group-label">Styl</div>
+                <div class="group-label">Písmo & Efekty</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="exec('list', 'ordered')"><div class="icon-sq">🔢</div>Seznam</div>
-                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">➡️</div>Odsadit</div>
-                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">⬅️</div>Zmenšit</div>
+                    <div class="btn-icon" onclick="setLineHeight('1.0')"><div class="icon-sq">1.0</div></div>
+                    <div class="btn-icon" onclick="setLineHeight('1.5')"><div class="icon-sq">1.5</div></div>
+                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">➡️</div></div>
+                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">⬅️</div></div>
                 </div>
                 <div class="group-label">Odstavec & Řádkování</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="changeCase('upper')"><div class="icon-sq">AA</div>VELKÁ</div>
-                    <div class="btn-icon" onclick="changeCase('lower')"><div class="icon-sq">aa</div>malá</div>
+                    <div class="btn-icon" onclick="exec('align', 'left')"><div class="icon-sq">⬅️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'center')"><div class="icon-sq">⬆️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'right')"><div class="icon-sq">➡️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'justify')"><div class="icon-sq">↔️</div></div>
                 </div>
-                <div class="group-label">Písmo</div>
+                <div class="group-label">Zarovnání</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap:5px;">
+                    <button class="style-btn" onclick="applyStyle('h1')" style="font-weight:700; border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Nadpis 1</button>
+                    <button class="style-btn" onclick="applyStyle('h2')" style="font-weight:600; border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Nadpis 2</button>
+                    <button class="style-btn" onclick="applyStyle('p')" style="border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Normální</button>
+                </div>
+                <div class="group-label">Rychlé styly</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Hledat</div>
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Najít</div>
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔄</div>Nahradit</div>
                 </div>
                 <div class="group-label">Úpravy</div>
             </div>
@@ -529,11 +649,19 @@
         <div id="tab-insert" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="insertTableOfContents()"><div class="icon-sq">📑</div>Vložit Obsah</div>
+                    <div class="btn-icon" onclick="insertTodayDate()"><div class="icon-sq">📅</div>Dnešní datum</div>
                     <div class="btn-icon" onclick="alert('Vkládám titulní stranu...')"><div class="icon-sq">📄</div>Titulní str.</div>
-                    <div class="btn-icon" onclick="alert('Nová prázdná strana...')"><div class="icon-sq">🗒️</div>Prázdná str.</div>
-                    <div class="btn-icon" onclick="alert('Konec stránky vložen')"><div class="icon-sq">✂️</div>Konec str.</div>
                 </div>
-                <div class="group-label">Stránky</div>
+                <div class="group-label">Stránky & Obsah</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertStamp('pravni-moc')"><div class="icon-sq">⚖️</div>Právní moc</div>
+                    <div class="btn-icon" onclick="insertStamp('shoda')"><div class="icon-sq">📄</div>Shoda</div>
+                    <div class="btn-icon" onclick="insertStamp('prevzal')"><div class="icon-sq">✍️</div>Převzal</div>
+                </div>
+                <div class="group-label">Právní doložky</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -577,21 +705,13 @@
                 <div class="group-label">Vzhled</div>
             </div>
             <div class="tool-group">
-                <div class="icons">
-                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; margin-left:10px;">
-                        <span>Vodoznak:</span>
-                        <div style="display:flex; gap:4px;">
-                            <select onchange="applyWatermark(this.value)" class="combo-box" id="watermark-select">
-                                <option value="NONE">Žádný</option>
-                                <option value="DRAFT">DRAFT</option>
-                                <option value="ORIGINÁL">ORIGINÁL</option>
-                                <option value="SOUKROMÉ">SOUKROMÉ</option>
-                            </select>
-                            <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
-                        </div>
+                    <div class="btn-icon" onclick="setWatermark('KONCEPT')"><div class="icon-sq">📄</div>Koncept</div>
+                    <div class="btn-icon" onclick="setWatermark('DŮVĚRNÉ')"><div class="icon-sq">🔒</div>Důvěrné</div>
+                    <div style="display:flex; flex-direction:column; align-items:center; gap:2px; margin:0 10px;">
+                        <input type="color" id="wm-color" value="#000000" onchange="updateWatermarkStyle()" style="width:24px; height:24px; border:none; padding:0; cursor:pointer; background:none;">
+                        <span style="font-size:9px; color:#94a3b8;">Barva</span>
                     </div>
-                    <div class="btn-icon" onclick="customAlert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>
-                    <div class="btn-icon" onclick="customAlert('Ohraničení stránky...')"><div class="icon-sq">🖼️</div>Ohraničení</div>
+                    <div class="btn-icon" onclick="setWatermark('')"><div class="icon-sq">🚫</div>Zrušit</div>
                 </div>
                 <div class="group-label">Pozadí stránky</div>
             </div>
@@ -614,10 +734,11 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertSignBlock()"><div class="icon-sq">✒️</div>Podpis</div>
+                    <div class="btn-icon" onclick="linkJudicates()"><div class="icon-sq">🔗</div>Judikáty</div>
                     <div class="btn-icon" onclick="anonymize()"><div class="icon-sq">🛡️</div>Anonym</div>
+                    <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Vložit §</div>
                 </div>
-                <div class="group-label">Validace & Bezpečí</div>
+                <div class="group-label">Právní analýza</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
@@ -625,6 +746,13 @@
                     <div class="btn-icon" onclick="insertPara()"><div class="icon-sq">§</div>Paragraf</div>
                 </div>
                 <div class="group-label">Rychlé prvky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showWorklog()"><div class="icon-sq">📊</div>Zapsat úkon</div>
+                    <div class="btn-icon" onclick="downloadWorklog()"><div class="icon-sq">📥</div>Exportovat</div>
+                </div>
+                <div class="group-label">Evidence práce</div>
             </div>
         </div>
         <div id="tab-layout" class="tool-groups-container">
@@ -678,17 +806,25 @@
         <div id="tab-revize" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="alert('Kontrola pravopisu spuštěna...')"><div class="icon-sq">✓</div>Pravopis</div>
-                    <div class="btn-icon" onclick="alert('Slovník synonym...')"><div class="icon-sq">📖</div>Tezaurus</div>
+                    <div class="btn-icon" onclick="showRedlines()"><div class="icon-sq" style="color:#ef4444;">🔍</div>Srovnat</div>
+                    <div class="btn-icon" onclick="showHistoryManager()"><div class="icon-sq">📜</div>Historie verzí</div>
+                    <div class="btn-icon" onclick="toggleCommentDrawer(true)"><div class="icon-sq">💬</div>Komentáře</div>
                 </div>
-                <div class="group-label">Kontrola</div>
+                <div class="group-label">Verze & Kontrola</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="toggleTrackChanges()"><div class="icon-sq">📝</div>Sledovat</div>
-                    <div class="btn-icon" onclick="addComment()"><div class="icon-sq">💬</div>Komentář</div>
+                    <div class="btn-icon" onclick="validateDocument()"><div class="icon-sq" style="color:#2563eb;">🛡️</div>Prověřit text</div>
+                    <div class="btn-icon" onclick="clearHighlights()"><div class="icon-sq">🧹</div>Vyčistit</div>
                 </div>
-                <div class="group-label">Změny & Revize</div>
+                <div class="group-label">Závěrečná kontrola</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="alert('Kontrola pravopisu...')"><div class="icon-sq">✓</div>Pravopis</div>
+                    <div class="btn-icon" onclick="alert('Slovník synonym...')"><div class="icon-sq">📖</div>Tezaurus</div>
+                </div>
+                <div class="group-label">Jazyk</div>
             </div>
         </div>
 
@@ -833,7 +969,14 @@
                     <div class="btn-icon" onclick="alert('ISDS...')"><div class="icon-sq">📨</div>Datovky</div>
                 </div>
                 <div class="group-label" data-i18n="group_connectivity">Konektivita</div>
+                <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Noční režim</div>
+                    <div class="btn-icon" onclick="alert('Zálohování do cloudu...')"><div class="icon-sq">☁️</div>Auto-Cloud</div>
+                </div>
+                <div class="group-label" data-i18n="group_advanced">Pokročilé</div>
             </div>
+        </div>
             <div class="tool-group">
                 <div class="group-label">Automatizace verzí</div>
                 <div style="padding: 5px; display: flex; flex-direction: column; gap: 8px;">
@@ -923,7 +1066,7 @@
                         <div>Advokátní kancelář Lexis</div>
                         <div style="text-align: right;">Spis: 2024/005/ZD</div>
                     </div>
-                    <div id="editor">
+                    <div id="editor" spellcheck="true">
                         <h1>SMLOUVA O DÍLO</h1>
                         <p><b>I. Smluvní strany</b></p>
                         <p>Zhotovitel: [JMÉNO], IČO: [IČO]</p>
@@ -978,22 +1121,27 @@
             </button>
         </div>
         
-        <div style="padding: 10px 15px; background: #f8fafc; border-top: 1px solid #eee;">
-            <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px;">📚 Referenční materiály</div>
-            <div id="reference-list">
-                <div style="padding: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 11px;">
-                    <div style="font-weight: 600; margin-bottom: 2px;">NS 23 Cdo 456/2021:</div>
-                    "Zhotovitel odpovídá za vady díla..."
-                </div>
+        <div style="padding: 15px; background: #f8fafc; border-top: 1px solid #eee; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden;">
+            <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                <span>📚 Knihovna doložek</span>
+                <button onclick="saveSelectionAsClause()" style="background: var(--word-blue); color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 9px; cursor: pointer;">+ Uložit výběr</button>
+            </div>
+            <div id="clause-library-list" style="overflow-y: auto; flex-grow: 1;">
+                <!-- Doložky se načtou dynamicky -->
+                <div style="text-align:center; color:#94a3b8; font-size:11px; margin-top:20px; font-style:italic;">Žádné uložené doložky</div>
             </div>
         </div>
     </div>
 
     <div class="status-bar">
-        <span id="page-count">Strana 1 z 1</span>
-        <span id="word-count">Slova: 0</span>
-        <span id="char-count">Znaky: 0</span>
+        <span id="page-count">Strana 1 z 1</span> | 
+        <span id="word-count-panel">
+            <span data-i18n="status_words">Slova:</span> <span id="word-cnt">0</span> | 
+            <span data-i18n="status_chars">Znaky:</span> <span id="char-cnt">0</span> | 
+            <span data-i18n="status_ns">Normostrany:</span> <span id="ns-cnt">0.00</span>
+        </span>
         <div style="flex-grow: 1"></div>
+        <div id="app-version-status" style="margin-right:15px; font-size:11px; color:#64748b;">LexisEditor <span id="dynamic-ver">...</span></div>
         <span>✨ AI: Aktivní</span>
         <span id="save-status">✓ Uloženo</span>
     </div>
@@ -2644,6 +2792,808 @@ V ........................ dne ...............     V ........................ dn
             document.getElementById('app-lang').value = savedLang;
             changeLanguage(savedLang);
         };
+        // --- EXPORTY (v1.4.0) ---
+        function exportToMarkdown() {
+            const html = quill.root.innerHTML;
+            // Velmi jednoduchý převod HTML -> MD
+            let md = html
+                .replace(/<h1>(.*?)<\/h1>/g, '# $1\n\n')
+                .replace(/<h2>(.*?)<\/h2>/g, '## $1\n\n')
+                .replace(/<h3>(.*?)<\/h3>/g, '### $1\n\n')
+                .replace(/<b>(.*?)<\/b>/g, '**$1**')
+                .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+                .replace(/<i>(.*?)<\/i>/g, '*$1*')
+                .replace(/<em>(.*?)<\/em>/g, '*$1*')
+                .replace(/<p>(.*?)<\/p>/g, '$1\n\n')
+                .replace(/<br>/g, '\n')
+                .replace(/&nbsp;/g, ' ');
+            
+            // Odstranění HTML tagů
+            md = md.replace(/<[^>]*>?/gm, '');
+
+            const blob = new Blob([md], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dokument.md';
+            a.click();
+        }
+
+        // --- REDLINES (POROVNÁVÁNÍ) ---
+        function showRedlines() {
+            const currentText = quill.getText();
+            const versions = JSON.parse(localStorage.getItem('lexis_versions') || '[]');
+            if (versions.length === 0) {
+                return customAlert("Pro porovnání je nutné mít alespoň jednu uloženou verzi v historii.");
+            }
+
+            // Vezmeme poslední uloženou verzi
+            const lastVersion = versions[versions.length - 1].content;
+            // Quill html v historii je html, ale my chceme text pro diff (nebo stripnout html)
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = lastVersion;
+            const oldText = tempDiv.innerText;
+
+            const dmp = new diff_match_patch();
+            const diffs = dmp.diff_main(oldText, currentText);
+            dmp.diff_cleanupSemantic(diffs);
+
+            let diffHtml = '';
+            diffs.forEach(part => {
+                const type = part[0]; // 0=equal, 1=insert, -1=delete
+                const data = part[1];
+                if (type === 0) diffHtml += `<span>${data}</span>`;
+                else if (type === 1) diffHtml += `<span style="background:#dcfce7; color:#166534; text-decoration:underline;">${data}</span>`;
+                else if (type === -1) diffHtml += `<span style="background:#fee2e2; color:#991b1b; text-decoration:line-through;">${data}</span>`;
+            });
+
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; font-family:'Inter', sans-serif;";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff; width:80%; height:80%; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);";
+            modal.innerHTML = `
+                <div style="padding:15px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+                    <span style="font-weight:700; color:#1e293b;">🔍 Porovnání s poslední verzí (Redlines)</span>
+                    <button id="close-redlines" style="border:none; background:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+                <div style="flex-grow:1; overflow-y:auto; padding:30px; line-height:1.6; white-space:pre-wrap; font-family:'Lora', serif; font-size:15px;">
+                    ${diffHtml}
+                </div>
+                <div style="padding:15px; border-top:1px solid #e2e8f0; background:#f8fafc; text-align:right;">
+                    <span style="font-size:12px; color:#64748b; margin-right:20px;">
+                        <span style="background:#dcfce7; padding:2px 5px; border-radius:3px;">Přidáno</span>
+                        <span style="background:#fee2e2; padding:2px 5px; border-radius:3px; margin-left:10px;">Smazáno</span>
+                    </span>
+                    <button id="close-redlines-btn" style="padding:8px 20px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600;">Zavřít</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const close = () => document.body.removeChild(overlay);
+            document.getElementById('close-redlines').onclick = close;
+            document.getElementById('close-redlines-btn').onclick = close;
+        }
+
+        // --- GENERÁTOR OBSAHU (v1.4.0) ---
+        function insertTableOfContents() {
+            const headings = quill.root.querySelectorAll('h1, h2, h3');
+            if (headings.length === 0) {
+                return customAlert("Pro vytvoření obsahu musí dokument obsahovat alespoň jeden nadpis (H1, H2 nebo H3).");
+            }
+
+            let tocHtml = '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:25px; margin:20px 0; font-family:\'Inter\', sans-serif;">';
+            tocHtml += '<div style="font-weight:800; font-size:20px; margin-bottom:20px; color:#1e293b; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">Obsah dokumentu</div>';
+            
+            headings.forEach(h => {
+                const level = parseInt(h.tagName.substring(1));
+                const text = h.innerText;
+                const padding = (level - 1) * 24;
+                const fontSize = 16 - (level * 1);
+                const fontWeight = level === 1 ? '700' : '400';
+                const color = level === 1 ? '#1e293b' : '#475569';
+
+                tocHtml += `
+                    <div style="display:flex; align-items:baseline; padding-left:${padding}px; margin-bottom:10px; font-size:${fontSize}px; font-weight:${fontWeight}; color:${color};">
+                        <span>${text}</span>
+                        <div style="flex-grow:1; border-bottom:1px dotted #cbd5e1; margin:0 10px; position:relative; top:-4px;"></div>
+                    </div>
+                `;
+            });
+            
+            tocHtml += '</div><p><br></p>';
+            
+            const range = quill.getSelection(true);
+            quill.clipboard.dangerouslyPasteHTML(range.index, tocHtml);
+            customAlert("Automatický obsah byl vložen na pozici kurzoru.");
+        }
+
+        // --- EVIDENCE PRÁCE (v1.4.0) ---
+        function showWorklog() {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; font-family:'Inter', sans-serif;";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff; width:400px; border-radius:12px; padding:25px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); animation: slideUp 0.3s ease-out;";
+            modal.innerHTML = `
+                <div style="font-weight:800; font-size:18px; margin-bottom:20px; color:#1e293b;">📊 Záznam právního úkonu</div>
+                
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:11px; color:#64748b; display:block; margin-bottom:5px; font-weight:600; text-transform:uppercase;">Popis úkonu</label>
+                    <input type="text" id="wl-desc" value="Práce na dokumentu" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                </div>
+                
+                <div style="display:flex; gap:15px; margin-bottom:20px;">
+                    <div style="flex:1;">
+                        <label style="font-size:11px; color:#64748b; display:block; margin-bottom:5px; font-weight:600; text-transform:uppercase;">Čas (minuty)</label>
+                        <input type="number" id="wl-time" value="30" step="5" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:11px; color:#64748b; display:block; margin-bottom:5px; font-weight:600; text-transform:uppercase;">Sazba (Kč/h)</label>
+                        <input type="number" id="wl-rate" value="2500" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:15px; border-radius:8px; margin-bottom:20px; text-align:center;">
+                    <div style="font-size:11px; color:#64748b; margin-bottom:2px;">K fakturaci:</div>
+                    <div id="wl-total" style="font-size:20px; font-weight:800; color:#2563eb;">1 250 Kč</div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button id="wl-cancel" style="flex:1; padding:12px; background:#f1f5f9; color:#475569; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Zrušit</button>
+                    <button id="wl-save" style="flex:2; padding:12px; background:#2563eb; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Uložit úkon</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const updateResult = () => {
+                const mins = parseInt(document.getElementById('wl-time').value) || 0;
+                const rate = parseInt(document.getElementById('wl-rate').value) || 0;
+                const total = Math.round((mins / 60) * rate);
+                document.getElementById('wl-total').innerText = total.toLocaleString('cs-CZ') + ' Kč';
+            };
+
+            document.getElementById('wl-time').oninput = updateResult;
+            document.getElementById('wl-rate').oninput = updateResult;
+
+            document.getElementById('wl-cancel').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('wl-save').onclick = () => {
+                const logs = JSON.parse(localStorage.getItem('lexis_worklogs') || '[]');
+                logs.push({
+                    id: Date.now(),
+                    desc: document.getElementById('wl-desc').value,
+                    time: document.getElementById('wl-time').value,
+                    rate: document.getElementById('wl-rate').value,
+                    total: document.getElementById('wl-total').innerText,
+                    date: new Date().toLocaleDateString('cs-CZ'),
+                    doc: document.title
+                });
+                localStorage.setItem('lexis_worklogs', JSON.stringify(logs));
+                customAlert("Úkon byl úspěšně zapsán do výkazu.");
+                document.body.removeChild(overlay);
+            };
+        }
+
+        function downloadWorklog() {
+            const logs = JSON.parse(localStorage.getItem('lexis_worklogs') || '[]');
+            if (logs.length === 0) return customAlert("Zatím nemáte žádné zapsané úkony k exportu.");
+
+            let csv = "Datum;Úkon;Čas (min);Sazba (Kč/h);Celkem;Dokument\n";
+            logs.forEach(l => {
+                csv += `${l.date};${l.desc};${l.time};${l.rate};${l.total};${l.doc}\n`;
+            });
+
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vykaz_prace_${new Date().toLocaleDateString('cs-CZ').replace(/\./g, '_')}.csv`;
+            a.click();
+        }
+        // --- DARK MODE ---
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('lexis_dark_mode', isDark);
+        }
+
+        // --- VODOZNAK ---
+        function updateWatermark(text) {
+            const overlay = document.getElementById('watermark-overlay');
+            const span = document.getElementById('watermark-text');
+            if (!text || text === 'ŽÁDNÝ') {
+                overlay.style.display = 'none';
+            } else {
+                overlay.style.display = 'flex';
+                span.innerText = text;
+            }
+        }
+
+        // --- NAJÍT A NAHRADIT ---
+        function showFindReplace() {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; z-index:10000; font-family:'Inter', sans-serif;";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff; width:350px; border-radius:12px; padding:20px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1);";
+            modal.innerHTML = `
+                <div style="font-weight:700; margin-bottom:15px; color:#1e293b;">🔍 Najít a Nahradit</div>
+                <input type="text" id="fr-find" placeholder="Najít..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:10px;">
+                <input type="text" id="fr-replace" placeholder="Nahradit za..." style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:15px;">
+                <div style="display:flex; gap:10px;">
+                    <button id="fr-btn-all" style="flex:1; padding:8px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px;">Nahradit vše</button>
+                    <button id="fr-btn-close" style="padding:8px; background:#f1f5f9; border:none; border-radius:6px; cursor:pointer; font-size:12px;">Zrušit</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('fr-btn-close').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('fr-btn-all').onclick = () => {
+                const find = document.getElementById('fr-find').value;
+                const replace = document.getElementById('fr-replace').value;
+                if (!find) return;
+
+                const content = quill.getText();
+                let count = 0;
+                let index = content.indexOf(find);
+                
+                while (index !== -1) {
+                    quill.deleteText(index, find.length);
+                    quill.insertText(index, replace);
+                    count++;
+                    index = quill.getText().indexOf(find, index + replace.length);
+                }
+                
+                customAlert(`Nahrazeno ${count} výskytů.`);
+                document.body.removeChild(overlay);
+            };
+        }
+
+        // Přidáme overlay do HTML v initApp
+        const oldInitApp4 = initApp;
+        initApp = async function() {
+            await oldInitApp4();
+            
+            // Přidáme div pro vodoznak do editor-paper
+            const paper = document.querySelector('.editor-paper');
+            if (paper && !document.getElementById('watermark-overlay')) {
+                const wm = document.createElement('div');
+                wm.id = 'watermark-overlay';
+                wm.innerHTML = '<span id="watermark-text">NÁVRH</span>';
+                paper.insertBefore(wm, paper.firstChild);
+            }
+
+            // Načteme Dark Mode
+            if (localStorage.getItem('lexis_dark_mode') === 'true') {
+                document.body.classList.add('dark-mode');
+            }
+
+            // Sledování změn pro metriky a zkratky
+            quill.on('text-change', () => {
+                updateMetrics();
+                handleSnippets();
+            });
+        };
+
+        // --- PRÁVNÍ METRIKY (v1.5.0) ---
+        function updateMetrics() {
+            const text = quill.getText().trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            const chars = quill.getLength() - 1; 
+            const ns = (chars / 1800).toFixed(2);
+
+            const wEl = document.getElementById('word-cnt');
+            const cEl = document.getElementById('char-cnt');
+            const nEl = document.getElementById('ns-cnt');
+            if (wEl) wEl.innerText = words;
+            if (cEl) cEl.innerText = chars;
+            if (nEl) nEl.innerText = ns;
+        }
+
+        // --- PRÁVNÍ ZKRATKY (SNIPPETS) ---
+        const SNIPPETS = {
+            '/pm': 'Plná moc k zastupování',
+            '/oz': 'zákon č. 89/2012 Sb., občanský zákoník',
+            '/tz': 'zákon č. 40/2009 Sb., trestní zákoník',
+            '/osr': 'zákon č. 99/1963 Sb., občanský soudní řád',
+            '/s': 'Smluvní strany se dohodly na následujícím:',
+            '/p': 'Příloha č. '
+        };
+
+        function handleSnippets() {
+            const selection = quill.getSelection();
+            if (!selection) return;
+            const textBefore = quill.getText(0, selection.index);
+            for (const [trigger, replacement] of Object.entries(SNIPPETS)) {
+                if (textBefore.endsWith(trigger + ' ')) {
+                    const start = selection.index - (trigger.length + 1);
+                    quill.deleteText(start, trigger.length + 1);
+                    quill.insertText(start, replacement);
+                    break;
+                }
+            }
+        }
+
+        // --- DODATEČNÉ FORMÁTOVÁNÍ (v1.4.1) ---
+        function applyHighlight(color) {
+            const range = quill.getSelection();
+            if (range) {
+                const isHighlighted = quill.getFormat(range).background === color;
+                quill.format('background', isHighlighted ? false : color);
+            }
+        }
+
+        function setLineHeight(val) {
+            // Quill nemá nativní lineHeight v základu bez register, použijeme CSS na selekci
+            const range = quill.getSelection();
+            if (range) {
+                quill.format('lineHeight', val);
+            }
+        }
+
+        function applyStyle(type) {
+            const range = quill.getSelection();
+            if (range) {
+                if (type === 'p') quill.format('header', false);
+                else if (type === 'h1') quill.format('header', 1);
+                else if (type === 'h2') quill.format('header', 2);
+            }
+        }
+
+        // Registrace lineHeight pro Quill
+        const Parchment = Quill.import('parchment');
+        class LineHeightAttributor extends Parchment.Attributor.Style {
+            constructor() {
+                super('lineHeight', 'line-height', {
+                    scope: Parchment.Scope.INLINE,
+                    whitelist: ['1.0', '1.15', '1.5', '2.0']
+                });
+            }
+        }
+        Quill.register(new LineHeightAttributor());
+
+        function insertTodayDate() {
+            const date = new Date().toLocaleDateString('cs-CZ');
+            const range = quill.getSelection(true);
+            quill.insertText(range.index, date);
+            customAlert(`Datum ${date} vloženo.`);
+        }
+
+        // --- SPRÁVCE HISTORIE (v1.5.0) ---
+        function showHistoryManager() {
+            const history = JSON.parse(localStorage.getItem('lexis_doc_history') || '[]');
+            if (history.length === 0) return customAlert("Zatím nemáte žádné uložené verze k zobrazení.");
+
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; font-family:'Inter', sans-serif;";
+            
+            let listHtml = history.map((v, i) => `
+                <div style="padding:12px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; hover:background:#f8fafc;">
+                    <div>
+                        <div style="font-weight:700; font-size:13px; color:#1e293b;">Verze ze dne ${new Date(v.timestamp).toLocaleString('cs-CZ')}</div>
+                        <div style="font-size:11px; color:#64748b;">${v.content.length} znaků</div>
+                    </div>
+                    <button onclick="restoreVersion(${i}); document.body.removeChild(this.closest('.history-overlay'))" style="padding:6px 12px; background:#2563eb; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Obnovit</button>
+                </div>
+            `).reverse().join('');
+
+            const modal = document.createElement('div');
+            overlay.className = 'history-overlay';
+            modal.style = "background:#fff; width:450px; max-height:80%; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);";
+            modal.innerHTML = `
+                <div style="padding:15px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
+                    <span style="font-weight:700; color:#1e293b;">📜 Historie verzí dokumentu</span>
+                    <button id="close-history" style="border:none; background:none; font-size:20px; cursor:pointer; color:#64748b;">&times;</button>
+                </div>
+                <div style="flex-grow:1; overflow-y:auto; padding:10px;">
+                    ${listHtml}
+                </div>
+                <div style="padding:15px; border-top:1px solid #e2e8f0; background:#f8fafc; text-align:right;">
+                    <button id="close-history-btn" style="padding:8px 20px; background:#f1f5f9; color:#475569; border:none; border-radius:6px; cursor:pointer; font-weight:600;">Zavřít</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const close = () => document.body.removeChild(overlay);
+            document.getElementById('close-history').onclick = close;
+            document.getElementById('close-history-btn').onclick = close;
+        }
+
+        function restoreVersion(index) {
+            const history = JSON.parse(localStorage.getItem('lexis_doc_history') || '[]');
+            if (history[index]) {
+                quill.setContents(history[index].content);
+                customAlert("Dokument byl úspěšně obnoven ze zálohy.");
+            }
+        }
+        // --- ZÁVĚREČNÁ KONTROLA (v1.6.0) ---
+        function validateDocument() {
+            const text = quill.getText();
+            let errors = [];
+
+            // 1. Kontrola placeholderů
+            const placeholders = [/\[.*?\]/g, /\.\.\./g, /_{3,}/g];
+            placeholders.forEach(regex => {
+                let match;
+                while ((match = regex.exec(text)) !== null) {
+                    errors.push({ index: match.index, length: match[0].length, type: 'Zapomenutý údaj' });
+                }
+            });
+
+            // 2. Kontrola typografie
+            const typoRegex = [
+                { reg: / {2,}/g, msg: 'Dvojitá mezera' },
+                { reg: / ,/g, msg: 'Mezera před čárkou' },
+                { reg: /\b(\w+)\s+\1\b/gi, msg: 'Duplicitní slovo' },
+                { reg: /[,.?!][a-zA-Zá-žÁ-Ž]/g, msg: 'Chybějící mezera po znaménku' }
+            ];
+
+            typoRegex.forEach(item => {
+                let match;
+                while ((match = item.reg.exec(text)) !== null) {
+                    errors.push({ index: match.index, length: match[0].length, type: item.msg });
+                }
+            });
+
+            // 3. Kontrola právních záměn (v1.6.1)
+            const legalTerms = [
+                { reg: /zmocněnec/gi, msg: 'Pozor na záměnu: Zmocněnec vs Zmocnitel' },
+                { reg: /zmocnitel/gi, msg: 'Pozor na záměnu: Zmocnitel vs Zmocněnec' },
+                { reg: /půjčitel/gi, msg: 'Stará terminologie? (nyní zapůjčitel)' }
+            ];
+
+            legalTerms.forEach(item => {
+                let match;
+                while ((match = item.reg.exec(text)) !== null) {
+                    errors.push({ index: match.index, length: match[0].length, type: item.msg });
+                }
+            });
+
+            if (errors.length === 0) {
+                return customAlert("🛡️ Dokument je v pořádku. Nebyly nalezeny žádné prázdné údaje ani typografické chyby.");
+            }
+
+            // Zvýraznění chyb
+            errors.forEach(err => {
+                quill.formatText(err.index, err.length, {
+                    'background': '#fef08a',
+                    'color': '#854d0e'
+                });
+            });
+
+            customAlert(`🛡️ Nalezeno ${errors.length} potenciálních chyb nebo prázdných míst. Byla zvýrazněna žlutě.`);
+        }
+
+        function clearHighlights() {
+            quill.formatText(0, quill.getLength(), {
+                'background': false,
+                'color': false
+            });
+            customAlert("Zvýraznění bylo odstraněno.");
+        }
+
+        // --- PRÁVNÍ DOLOŽKY ---
+        function insertStamp(type) {
+            let html = '';
+            const now = new Date().toLocaleDateString('cs-CZ');
+            
+            if (type === 'pravni-moc') {
+                html = `
+                    <div style="border: 2px solid #ef4444; color: #ef4444; padding: 10px; width: 250px; text-align: center; font-weight: 800; border-radius: 4px; margin: 20px 0;">
+                        PRÁVNÍ MOC NABYTA DNE:<br>
+                        <span style="font-size: 20px;">${now}</span>
+                    </div>`;
+            } else if (type === 'shoda') {
+                html = `
+                    <div style="border: 2px solid #2563eb; color: #2563eb; padding: 10px; width: 300px; font-size: 12px; border-radius: 4px; margin: 20px 0;">
+                        <b>POTVRZENÍ SHODY S ORIGINÁLEM</b><br>
+                        Tento dokument souhlasí s originálem uloženým ve spisu.<br>
+                        Dne: ${now} &nbsp;&nbsp;&nbsp; Podpis: .....................
+                    </div>`;
+            } else if (type === 'prevzal') {
+                html = `
+                    <div style="border-top: 1px solid #000; width: 200px; margin-top: 40px; padding-top: 5px; font-size: 11px;">
+                        PŘEVZAL DNE: ${now}<br>
+                        Podpis:
+                    </div>`;
+            }
+
+            const range = quill.getSelection(true);
+            quill.clipboard.dangerouslyPasteHTML(range.index, html);
+        }
+        // --- KNIHOVNA DOLOŽEK (v1.7.0) ---
+        function saveSelectionAsClause() {
+            const range = quill.getSelection();
+            if (!range || range.length === 0) return customAlert("Nejdříve v dokumentu vyberte text, který chcete uložit jako doložku.");
+
+            const text = quill.getText(range.index, range.length);
+            const html = quill.root.innerHTML.substring(range.index, range.index + range.length); // Zjednodušeno pro demo
+            
+            customPrompt("Název doložky:", "Nová doložka", (name) => {
+                if (!name) return;
+                const clauses = JSON.parse(localStorage.getItem('lexis_clauses') || '[]');
+                clauses.push({
+                    id: Date.now(),
+                    name: name,
+                    content: quill.getContents(range.index, range.length)
+                });
+                localStorage.setItem('lexis_clauses', JSON.stringify(clauses));
+                renderClauses();
+                customAlert(`Doložka "${name}" byla uložena.`);
+            });
+        }
+
+        function renderClauses() {
+            const list = document.getElementById('clause-library-list');
+            const clauses = JSON.parse(localStorage.getItem('lexis_clauses') || '[]');
+            
+            if (clauses.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:11px; margin-top:20px; font-style:italic;">Žádné uložené doložky</div>';
+                return;
+            }
+
+            list.innerHTML = clauses.map(c => `
+                <div class="clause-item" style="padding:8px; background:white; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; cursor:pointer; position:relative; transition:all 0.2s;" onclick="insertClause(${c.id})">
+                    <div style="font-weight:600; font-size:12px; color:#1e293b; margin-bottom:2px;">${c.name}</div>
+                    <div style="font-size:10px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.id}</div>
+                    <div onclick="event.stopPropagation(); deleteClause(${c.id})" style="position:absolute; top:5px; right:5px; color:#cbd5e1; font-size:14px;">&times;</div>
+                </div>
+            `).join('');
+        }
+
+        function insertClause(id) {
+            const clauses = JSON.parse(localStorage.getItem('lexis_clauses') || '[]');
+            const c = clauses.find(x => x.id === id);
+            if (c) {
+                const range = quill.getSelection(true);
+                quill.updateContents(new Delta().retain(range.index).concat(c.content));
+                customAlert(`Doložka "${c.name}" vložena.`);
+            }
+        }
+
+        function deleteClause(id) {
+            let clauses = JSON.parse(localStorage.getItem('lexis_clauses') || '[]');
+            clauses = clauses.filter(x => x.id !== id);
+            localStorage.setItem('lexis_clauses', JSON.stringify(clauses));
+            renderClauses();
+        }
+
+        // --- INTELIGENTNÍ PARAGRAFY ---
+        function setupSmartParagraphs() {
+            quill.keyboard.addBinding({
+                key: 'Enter'
+            }, function(range, context) {
+                const lineText = context.prefix + context.suffix;
+                const match = lineText.match(/^§\s*(\d+)/);
+                if (match) {
+                    const nextNum = parseInt(match[1]) + 1;
+                    quill.insertText(range.index, '\n§ ' + nextNum + ' ');
+                    quill.setSelection(range.index + (nextNum.toString().length + 4));
+                    return false; // Zastavíme standardní Enter
+                }
+                return true;
+            });
+        }
+
+        // Registrace do initApp
+        const oldInitApp5 = initApp;
+        initApp = async function() {
+            await oldInitApp5();
+            renderClauses();
+            setupSmartParagraphs();
+
+            // Načtení verze
+            if (window.electronAPI && window.electronAPI.getAppVersion) {
+                const ver = await window.electronAPI.getAppVersion();
+                const verEl = document.getElementById('dynamic-ver');
+                if (verEl) verEl.innerText = 'v' + ver;
+                
+                // Update centered title
+                const titleEl = document.getElementById('window-doc-title');
+                if (titleEl) titleEl.innerText = `Smlouva_o_dilo_v${ver}.docx - Uloženo v LexisCloudu`;
+            }
+        };
+
+        const Delta = Quill.import('delta');
+        // --- PROFIL PRÁVNÍKA & HLAVIČKY (v1.8.0) ---
+        function showProfileModal() {
+            const profile = JSON.parse(localStorage.getItem('lexis_profile') || '{}');
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:20000; font-family:'Inter', sans-serif;";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff; width:480px; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);";
+            modal.innerHTML = `
+                <div style="padding:20px; background:var(--word-blue); color:white; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:700; font-size:16px;">👤 Profil a konfigurace hlavičky</span>
+                    <button id="close-profile" style="border:none; background:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
+                </div>
+                <div style="padding:20px; max-height:500px; overflow-y:auto;">
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:8px;">Osobní údaje</label>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <input type="text" id="prof-name" placeholder="Jméno a příjmení" value="${profile.name || ''}" style="flex:2; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+                            <input type="text" id="prof-title" placeholder="Titul" value="${profile.title || ''}" style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+                        </div>
+                        <input type="text" id="prof-position" placeholder="Pracovní pozice (např. advokát)" value="${profile.position || ''}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:10px;">
+                    </div>
+                    
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:8px;">Kancelář & Sídlo</label>
+                        <input type="text" id="prof-office" placeholder="Název kanceláře" value="${profile.office || ''}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:10px;">
+                        <input type="text" id="prof-address" placeholder="Adresa sídla" value="${profile.address || ''}" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:10px;">
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="prof-ico" placeholder="IČO" value="${profile.ico || ''}" style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+                            <input type="text" id="prof-cak" placeholder="Ev. č. ČAK" value="${profile.cak || ''}" style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:6px;">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; display:block; margin-bottom:8px;">Nastavení vkládání hlavičky</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; background:#f8fafc; padding:15px; border-radius:8px;">
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-name" ${profile.h_name !== false ? 'checked' : ''}> Jméno a titul</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-pos" ${profile.h_pos !== false ? 'checked' : ''}> Pozice</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-office" ${profile.h_office !== false ? 'checked' : ''}> Kancelář</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-addr" ${profile.h_addr !== false ? 'checked' : ''}> Adresa</label>
+                            <label style="font-size:13px; display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" id="h-ico" ${profile.h_ico !== false ? 'checked' : ''}> IČO a ČAK</label>
+                        </div>
+                    </div>
+                </div>
+                <div style="padding:20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; gap:10px;">
+                    <div style="display:flex; gap:5px;">
+                        <button id="prof-insert" style="padding:10px 15px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:12px;">Vložit hlavičku</button>
+                        <button id="prof-sign" style="padding:10px 15px; background:#8b5cf6; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600; font-size:12px;">Vložit podpis</button>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button id="prof-cancel" style="padding:10px 20px; background:#f1f5f9; color:#475569; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Zrušit</button>
+                        <button id="prof-save" style="padding:10px 20px; background:var(--word-blue); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Uložit profil</button>
+                    </div>
+                </div>
+                <div style="padding:0 20px 20px 20px; background:#f8fafc; font-size:11px; color:#94a3b8;">
+                    <label style="cursor:pointer; text-decoration:underline;">
+                        Nahrát naskenovaný podpis (PNG/JPG)...
+                        <input type="file" id="prof-sign-file" style="display:none;" accept="image/*">
+                    </label>
+                    <div id="sign-preview" style="margin-top:5px; height:30px; display:${profile.sign ? 'block' : 'none'};">✓ Podpis nahrán</div>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const close = () => document.body.removeChild(overlay);
+            document.getElementById('close-profile').onclick = close;
+            document.getElementById('prof-cancel').onclick = close;
+
+            let currentSignData = profile.sign || null;
+            document.getElementById('prof-sign-file').onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        currentSignData = ev.target.result;
+                        document.getElementById('sign-preview').style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            document.getElementById('prof-save').onclick = () => {
+                const data = {
+                    name: document.getElementById('prof-name').value,
+                    title: document.getElementById('prof-title').value,
+                    position: document.getElementById('prof-position').value,
+                    office: document.getElementById('prof-office').value,
+                    address: document.getElementById('prof-address').value,
+                    ico: document.getElementById('prof-ico').value,
+                    cak: document.getElementById('prof-cak').value,
+                    h_name: document.getElementById('h-name').checked,
+                    h_pos: document.getElementById('h-pos').checked,
+                    h_office: document.getElementById('h-office').checked,
+                    h_addr: document.getElementById('h-addr').checked,
+                    h_ico: document.getElementById('h-ico').checked,
+                    sign: currentSignData
+                };
+                localStorage.setItem('lexis_profile', JSON.stringify(data));
+                customAlert("Profil byl úspěšně uložen.");
+                close();
+            };
+
+            document.getElementById('prof-insert').onclick = () => {
+                // ... (stejné jako předtím)
+                const p = {
+                    name: document.getElementById('prof-name').value,
+                    title: document.getElementById('prof-title').value,
+                    position: document.getElementById('prof-position').value,
+                    office: document.getElementById('prof-office').value,
+                    address: document.getElementById('prof-address').value,
+                    ico: document.getElementById('prof-ico').value,
+                    cak: document.getElementById('prof-cak').value
+                };
+                
+                let lines = [];
+                if (document.getElementById('h-office').checked && p.office) lines.push(`<strong>${p.office}</strong>`);
+                if (document.getElementById('h-name').checked && p.name) lines.push(`${p.title ? p.title + ' ' : ''}${p.name}`);
+                if (document.getElementById('h-pos').checked && p.position) lines.push(`<span style="font-size:12px; color:#64748b;">${p.position}</span>`);
+                if (document.getElementById('h-addr').checked && p.address) lines.push(p.address);
+                if (document.getElementById('h-ico').checked) {
+                    let icoLine = [];
+                    if (p.ico) icoLine.push(`IČO: ${p.ico}`);
+                    if (p.cak) icoLine.push(`ev. č. ČAK: ${p.cak}`);
+                    if (icoLine.length > 0) lines.push(icoLine.join(', '));
+                }
+
+                const html = `<div style="border-bottom: 2px solid var(--word-blue); padding-bottom: 10px; margin-bottom: 20px; font-family: 'Inter', sans-serif;">${lines.map(l => `<div style="margin-bottom:2px;">${l}</div>`).join('')}</div><p><br></p>`;
+                const range = quill.getSelection(true);
+                quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                close();
+            };
+
+            document.getElementById('prof-sign').onclick = () => {
+                if (!currentSignData) return customAlert("Nejdříve nahrajte obrázek svého podpisu.");
+                const range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'image', currentSignData);
+                close();
+            };
+        }
+
+        // --- DODATEČNÉ FUNKCE v1.9.0 ---
+        function setWatermark(text) {
+            const wrapper = document.getElementById('editor-wrapper');
+            const wText = document.getElementById('watermark-text');
+            if (!text) {
+                wrapper.classList.remove('has-watermark');
+            } else {
+                wText.innerText = text;
+                wrapper.classList.add('has-watermark');
+                updateWatermarkStyle();
+            }
+        }
+
+        function updateWatermarkStyle() {
+            const wText = document.getElementById('watermark-text');
+            const color = document.getElementById('wm-color').value;
+            if (wText) {
+                wText.style.color = color;
+            }
+        }
+
+        function linkJudicates() {
+            const delta = quill.getContents();
+            let count = 0;
+            // Spisová značka: např. 29 Cdo 123/2021
+            const regex = /(\d+)\s+([A-Z][a-z]*)\s+(\d+)\/(\d+)/g;
+            
+            const newDelta = new Delta();
+            delta.ops.forEach(op => {
+                if (typeof op.insert === 'string') {
+                    let lastIndex = 0;
+                    let match;
+                    while ((match = regex.exec(op.insert)) !== null) {
+                        // Text před shodou
+                        newDelta.insert(op.insert.substring(lastIndex, match.index), op.attributes);
+                        
+                        // Spisová značka jako odkaz
+                        const spZn = match[0];
+                        const url = `https://nsoud.cz/Judikatura/ns_web.nsf/WebSearch?OpenForm&query=[SpisovaZnacka]="${encodeURIComponent(spZn)}"`;
+                        newDelta.insert(spZn, { ...op.attributes, link: url, color: '#2563eb' });
+                        
+                        lastIndex = regex.lastIndex;
+                        count++;
+                    }
+                    newDelta.insert(op.insert.substring(lastIndex), op.attributes);
+                } else {
+                    newDelta.push(op);
+                }
+            });
+            
+            quill.setContents(newDelta);
+            customAlert(`Zpracováno! Nalezeno a prolinkováno ${count} spisových značek na web Nejvyššího soudu.`);
+        }
     </script>
 </body>
 </html>
