@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const HTMLToDOCX = require('html-to-docx');
 const axios = null; // Removed in favor of native fetch
+const pdf = require('pdf-parse');
+const forge = require('node-forge');
 
 let mainWindow;
 
@@ -409,6 +411,85 @@ ipcMain.handle('test-post-connection', async (event, creds) => {
         return { success: false, error: `Server vrátil kód ${response.status}` };
     } catch (error) {
         console.error('Post Test Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// --- PDF IMPORT ---
+ipcMain.handle('import-pdf', async () => {
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            title: 'Importovat text z PDF',
+            filters: [{ name: 'PDF Dokumenty', extensions: ['pdf'] }],
+            properties: ['openFile']
+        });
+
+        if (canceled || filePaths.length === 0) return { success: false, canceled: true };
+
+        const dataBuffer = fs.readFileSync(filePaths[0]);
+        const data = await pdf(dataBuffer);
+
+        return { 
+            success: true, 
+            text: data.text,
+            info: data.info,
+            pages: data.numpages
+        };
+    } catch (error) {
+        console.error('PDF Import Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// --- ZFO IMPORT (Datové zprávy) ---
+ipcMain.handle('import-zfo', async () => {
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            title: 'Otevřít datovou zprávu (.zfo)',
+            filters: [{ name: 'Datové zprávy', extensions: ['zfo'] }],
+            properties: ['openFile']
+        });
+
+        if (canceled || filePaths.length === 0) return { success: false, canceled: true };
+
+        const zfoBuffer = fs.readFileSync(filePaths[0]);
+        const zfoContent = zfoBuffer.toString('binary');
+        
+        // ZFO je PKCS#7 (CMS) kontejner. Pro jednoduchou extrakci obsahu (XML)
+        // se pokusíme najít začátek XML struktury.
+        // V produkční verzi by se mělo použít node-forge pro korektní CMS parsing.
+        
+        let xmlContent = '';
+        const startTag = '<dmMessage';
+        const endTag = '</dmMessage>';
+        const startIndex = zfoContent.indexOf(startTag);
+        const endIndex = zfoContent.indexOf(endTag);
+        
+        if (startIndex !== -1 && endIndex !== -1) {
+            xmlContent = zfoContent.substring(startIndex, endIndex + endTag.length);
+        } else {
+            // Zkusíme hledat obecnější <root> pokud dmMessage není hlavní
+            const altStart = '<?xml';
+            const altStartIndex = zfoContent.indexOf(altStart);
+            if (altStartIndex !== -1) {
+                xmlContent = zfoContent.substring(altStartIndex);
+            }
+        }
+
+        if (!xmlContent) throw new Error('Nepodařilo se extrahovat XML obsah ze ZFO souboru.');
+
+        // Extrakce základních metadat (jednoduchý regex pro demo/v3.5)
+        const senderMatch = xmlContent.match(/<dmSender>(.*?)<\/dmSender>/);
+        const subjectMatch = xmlContent.match(/<dmAnnotation>(.*?)<\/dmAnnotation>/);
+        
+        return { 
+            success: true, 
+            xml: xmlContent,
+            sender: senderMatch ? senderMatch[1] : 'Neznámý odesílatel',
+            subject: subjectMatch ? subjectMatch[1] : 'Bez předmětu'
+        };
+    } catch (error) {
+        console.error('ZFO Import Error:', error);
         return { success: false, error: error.message };
     }
 });

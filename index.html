@@ -898,6 +898,13 @@
         <div id="tab-insert" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
+                    <div class="btn-icon" onclick="importPdf()"><div class="icon-sq">📄</div>Import PDF</div>
+                    <div class="btn-icon" onclick="importZfo()"><div class="icon-sq">📦</div>Import ZFO</div>
+                </div>
+                <div class="group-label">Dokumenty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="insertTOC()"><div class="icon-sq">📖</div>Vložit Obsah</div>
                     <div class="btn-icon" onclick="insertCurrentDate()"><div class="icon-sq">📆</div>Dnešní datum</div>
                     <div class="btn-icon" onclick="insertTitlePage()"><div class="icon-sq">🗂️</div>Titulní str.</div>
@@ -3516,6 +3523,71 @@ V ........................ dne ...............     V ........................ dn
             
             quill.clipboard.dangerouslyPasteHTML(index, signBlock);
             customAlert("✅ Dokument byl digitálně podepsán interním certifikátem LexisEditoru.");
+        }
+
+        async function importPdf() {
+            if (!window.electronAPI || !window.electronAPI.importPdf) {
+                return customAlert("Import PDF je dostupný pouze v desktopové verzi.");
+            }
+
+            document.getElementById('loader-text').innerText = "Importuji a analyzuji PDF dokument...";
+            document.getElementById('loader-overlay').style.display = 'flex';
+
+            try {
+                const result = await window.electronAPI.importPdf();
+                document.getElementById('loader-overlay').style.display = 'none';
+
+                if (result.success) {
+                    const range = quill.getSelection() || { index: quill.getLength() };
+                    // Vyčistíme text od nadbytečných konců řádků, které PDF často přidává
+                    const cleanText = result.text.replace(/(\r\n|\n|\r)/gm, " ").replace(/\s\s+/g, ' ');
+                    
+                    quill.insertText(range.index, "\n--- IMPORT Z PDF ---\n" + cleanText + "\n--- KONEC IMPORTU ---\n");
+                    customAlert(`✅ Importováno ${result.pages} stran z PDF.`);
+                } else if (!result.canceled) {
+                    customAlert(`Chyba při importu: ${result.error}`);
+                }
+            } catch (err) {
+                document.getElementById('loader-overlay').style.display = 'none';
+                customAlert(`Chyba: ${err.message}`);
+            }
+        }
+
+        async function importZfo() {
+            if (!window.electronAPI || !window.electronAPI.importZfo) {
+                return customAlert("Import ZFO je dostupný pouze v desktopové verzi.");
+            }
+
+            try {
+                const result = await window.electronAPI.importZfo();
+                if (result.success) {
+                    toggleAIDrawer(true);
+                    document.getElementById('ai-header-text').innerText = "Obsah datové zprávy (.zfo)";
+                    document.getElementById('ai-output').innerHTML = `
+                        <div style="padding:10px; background:#f0f9ff; border-radius:8px; border:1px solid #bae6fd; margin-bottom:15px;">
+                            <div style="font-size:11px; text-transform:uppercase; color:#0369a1; font-weight:800;">Odesílatel</div>
+                            <div style="font-weight:700; margin-bottom:10px;">${result.sender}</div>
+                            <div style="font-size:11px; text-transform:uppercase; color:#0369a1; font-weight:800;">Předmět</div>
+                            <div style="font-style:italic;">${result.subject}</div>
+                        </div>
+                        <div style="max-height:250px; overflow-y:auto; background:#f8fafc; padding:10px; font-family:monospace; font-size:11px; border:1px solid #e2e8f0; border-radius:4px;">
+                            ${result.xml.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+                        </div>
+                        <button onclick="insertZfoContent(\`${result.sender}\`, \`${result.subject}\`)" style="width:100%; padding:12px; background:var(--word-blue); color:white; border:none; border-radius:6px; margin-top:15px; cursor:pointer; font-weight:600;">Vložit metadata do dokumentu</button>
+                    `;
+                } else if (!result.canceled) {
+                    customAlert(`Chyba při importu: ${result.error}`);
+                }
+            } catch (err) {
+                customAlert(`Chyba: ${err.message}`);
+            }
+        }
+
+        function insertZfoContent(sender, subject) {
+            const text = `\n--- INFO O DATOVÉ ZPRÁVĚ ---\nOdesílatel: ${sender}\nPředmět: ${subject}\n----------------------------\n`;
+            const range = quill.getSelection() || { index: quill.getLength() };
+            quill.insertText(range.index, text, { italic: true, color: '#64748b' });
+            toggleAIDrawer(false);
         }
 
         async function exportToDocx() {
