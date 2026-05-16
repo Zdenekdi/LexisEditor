@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://ui-avatars.com/api/?name=Lexis+Editor&background=2563eb&color=fff&size=150&rounded=true&font-size=0.33" width="120" alt="LexisEditor Logo" style="border-radius: 20px;">
+  <img src="lexis_editor_logo_premium_1778878484982.png" width="200" alt="LexisEditor Logo" style="border-radius: 20px;">
   
   # LexisEditor v2.1.0
   **Profesionální AI-Native Legal Workspace**
