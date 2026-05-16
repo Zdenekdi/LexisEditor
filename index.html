@@ -719,6 +719,17 @@
             border-bottom: 2px solid #eab308;
             cursor: help;
         }
+
+        .active-mic .icon-sq {
+            animation: pulse-mic 1.5s infinite;
+            border-color: #ef4444 !important;
+        }
+
+        @keyframes pulse-mic {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
     </style>
 </head>
 <body id="main-body">
@@ -828,6 +839,7 @@
                     <div class="btn-icon" onclick="sendViaEmail()"><div class="icon-sq">📧</div>E-mail</div>
                     <div class="btn-icon" onclick="saveAsTemplateDialog()"><div class="icon-sq">💾</div>Uložit jako Šablonu</div>
                     <div class="btn-icon" onclick="exportWebPreview()"><div class="icon-sq">🌐</div>Webový náhled</div>
+                    <div class="btn-icon" onclick="indexCurrentDocument()" style="background:rgba(124,58,237,0.1);"><div class="icon-sq">🧠</div>Indexovat KB</div>
                 </div>
                 <div class="group-label">Dokument</div>
             </div>
@@ -860,6 +872,7 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="document.execCommand('copy')"><div class="icon-sq">📋</div>Kopírovat</div>
                     <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Najít</div>
+                    <div id="dictation-btn" class="btn-icon" onclick="toggleDictation()"><div class="icon-sq">🎙️</div>Diktovat</div>
                 </div>
                 <div class="group-label">Úpravy & Schránka</div>
             </div>
@@ -1243,6 +1256,8 @@
                     <div class="btn-icon" onclick="alert('Mobilní skenování:\n1. Otevřete LexisLink Remote v mobilu.\n2. Klikněte na Skenovat dokument (foťák).\n3. Vyfoťte papírovou smlouvu.\n4. V počítači se otevře náhled s možností AI OCR.')"><div class="icon-sq">📸</div>Jak skenovat?</div>
                     <div class="btn-icon" onclick="alert('Knihovna doložek:\n1. Označte v dokumentu text (např. rozhodčí doložku).\n2. V panelu Toolbox (vpravo) klikněte na Doložky -> Přidat.\n3. Kdykoliv později ji vložíte jediným kliknutím.')"><div class="icon-sq">📚</div>Knihovna</div>
                     <div class="btn-icon" onclick="alert('Obsah (ToC):\n1. Používejte v dokumentu Nadpisy (H1, H2).\n2. Na kartě Vložit klikněte na Obsah.\n3. Automaticky se vygeneruje přehledná tabulka s odkazy.')"><div class="icon-sq">📜</div>Generování obsahu</div>
+                    <div class="btn-icon" onclick="runSelfDiagnostic()" style="background:rgba(239,68,68,0.1);"><div class="icon-sq">🛡️</div>Self-Test</div>
+                    <div class="btn-icon" onclick="startOnboarding()" style="background:rgba(37,99,235,0.1);"><div class="icon-sq">🎓</div>Průvodce</div>
                 </div>
                 <div class="group-label">Návody</div>
             </div>
@@ -1554,6 +1569,7 @@
             <div class="ai-tab active" onclick="switchAITab('chat', this)" id="tab-ai-chat">Chat</div>
             <div class="ai-tab" onclick="switchAITab('research', this)" id="tab-ai-research">Rešerše</div>
             <div class="ai-tab" onclick="switchAITab('summary', this)" id="tab-ai-summary">Shrnutí</div>
+            <div class="ai-tab" onclick="switchAITab('kb', this)" id="tab-ai-kb" style="color:var(--ai-color)">🧠 Znalosti</div>
         </div>
 
         <div class="ai-body" id="ai-output" style="padding:15px; flex-grow: 1; overflow-y: auto;">
@@ -1581,6 +1597,7 @@
             <div id="variables-form" style="display:flex; flex-direction:column; gap:12px;">
                 <!-- Form inputs will be here -->
             </div>
+            <button onclick="exportToISDS()" style="width:100%; padding:10px; margin-top:20px; background:#16a34a; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:700;">📤 Exportovat pro ISDS (.zfo data)</button>
         </div>
 
         <!-- AI Input Area -->
@@ -2772,7 +2789,7 @@
             });
         }
         
-        function anonymize() {
+        async function anonymize() {
             const text = quill.getText();
             const patterns = {
                 "Rodná čísla": /\d{6}\/\d{3,4}/g,
@@ -2783,44 +2800,122 @@
 
             let foundCount = 0;
             let results = [];
+            let allMatches = [];
+
             for (const [name, regex] of Object.entries(patterns)) {
                 const matches = text.match(regex);
                 if (matches) {
                     foundCount += matches.length;
                     results.push(`${name}: ${matches.length}x`);
+                    matches.forEach(m => allMatches.push({ text: m, type: name }));
                 }
             }
 
-            if (foundCount === 0) return customAlert("V dokumentu nebyla nalezena žádná citlivá data k anonymizaci.");
-
-            const msg = `Nalezeno celkem ${foundCount} citlivých údajů:\n${results.join("\n")}\n\nChcete vše nahradit textem [ANONYMIZOVÁNO]?`;
-            
-            // Pro jednoduchost nahradíme vše naráz
             const overlay = document.createElement('div');
-            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+            overlay.id = "anon-overlay";
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); transition: all 0.3s;";
+            
             const modal = document.createElement('div');
-            modal.style = "background:#fff;padding:24px;border-radius:12px;width:340px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+            modal.style = "background:#fff;padding:30px;border-radius:16px;width:450px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);font-family:'Outfit',sans-serif; border:1px solid rgba(255,255,255,0.1);";
+            
+            const statsHtml = foundCount > 0 ? 
+                `<div style="background:#f1f5f9; padding:15px; border-radius:8px; margin-bottom:20px;">
+                    <div style="font-weight:700; color:var(--word-blue); font-size:12px; margin-bottom:8px; text-transform:uppercase;">Nalezeno vzorcem:</div>
+                    <div style="font-size:13px; color:#475569;">${results.join(", ")}</div>
+                </div>` : 
+                `<div style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; border:1px dashed #e2e8f0; border-radius:8px; margin-bottom:20px;">
+                    Vzorce nenašly žádná data. Doporučujeme AI skenování pro detekci jmen.
+                </div>`;
+
             modal.innerHTML = `
-                <div style="font-weight:600;font-size:15px;margin-bottom:12px;">🛡️ Právní anonymizátor</div>
-                <div style="font-size:13px;line-height:1.5;color:#475569;margin-bottom:20px;">${msg.replace(/\n/g, '<br>')}</div>
-                <div style="display:flex;justify-content:flex-end;gap:10px;">
-                    <button id="anon-cancel" style="padding:8px 16px;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
-                    <button id="anon-go" style="padding:8px 16px;background:#1e293b;color:#fff;border:none;border-radius:6px;cursor:pointer;">Provést anonymizaci</button>
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                    <div style="font-size:32px;">🛡️</div>
+                    <div>
+                        <div style="font-weight:800; font-size:18px; color:var(--word-blue);">Právní Anonymizátor</div>
+                        <div style="font-size:12px; color:#64748b;">Zabezpečení dokumentu před sdílením</div>
+                    </div>
+                </div>
+                
+                ${statsHtml}
+
+                <div id="ai-anon-status" style="display:none; margin-bottom:20px; padding:15px; background:rgba(124,58,237,0.1); border-radius:8px; border:1px solid rgba(124,58,237,0.2);">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="spinner-small"></div>
+                        <div style="font-size:13px; color:#7c3aed; font-weight:600;">AI analyzuje jména a firmy...</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                    <button id="anon-standard" style="padding:12px; background:var(--word-blue); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">Standardní (Regex)</button>
+                    <button id="anon-ai" style="padding:12px; background:linear-gradient(135deg, #7c3aed, #4f46e5); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">AI Skenování Jmen</button>
+                </div>
+
+                <div style="display:flex; justify-content:center;">
+                    <button id="anon-cancel" style="color:#64748b; background:none; border:none; cursor:pointer; font-size:13px; font-weight:500;">Zavřít bez změn</button>
                 </div>
             `;
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
             document.getElementById('anon-cancel').onclick = () => document.body.removeChild(overlay);
-            document.getElementById('anon-go').onclick = () => {
-                let newText = text;
-                for (const regex of Object.values(patterns)) {
-                    newText = newText.replace(regex, "[ANONYMIZOVÁNO]");
-                }
-                quill.setText(newText);
+            
+            document.getElementById('anon-standard').onclick = () => {
+                if (allMatches.length === 0) return customAlert("Nebylo co anonymizovat.");
+                executeAnonymization(allMatches.map(m => m.text));
                 document.body.removeChild(overlay);
-                customAlert("Dokument byl anonymizován.");
             };
+
+            document.getElementById('anon-ai').onclick = async () => {
+                const btn = document.getElementById('anon-ai');
+                const status = document.getElementById('ai-anon-status');
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+                status.style.display = "block";
+
+                try {
+                    const aiEntities = await detectEntitiesWithAI(text);
+                    if (aiEntities && aiEntities.length > 0) {
+                        executeAnonymization([...allMatches.map(m => m.text), ...aiEntities]);
+                        customAlert(`AI úspěšně anonymizovala ${aiEntities.length} dalších jmen a subjektů.`);
+                    } else {
+                        customAlert("AI nenašla žádná další jména k anonymizaci.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    customAlert("AI skenování selhalo. Zkontrolujte připojení k lokálnímu LLM.");
+                } finally {
+                    document.body.removeChild(overlay);
+                }
+            };
+        }
+
+        async function detectEntitiesWithAI(text) {
+            const prompt = `Jsi právní asistent. V následujícím textu najdi VŠECHNA jména osob, názvy firem, adresy a další citlivé údaje. 
+            Vrať pouze seznam nalezených výrazů oddělených čárkou. Nic jiného nepiš. Pokud nic nenajdeš, napiš "NULL".
+            
+            TEXT:
+            ${text.substring(0, 3000)}`; // Limit for context
+            
+            const response = await callAI(prompt, { temperature: 0.1 });
+            if (!response || response.includes("NULL")) return [];
+            
+            return response.split(",").map(s => s.trim()).filter(s => s.length > 1);
+        }
+
+        function executeAnonymization(targets) {
+            // Unikátní set cílů, abychom nenahrazovali 10x totéž
+            const uniqueTargets = [...new Set(targets)];
+            let html = quill.root.innerHTML;
+            
+            uniqueTargets.forEach(target => {
+                // Pozor: escape spec. znaků pro regex
+                const safeTarget = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(safeTarget, 'g');
+                html = html.replace(regex, `<span style="background:var(--word-blue); color:var(--word-blue); border-radius:2px;" title="Původně: ${target}">[ANONYMIZOVÁNO]</span>`);
+            });
+            
+            quill.root.innerHTML = html;
+            customAlert("Anonymizace proběhla úspěšně. Citlivá data byla překryta.");
         }
 
         function insertClause(type) {
@@ -3562,6 +3657,10 @@ V ........................ dne ...............     V ........................ dn
                 actions.style.display = 'flex';
                 inputCont.style.display = 'none';
                 actions.innerHTML = '<button onclick="runSummarization()" style="width:100%; padding:12px; background:var(--word-blue); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:700;">✨ Generovat shrnutí</button>';
+            } else if (tab === 'kb') {
+                document.getElementById('ai-header-text').innerText = "🧠 AI AGENT: ZNALOSTI";
+                output.innerHTML = '<b>Sémantické vyhledávání v historii:</b> Zadejte dotaz (např. "Prorogační doložky v nájemních smlouvách") a já prohledám vaše zaindexované dokumenty.';
+                inputCont.style.display = 'flex';
             }
         }
 
@@ -3820,6 +3919,8 @@ V ........................ dne ...............     V ........................ dn
         }
 
         // --- Dynamic Variables (Fáze 10.2) ---
+        let varValues = new Map();
+
         function scanForVariables() {
             const text = quill.getText();
             const regex = /\{\{(.+?)\}\}/g;
@@ -3830,9 +3931,10 @@ V ........................ dne ...............     V ........................ dn
             
             matches.forEach(v => {
                 const group = document.createElement('div');
+                const lastVal = varValues.get(v) || '';
                 group.innerHTML = `
                     <label style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px;">${v}</label>
-                    <input type="text" placeholder="Zadejte hodnotu..." oninput="updateVariable('${v}', this.value)" 
+                    <input type="text" placeholder="Zadejte hodnotu..." value="${lastVal}" oninput="updateVariable('${v}', this.value)" 
                            style="width:100%; padding:8px; border:1px solid #e2e8f0; border-radius:4px; font-size:12px;">
                 `;
                 form.appendChild(group);
@@ -3840,10 +3942,23 @@ V ........................ dne ...............     V ........................ dn
         }
 
         function updateVariable(name, value) {
-            // Tohle je náročnější - ve v3.0 budeme používat Delta transformace
-            // Pro MVP v2.5 uděláme globální replace v HTML (pozor na formátování)
-            // Lepší přístup: Najít všechny výskyty {{name}} a nahradit je spanem s ID
-            console.log(`Updating ${name} to ${value}`);
+            varValues.set(name, value);
+        }
+
+        function exportToISDS() {
+            if (varValues.size === 0) return customAlert("V dokumentu nejsou žádné vyplněné proměnné.");
+            
+            const data = Object.fromEntries(varValues);
+            const json = JSON.stringify(data, null, 2);
+            
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ISDS_Data_${Date.now()}.json`;
+            a.click();
+            
+            customAlert("Data pro ISDS byla připravena a stažena.\nMůžete je nahrát do formuláře nebo poslat dál.");
         }
 
         function generateToC() {
@@ -3881,11 +3996,50 @@ V ........................ dne ...............     V ........................ dn
             customAlert("Obsah byl vygenerován na začátek dokumentu.");
         }
 
+        async function runSelfDiagnostic() {
+            let results = [];
+            
+            // 1. Check Quill
+            results.push(quill ? "✅ Quill Editor: OK" : "❌ Quill Editor: FAILED");
+            
+            // 2. Check AI Config
+            try {
+                const config = await window.electronAPI.getAIConfig();
+                results.push(config.hasConfig ? "✅ AI Config: LOADED" : "⚠️ AI Config: MISSING (Setup needed)");
+            } catch(e) { results.push("❌ AI Config: ERROR"); }
+            
+            // 3. Check LexisLink
+            results.push(window.electronAPI.startLexisLink ? "✅ LexisLink API: OK" : "❌ LexisLink API: FAILED");
+            
+            // 4. Check LocalStorage (History/Clauses)
+            const historySize = JSON.parse(localStorage.getItem('lexis_history') || '[]').length;
+            results.push(`✅ History: ${historySize} versions found`);
+            
+            customAlert("LexisEditor Self-Diagnostic:\n\n" + results.join("\n"));
+        }
+
         async function sendAIQuery() {
             const input = document.getElementById('ai-prompt');
             const output = document.getElementById('ai-output');
             const prompt = input.value.trim();
             if (!prompt) return;
+
+            // Fáze 12: Sémantické hledání
+            const activeTab = document.querySelector('.ai-tab.active');
+            if (activeTab && activeTab.id === 'tab-ai-kb') {
+                showLoader("Prohledávám znalostní bázi...");
+                const result = await searchKnowledgeBase(prompt);
+                output.innerHTML += `
+                    <div class="ai-bubble user">${prompt}</div>
+                    <div class="ai-bubble bot" style="border-left:4px solid var(--ai-color); background:rgba(124,58,237,0.05);">
+                        <div style="font-weight:700; color:var(--ai-color); font-size:11px; margin-bottom:5px;">VÝSLEDEK HLEDÁNÍ V HISTORII</div>
+                        ${result.replace(/\n/g, '<br>')}
+                    </div>`;
+                hideLoader();
+                input.value = '';
+                output.scrollTop = output.scrollHeight;
+                return;
+            }
 
             const config = getAIConfig();
 
@@ -4875,16 +5029,189 @@ V ........................ dne ...............     V ........................ dn
             window.scanT = setTimeout(scanPlaceholders, 1200);
         });
 
-        // Klávesová zkratka pro verzi
+        // Klávesové zkratky (Fáze 14)
         window.addEventListener('keydown', e => {
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'S') {
+            const isMod = e.metaKey || e.ctrlKey;
+            
+            // Základní formátování
+            if (isMod && e.key === 'b') { e.preventDefault(); quill.format('bold', !quill.getFormat().bold); }
+            if (isMod && e.key === 'i') { e.preventDefault(); quill.format('italic', !quill.getFormat().italic); }
+            if (isMod && e.key === 'u') { e.preventDefault(); quill.format('underline', !quill.getFormat().underline); }
+            
+            // Nadpisy
+            if (isMod && e.key === '1') { e.preventDefault(); quill.format('header', quill.getFormat().header === 1 ? false : 1); }
+            if (isMod && e.key === '2') { e.preventDefault(); quill.format('header', quill.getFormat().header === 2 ? false : 2); }
+            if (isMod && e.key === '3') { e.preventDefault(); quill.format('header', quill.getFormat().header === 3 ? false : 3); }
+
+            // Speciální
+            if (isMod && e.shiftKey && e.key === 'S') {
                 e.preventDefault();
                 manualSaveVersion();
             }
+            if (isMod && e.key === 'l') { e.preventDefault(); toggleAIDrawer(); }
+            if (isMod && e.shiftKey && e.key === 'A') { e.preventDefault(); anonymize(); }
         });
 
-        // --- INTEGRACE ---
-        function saveIntegrationSettings() {
+        // --- Onboarding (Fáze 14) ---
+        function startOnboarding() {
+            const steps = [
+                { el: '.ribbon', msg: "Vítejte v LexisEditoru! Zde najdete všechny nástroje přehledně rozdělené do karet." },
+                { el: '#ai-drawer-toggle', msg: "Tímto tlačítkem otevřete AI Toolbox. Zde najdete asistenta, knihovnu doložek i sémantické hledání." },
+                { el: '#dictation-btn', msg: "Potřebujete si uvolnit ruce? Použijte diktování pro psaní hlasem přímo do smlouvy." },
+                { el: '.doc-title-center', msg: "Kliknutím sem můžete dokument přejmenovat. Vše se automaticky ukládá na váš disk." }
+            ];
+
+            let currentStep = 0;
+
+            function showStep() {
+                const s = steps[currentStep];
+                const target = document.querySelector(s.el);
+                if (!target) return next();
+
+                const rect = target.getBoundingClientRect();
+                const tip = document.createElement('div');
+                tip.id = "tour-tip";
+                tip.style = `position:fixed; top:${rect.bottom + 15}px; left:${rect.left}px; background:var(--word-blue); color:white; padding:15px; border-radius:10px; width:250px; z-index:10000; box-shadow:0 10px 25px rgba(0,0,0,0.2); font-size:13px; font-family:'Inter',sans-serif;`;
+                tip.innerHTML = `
+                    <div style="margin-bottom:10px;">${s.msg}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:10px; opacity:0.7;">Krok ${currentStep + 1} z ${steps.length}</span>
+                        <button id="tour-next" style="padding:4px 10px; background:var(--accent); color:white; border:none; border-radius:4px; cursor:pointer; font-weight:700;">Další →</button>
+                    </div>
+                    <div style="position:absolute; top:-8px; left:20px; width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; border-bottom:8px solid var(--word-blue);"></div>
+                `;
+                document.body.appendChild(tip);
+
+                document.getElementById('tour-next').onclick = next;
+            }
+
+            function next() {
+                const old = document.getElementById('tour-tip');
+                if (old) old.remove();
+                currentStep++;
+                if (currentStep < steps.length) showStep();
+                else customAlert("Průvodce dokončen! Přejeme vám efektivní práci.");
+            }
+
+            showStep();
+        }
+        let knowledgeBase = JSON.parse(localStorage.getItem('lexis_kb') || '[]');
+
+        async function indexCurrentDocument() {
+            const text = quill.getText();
+            if (text.length < 50) return;
+
+            showLoader("Indexace dokumentu pro budoucí rešerši...");
+            
+            // AI vygeneruje krátké shrnutí a klíčová slova pro sémantické hledání
+            const prompt = `Shrň tento právní dokument do 3 vět a vypiš 5 klíčových slov (oddělených čárkou).
+            
+            TEXT:
+            ${text.substring(0, 2000)}`;
+
+            try {
+                const summary = await callAI(prompt, { temperature: 0.3 });
+                const docId = Date.now();
+                const title = document.getElementById('doc-title') ? document.getElementById('doc-title').innerText : "Bez názvu";
+                
+                knowledgeBase.push({
+                    id: docId,
+                    title: title,
+                    summary: summary,
+                    date: new Date().toISOString(),
+                    preview: text.substring(0, 500)
+                });
+
+                localStorage.setItem('lexis_kb', JSON.stringify(knowledgeBase));
+                customAlert("Dokument byl úspěšně zaindexován do vaší privátní znalostní báze.");
+            } catch (e) {
+                console.error(e);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function searchKnowledgeBase(query) {
+            if (knowledgeBase.length === 0) return "Vaše znalostní báze je zatím prázdná. Indexujte dokumenty pomocí tlačítka v menu.";
+            
+            // Sémantické hledání pomocí AI
+            const kbSummary = knowledgeBase.map((d, i) => `[ID:${i}] ${d.title}: ${d.summary}`).join("\n");
+            const prompt = `Jsi právní vyhledávač. Na základě dotazu uživatele najdi nejrelevantnější dokumenty z jeho historie.
+            DOTAZ: ${query}
+            
+            HISTORIE:
+            ${kbSummary}
+            
+            Vrať ID nejlepších shod (max 3) a stručné zdůvodnění proč.`;
+
+            return await callAI(prompt, { temperature: 0.2 });
+        }
+        // --- Voice Suite (Fáze 13) ---
+        let recognition = null;
+        let isDictating = false;
+
+        function toggleDictation() {
+            const btn = document.getElementById('dictation-btn');
+            const icon = btn.querySelector('.icon-sq');
+
+            if (isDictating) {
+                recognition.stop();
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return customAlert("Váš systém nepodporuje hlasové diktování.");
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'cs-CZ';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isDictating = true;
+                btn.classList.add('active-mic');
+                icon.style.background = '#fee2e2';
+                icon.style.color = '#ef4444';
+                icon.innerHTML = '🛑';
+                customAlert("Diktování spuštěno. Můžete mluvit...");
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    quill.focus();
+                    const range = quill.getSelection();
+                    quill.insertText(range ? range.index : quill.getLength(), finalTranscript + ' ');
+                }
+            };
+
+            recognition.onend = () => {
+                isDictating = false;
+                btn.classList.remove('active-mic');
+                icon.style.background = '';
+                icon.style.color = '';
+                icon.innerHTML = '🎙️';
+                customAlert("Diktování ukončeno.");
+            };
+
+            recognition.onerror = (e) => {
+                console.error("Dictation error:", e);
+                isDictating = false;
+                recognition.stop();
+            };
+
+            recognition.start();
+        }
             const url = document.getElementById('webhook-url').value;
             localStorage.setItem('lexis_webhook_url', url);
         }

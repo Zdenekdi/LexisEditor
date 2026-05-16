@@ -2,6 +2,14 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.0.0] - 2026-05-16
+### Přidáno
+- **AI Privacy Suite**: Upgrade anonymizátoru o detekci entit (jména, firmy) pomocí LLM.
+- **Znalostní báze (RAG)**: Indexace dokumentů a sémantické vyhledávání v historii přímo v AI Toolboxu.
+- **Voice Suite**: Hlasové diktování (Speech-to-Text) optimalizované pro češtinu.
+- **Onboarding**: Interaktivní průvodce (Tutorial) pro nové uživatele.
+- **Word Shortcuts**: Kompletní sada klávesových zkratek (Ctrl+B, I, U, 1-3, atd.).
+
 ## [2.5.0] - 2026-05-15
 ### Přidáno
 - **Ultimate Legal Suite**: Knihovna doložek (Clause Library) pro ukládání know-how.
