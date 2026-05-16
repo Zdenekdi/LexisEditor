@@ -8,6 +8,8 @@ class LexisUI {
         this.currentTab = 'home';
         this.isDrawerOpen = false;
         this.currentAuditResults = [];
+        this.idleTimer = null;
+        this.lockTimeout = 5 * 60 * 1000; // 5 minut výchozí
         
         this.init();
     }
@@ -17,8 +19,10 @@ class LexisUI {
         this.bindEvents();
         this.initContextMenu();
         this.loadQATSettings();
+        this.loadLockSettings();
         this.updateVersionDisplay();
         this.updateStats();
+        this.initIdleTimer();
     }
 
     bindEvents() {
@@ -35,55 +39,42 @@ class LexisUI {
             const qatMenu = document.getElementById('qat-custom-menu');
             if (qatMenu) qatMenu.style.display = 'none';
         });
+
+        // Idle activity listeners
+        document.addEventListener('mousemove', () => this.resetIdleTimer());
+        document.addEventListener('keydown', () => this.resetIdleTimer());
     }
 
-    initContextMenu() {
-        const editorEl = document.querySelector('.ql-editor');
-        const contextMenu = document.getElementById('editor-context-menu');
-        if (!editorEl || !contextMenu) return;
-
-        editorEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            contextMenu.style.display = 'block';
-            contextMenu.style.left = `${e.clientX}px`;
-            contextMenu.style.top = `${e.clientY}px`;
-        });
+    initIdleTimer() {
+        this.resetIdleTimer();
     }
 
-    showQATMenu(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const menu = document.getElementById('qat-custom-menu');
-        if (!menu) return;
-        menu.style.display = 'block';
-        menu.style.left = `${e.clientX}px`;
-        menu.style.top = `${e.clientY + 10}px`;
+    resetIdleTimer() {
+        if (this.idleTimer) clearTimeout(this.idleTimer);
+        this.idleTimer = setTimeout(() => {
+            this.lockApp();
+        }, this.lockTimeout);
     }
 
-    toggleQATItem(id) {
-        const btn = document.getElementById(id);
-        const check = document.getElementById(`check-${id}`);
-        if (!btn) return;
-        
-        const isHidden = btn.style.display === 'none';
-        btn.style.display = isHidden ? 'flex' : 'none';
-        if (check) check.innerText = isHidden ? '✓' : '';
-        
-        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
-        settings[id] = isHidden;
-        localStorage.setItem('lexis-qat-settings', JSON.stringify(settings));
+    lockApp() {
+        const lockScreen = document.getElementById('lock-screen');
+        if (lockScreen && this.lockTimeout > 0) {
+            lockScreen.style.display = 'flex';
+        }
     }
 
-    loadQATSettings() {
-        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
-        const defaults = { 'qat-save': true, 'qat-undo': true, 'qat-redo': true, 'qat-print': false, 'qat-new': false };
-        const finalSettings = { ...defaults, ...settings };
-        
-        for (const [id, visible] of Object.entries(finalSettings)) {
-            const btn = document.getElementById(id);
-            const check = document.getElementById(`check-${id}`);
-            if (btn) btn.style.display = visible ? 'flex' : 'none';
-            if (check) check.innerText = visible ? '✓' : '';
+    updateLockTimeout(val) {
+        this.lockTimeout = parseInt(val);
+        localStorage.setItem('lexis-lock-timeout', val);
+        this.resetIdleTimer();
+    }
+
+    loadLockSettings() {
+        const saved = localStorage.getItem('lexis-lock-timeout');
+        if (saved !== null) {
+            this.lockTimeout = parseInt(saved);
+            const select = document.getElementById('lock-timeout-select');
+            if (select) select.value = saved;
         }
     }
 
@@ -107,11 +98,9 @@ class LexisUI {
     }
 
     switchTab(tabName) {
-        // Deaktivace starých
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tool-groups-container').forEach(c => c.classList.remove('active'));
 
-        // Aktivace nových
         const targetTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
         const targetGroup = document.getElementById(`${tabName}-tools`);
         
@@ -176,7 +165,6 @@ class LexisUI {
         }
     }
 
-    // --- DOCUMENT IO ---
     saveDocument() {
         const html = this.core.getContent();
         const text = this.core.getText();
@@ -185,7 +173,6 @@ class LexisUI {
         if (window.electronAPI && window.electronAPI.saveFile) {
             window.electronAPI.saveFile({ title, html, text });
         } else {
-            // Browser fallback
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -224,7 +211,6 @@ class LexisUI {
         input.click();
     }
 
-    // --- CONTENT INSERTS ---
     insertFootnote() {
         this.customPrompt("Text poznámky pod čarou:", "", (text) => {
             if (!text) return;
@@ -263,7 +249,6 @@ class LexisUI {
         this.core.quill.insertText(range.index, sym);
     }
 
-    // --- TEXT MODIFICATIONS ---
     changeCase(type) {
         const range = this.core.quill.getSelection();
         if (range && range.length > 0) {
@@ -289,7 +274,6 @@ class LexisUI {
         });
     }
 
-    // --- WATERMARKS ---
     applyWatermark() {
         const wrapper = document.getElementById('editor-wrapper');
         let wmLayer = document.getElementById('watermark-layer');
@@ -313,13 +297,11 @@ class LexisUI {
         wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${text}</div>`;
     }
 
-    // --- APPLICATION FLOW ---
     openStartDocument(type) {
         if (type === 'blank') {
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
             this.core.setContent('<p><br></p>');
-            // initialization is already handled in index.html call to initApp()
         } else if (type === 'file') {
             this.importDocument();
         } else {
@@ -335,7 +317,6 @@ class LexisUI {
         }
     }
 
-    // --- LEGAL TOOLS ---
     formatLegal(type) {
         const range = this.core.quill.getSelection();
         if (!range) return;
@@ -497,7 +478,6 @@ class LexisUI {
         this.core.quill.insertText(range.index, clauses[type]);
     }
 
-    // --- AUDIT SYSTEM ---
     runFinalAudit() {
         this.showLoader("Provádím hloubkovou analýzu dokumentu...", () => {
             let allResults = [];
@@ -594,7 +574,6 @@ class LexisUI {
         this.renderAuditResults(this.currentAuditResults);
     }
 
-    // --- INTEGRATIONS ---
     startMailMerge() {
         this.customPrompt("Import dat (CSV obsah):", "Jméno,IČO,Sídlo\nJan Novák,123456,Praha", (csvData) => {
             if (!csvData) return;
@@ -615,7 +594,6 @@ class LexisUI {
         this.customAlert(`Zalinkováno ${found} spisových značek.`);
     }
 
-    // --- PAGE SETUP ---
     applyPaper(size) {
         const wrapper = document.getElementById('editor-wrapper');
         if (!wrapper) return;
@@ -648,7 +626,6 @@ class LexisUI {
         }
     }
 
-    // --- HELPERS & MODALS ---
     showLoader(text, callback) {
         const loader = document.getElementById('loader-overlay');
         const loaderText = document.getElementById('loader-text');
@@ -718,7 +695,6 @@ class LexisUI {
         };
     }
 
-    // --- CALCULATORS ---
     showFeeCalc() {
         this.customPrompt("Zadejte žalovanou částku (Kč):", "", (amount) => {
             if (!amount) return;
@@ -741,6 +717,56 @@ class LexisUI {
             const rate = repo + 8;
             this.customAlert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\n\nRočně: ${(val * rate / 100).toLocaleString('cs-CZ')} Kč\nMěsíčně: ${(val * rate / 1200).toLocaleString('cs-CZ')} Kč`);
         });
+    }
+
+    async initContextMenu() {
+        const editorEl = document.querySelector('.ql-editor');
+        const contextMenu = document.getElementById('editor-context-menu');
+        if (!editorEl || !contextMenu) return;
+
+        editorEl.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+        });
+    }
+
+    async loadQATSettings() {
+        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+        const defaults = { 'qat-save': true, 'qat-undo': true, 'qat-redo': true, 'qat-print': false, 'qat-new': false };
+        const finalSettings = { ...defaults, ...settings };
+        
+        for (const [id, visible] of Object.entries(finalSettings)) {
+            const btn = document.getElementById(id);
+            const check = document.getElementById(`check-${id}`);
+            if (btn) btn.style.display = visible ? 'flex' : 'none';
+            if (check) check.innerText = visible ? '✓' : '';
+        }
+    }
+
+    async showQATMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const menu = document.getElementById('qat-custom-menu');
+        if (!menu) return;
+        menu.style.display = 'block';
+        menu.style.left = `${e.clientX}px`;
+        menu.style.top = `${e.clientY + 10}px`;
+    }
+
+    async toggleQATItem(id) {
+        const btn = document.getElementById(id);
+        const check = document.getElementById(`check-${id}`);
+        if (!btn) return;
+        
+        const isHidden = btn.style.display === 'none';
+        btn.style.display = isHidden ? 'flex' : 'none';
+        if (check) check.innerText = isHidden ? '✓' : '';
+        
+        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+        settings[id] = isHidden;
+        localStorage.setItem('lexis-qat-settings', JSON.stringify(settings));
     }
 }
 

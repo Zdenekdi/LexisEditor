@@ -10,6 +10,7 @@
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff-match-patch/1.0.5/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     
     <link rel="stylesheet" href="css/lexis-style.css">
     <style>
@@ -595,6 +596,17 @@
                     <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
                         <span>Model:</span>
                         <input type="text" id="ai-model" value="llama3" onchange="saveAISettings()" class="combo-box" style="width:80px">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Auto-Zámek:</span>
+                        <select id="lock-timeout-select" onchange="lexisUI.updateLockTimeout(this.value)" class="combo-box">
+                            <option value="60000">1 minuta</option>
+                            <option value="300000" selected>5 minut</option>
+                            <option value="600000">10 minut</option>
+                            <option value="1800000">30 minut</option>
+                            <option value="3600000">1 hodina</option>
+                            <option value="0">Vypnuto</option>
+                        </select>
                     </div>
                 </div>
                 <div class="group-label">AI Engine</div>

@@ -1,7 +1,40 @@
 /**
+ * SecureVault Wrapper
+ * Bezpečné ukládání citlivých dat (API klíče, hesla).
+ */
+class SecureVault {
+    async save(key, value) {
+        if (window.electronAPI && window.electronAPI.saveAIConfig) {
+            const config = await this.getAll();
+            config[key] = value;
+            return await window.electronAPI.saveAIConfig(config);
+        } else {
+            localStorage.setItem(`secure_${key}`, btoa(value));
+            return true;
+        }
+    }
+
+    async get(key) {
+        if (window.electronAPI && window.electronAPI.getAIConfig) {
+            const config = await window.electronAPI.getAIConfig();
+            return config ? config[key] : null;
+        } else {
+            const val = localStorage.getItem(`secure_${key}`);
+            return val ? atob(val) : null;
+        }
+    }
+
+    async getAll() {
+        if (window.electronAPI && window.electronAPI.getAIConfig) {
+            return await window.electronAPI.getAIConfig() || {};
+        }
+        return {};
+    }
+}
+
+/**
  * LexisCore SDK v1.0
  * Jádro právního editoru LexisEditor.
- * Zapouzdřuje logiku dokumentu, AI a právních nástrojů.
  */
 class LexisCore {
     constructor(containerId, options = {}) {
@@ -11,26 +44,34 @@ class LexisCore {
         this.knowledgeBase = JSON.parse(localStorage.getItem('lexis_kb') || '[]');
         this.isTrackChangesActive = false;
         this.scanTimeout = null;
+        this.secureVault = new SecureVault();
         
         this.init();
     }
 
     init() {
-        // Registrace vlastních Blotů (Právní formáty)
         this.registerBlots();
         
-        // Inicializace Quill editoru
         this.quill = new Quill(this.containerId, {
             theme: 'snow',
             modules: {
                 toolbar: false,
                 keyboard: {
                     bindings: this.getKeyboardBindings()
+                },
+                clipboard: {
+                    matchers: [
+                        [Node.ELEMENT_NODE, (node, delta) => {
+                            if (typeof DOMPurify !== 'undefined' && node.innerHTML) {
+                                node.innerHTML = DOMPurify.sanitize(node.innerHTML);
+                            }
+                            return delta;
+                        }]
+                    ]
                 }
             }
         });
 
-        // Eventy
         this.quill.on('text-change', (delta, oldDelta, source) => {
             if (source === 'user' && this.isTrackChangesActive) {
                 this.handleTrackChanges(delta);
@@ -192,7 +233,8 @@ class LexisCore {
     }
 
     setContent(html) {
-        this.quill.root.innerHTML = html || '<p><br></p>';
+        const cleanHtml = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html || '') : (html || '');
+        this.quill.root.innerHTML = cleanHtml || '<p><br></p>';
     }
 
     getContent() {
@@ -205,7 +247,12 @@ class LexisCore {
 
     async callAI(prompt, systemPrompt = "Jsi špičkový právní asistent.") {
         if (this.options.aiProvider) {
-            return await this.options.aiProvider(prompt, systemPrompt);
+            try {
+                return await this.options.aiProvider(prompt, systemPrompt);
+            } catch (error) {
+                console.error("AI Provider Error:", error);
+                return "Chyba AI poskytovatele.";
+            }
         }
         return "AI Provider not configured.";
     }
