@@ -10,6 +10,22 @@ class LexisUI {
         this.currentAuditResults = [];
         this.idleTimer = null;
         this.lockTimeout = 5 * 60 * 1000; // 5 minut výchozí
+        this.currentPdfText = '';
+        this.activeDeadlines = [];
+        this.deadlineScanTimer = null;
+        
+        // Metadata fields for document memory
+        this.currentDocumentId = 'doc_active';
+        this.currentDocumentDeadline = null;
+        this.currentDocumentCj = '';
+
+        window.saveDetectedDeadline = (days, encContext) => {
+            const context = decodeURIComponent(encContext);
+            this.promptAddDeadline(days, context);
+        };
+        window.removeActiveDeadline = (id) => {
+            this.removeActiveDeadline(id);
+        };
         
         this.init();
     }
@@ -26,6 +42,8 @@ class LexisUI {
         this.updateStats();
         this.initIdleTimer();
         this.initLexisLinkListeners();
+        this.initDeadlines();
+        this.initActiveDocumentState();
     }
 
 
@@ -92,6 +110,14 @@ class LexisUI {
         const charEl = document.getElementById('char-count');
         if (wordEl) wordEl.innerText = `Slova: ${words}`;
         if (charEl) charEl.innerText = `Znaky: ${chars}`;
+
+        // Throttled scan for deadlines in editor and auto-saving state
+        clearTimeout(this.deadlineScanTimer);
+        this.deadlineScanTimer = setTimeout(() => {
+            this.scanTextForDeadlines(text, 'editor');
+            this.saveActiveDocumentState();
+            this.updateDocumentOutline();
+        }, 1500);
     }
 
     bindTabs() {
@@ -314,14 +340,20 @@ class LexisUI {
 
 
     openStartDocument(type) {
+        this.currentDocumentDeadline = null;
+        this.currentDocumentCj = '';
+        this.updateDeadlineBadge();
+        
         if (type === 'blank') {
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
             this.core.setContent('<p><br></p>');
             this.setDocumentStatus('draft', true);
+            this.saveActiveDocumentState();
         } else if (type === 'file') {
             this.importDocument();
             this.setDocumentStatus('draft', true);
+            this.saveActiveDocumentState();
         } else {
             this.showLoader("Načítání šablony...", async () => {
                 document.getElementById('start-screen').style.display = 'none';
@@ -332,6 +364,7 @@ class LexisUI {
                     this.core.setContent(content);
                 }
                 this.setDocumentStatus('draft', true);
+                this.saveActiveDocumentState();
             });
         }
     }
@@ -1215,6 +1248,197 @@ class LexisUI {
         });
     }
 
+    async openPdfViewer() {
+        if (!window.electronAPI || !window.electronAPI.importPdf) {
+            this.customAlert("Integrovaný PDF Prohlížeč je dostupný pouze v desktopové verzi aplikace.");
+            return;
+        }
+
+        try {
+            const res = await window.electronAPI.importPdf();
+            if (res && res.success) {
+                // Save the extracted text for import
+                this.currentPdfText = res.text || '';
+                
+                // Set the PDF in the iframe
+                const pdfFrame = document.getElementById('pdf-frame');
+                
+                if (pdfFrame) {
+                    pdfFrame.src = `data:application/pdf;base64,${res.base64}`;
+                    document.body.classList.add('pdf-active');
+                    
+                    // Automatically scan the opened PDF text for deadlines
+                    this.scanTextForDeadlines(this.currentPdfText, 'pdf');
+                    
+                    // Show a nice toast alert
+                    this.customAlert(`📋 <b>PDF dokument otevřen!</b><br><br>Váš PDF soubor byl načten do integrovaného prohlížeče vedle editoru. Text z něj můžete kdykoli přenést kliknutím na tlačítko <b>✨ Importovat text</b>.`);
+                }
+            } else if (res && res.error) {
+                this.customAlert("Nepodařilo se otevřít PDF dokument: " + res.error);
+            }
+        } catch (e) {
+            console.error(e);
+            this.customAlert("Chyba při otevírání PDF: " + e.message);
+        }
+    }
+
+    closePdfViewer() {
+        const pdfFrame = document.getElementById('pdf-frame');
+        
+        document.body.classList.remove('pdf-active');
+        if (pdfFrame) {
+            pdfFrame.src = '';
+        }
+        this.currentPdfText = '';
+    }
+
+    importCurrentPdfText() {
+        if (!this.currentPdfText) {
+            this.customAlert("Žádný text k importu nebyl nalezen.");
+            return;
+        }
+        
+        try {
+            const range = this.core.quill.getSelection(true);
+            this.core.quill.insertText(range.index, `\n${this.currentPdfText}\n`);
+            this.customAlert("✅ <b>Text byl importován!</b><br><br>Extrahovaný obsah z PDF byl vložen na pozici kurzoru.");
+        } catch (e) {
+            console.error(e);
+            this.customAlert("Nepodařilo se vložit text do editoru: " + e.message);
+        }
+    }
+
+    async generateReplyFromPdf() {
+        if (!this.currentPdfText) {
+            this.customAlert("Nebyly nalezeny žádné textové podklady k analýze.");
+            return;
+        }
+
+        // 1. Try to extract File Number (č. j. / sp. zn.)
+        const cjRegexes = [
+            /(?:č\s*\.\s*j\s*\.|číslo\s*jednací|sp\s*\.\s*zn\s*\.)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i,
+            /(?:spisová\s*značka|spis\.?\s*zn\.?)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i
+        ];
+        
+        let fileNumber = '';
+        for (const regex of cjRegexes) {
+            const match = regex.exec(this.currentPdfText);
+            if (match && match[1]) {
+                fileNumber = match[1].trim();
+                break;
+            }
+        }
+        
+        if (!fileNumber) {
+            fileNumber = 'Spis. zn. / Č. j. nevyplněno';
+        }
+        
+        // 2. Try to extract Sender or Court name
+        const courtRegex = /(?:okresní|krajský|vrchní|ústavní|nejvyšší)\s+soud\s+(?:v|ve|brně|praze|ostravě|plzni|olomouci|hradci|[a-zá-žěščřžýáíéóúůďťň]+)/i;
+        const courtMatch = courtRegex.exec(this.currentPdfText);
+        let recipient = courtMatch ? courtMatch[0].trim() : 'Příslušný soud / Orgán';
+        
+        // Capitalize first letters nicely
+        recipient = recipient.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+
+        // 3. Try to extract deadline
+        const deadlineRegex = /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-žěščřžýáíéóúůďťň]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/i;
+        const deadlineMatch = deadlineRegex.exec(this.currentPdfText);
+        const days = deadlineMatch ? parseInt(deadlineMatch[1]) : 15; // default to 15 days if not found
+
+        // 4. Confirm with user via customPrompt / confirmation
+        this.customPrompt(`📝 <b>Automatický návrh odpovědi</b><br><br>Detekovali jsme následující údaje z příchozího PDF. Můžete je upravit před vygenerováním:<br><br><b>Příjemce:</b>`, recipient, async (updatedRecipient) => {
+            if (!updatedRecipient) return;
+            
+            this.customPrompt(`<b>Spisová značka / Číslo jednací (č. j.):</b>`, fileNumber, async (updatedCj) => {
+                if (!updatedCj) return;
+                
+                this.customPrompt(`<b>Lhůta na odpověď (v počtu dní):</b>`, days.toString(), async (updatedDaysStr) => {
+                    const updatedDays = parseInt(updatedDaysStr) || 15;
+                    
+                    // Create beautiful reply template in editor
+                    const dateStr = new Date().toLocaleDateString('cs-CZ');
+                    const replyHtml = `
+                        <h1 class="ql-align-center" style="font-size: 16pt; color: #1e3a8a;">VYJÁDŘENÍ ÚČASTNÍKA</h1>
+                        <p><br></p>
+                        <p><b>Adresát:</b></p>
+                        <p><b>${updatedRecipient}</b></p>
+                        <p>[Adresa soudu]</p>
+                        <p><br></p>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 50%; padding: 5px 0;"><b>K č. j. / sp. zn.:</b> ${updatedCj}</td>
+                                    <td style="width: 50%; padding: 5px 0; text-align: right;"><b>Datum:</b> ${dateStr}</td>
+                                </tr>
+                                <tr>
+                                    <td style="width: 50%; padding: 5px 0;"><b>Zastoupený:</b> [Jméno klienta]</td>
+                                    <td style="width: 50%; padding: 5px 0; text-align: right;"><b>Právní zástupce:</b> Advokátní kancelář Lexis</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <hr style="border: none; border-top: 1px solid #cbd5e1; margin-bottom: 20px;">
+                        <p>K výzvě soudu ze dne [doplňte datum výzvy] k č. j. <b>${updatedCj}</b> podává účastník prostřednictvím svého právního zástupce následující vyjádření:</p>
+                        <p><br></p>
+                        <p><b>I.</b></p>
+                        <p>Účastník se plně vyjadřuje k žalobě tak, že s nárokem uplatněným žalobcem nesouhlasí a navrhuje, aby soud žalobu v plném rozsahu zamítl.</p>
+                        <p><br></p>
+                        <p><b>II.</b></p>
+                        <p>[Doplňte podrobnou právní a skutkovou argumentaci...]</p>
+                        <p><br></p>
+                        <p><b>III.</b></p>
+                        <p>S ohledem na výše uvedené navrhujeme, aby soud vydal tento</p>
+                        <p><br></p>
+                        <p class="ql-align-center"><b>r e z o l u c i :</b></p>
+                        <p><br></p>
+                        <p><b>Žaloba se v plném rozsahu zamítá. Žalobce je povinen uhradit žalovanému náklady řízení k rukám jeho právního zástupce do 3 dnů od právní moci rozsudku.</b></p>
+                        <p><br></p>
+                        <p style="text-align: right;">[Podpis zmocněnce / Razítko]</p>
+                    `;
+                    
+                    // 5. Update editor text and set state
+                    this.core.setContent(replyHtml);
+                    this.setDocumentStatus('draft', true);
+                    
+                    // 6. Automatically register in Deadline Guard & active document memory!
+                    const id = 'dl_' + Date.now();
+                    const date = new Date();
+                    date.setDate(date.getDate() + updatedDays);
+                    
+                    const newDl = {
+                        id: id,
+                        title: `Odpověď: ${updatedCj}`,
+                        days: updatedDays,
+                        dueDate: date.toISOString().split('T')[0],
+                        context: `Číslo jednací: ${updatedCj}, Odesílatel: ${updatedRecipient}`,
+                        createdAt: new Date().toISOString().split('T')[0]
+                    };
+                    
+                    this.activeDeadlines.push(newDl);
+                    await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+                    this.renderDeadlines();
+                    
+                    // Store in active document metadata
+                    this.currentDocumentDeadline = {
+                        dueDate: newDl.dueDate,
+                        days: updatedDays,
+                        title: newDl.title,
+                        context: newDl.context
+                    };
+                    this.currentDocumentCj = updatedCj;
+                    this.updateDeadlineBadge();
+                    this.saveActiveDocumentState();
+                    
+                    // Hide the detected section if we created the response
+                    const detectedSection = document.getElementById('detected-deadlines-section');
+                    if (detectedSection) detectedSection.style.display = 'none';
+                    
+                    this.customAlert(`✨ <b>Odpověď vygenerována!</b><br><br>1. Šablona vyjádření s hlavičkou a č. j. <b>${updatedCj}</b> byla připravena v editoru.<br>2. Lhůta na odpověď (<b>${updatedDays} dní</b>, tj. do <b>${newDl.dueDate}</b>) byla bezpečně uložena v interní paměti dokumentu a v hlídači.<br>3. Stav byl nastaven na <b>✍️ Rozpracované</b>.`);
+                });
+            });
+        });
+    }
+
     switchSidebarTab(tabName) {
         document.querySelectorAll('.main-sidebar-tab').forEach(t => t.classList.remove('active'));
         const activeTab = document.getElementById(`tab-sb-${tabName}`);
@@ -1908,6 +2132,332 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (!suppressNotification) {
             this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b>`);
         }
+        
+        this.saveActiveDocumentState();
+    }
+
+    async initActiveDocumentState() {
+        try {
+            const saved = await this.core.storage.get('documents', 'doc_active');
+            if (saved && saved.html) {
+                // Restore active document content and title
+                this.core.setContent(saved.html);
+                if (saved.status) {
+                    this.setDocumentStatus(saved.status, true);
+                }
+                
+                this.currentDocumentDeadline = saved.deadline || null;
+                this.currentDocumentCj = saved.cj || '';
+                this.updateDeadlineBadge();
+                this.updateDocumentOutline();
+                
+                // Hide start screen if active document was restored
+                const startScreen = document.getElementById('start-screen');
+                const appContainer = document.getElementById('app-container');
+                if (startScreen && appContainer) {
+                    startScreen.style.display = 'none';
+                    appContainer.style.display = 'flex';
+                }
+                
+                console.log("Aktivní stav dokumentu byl úspěšně obnoven ze zálohy.");
+            }
+        } catch (e) {
+            console.error("Chyba při obnově stavu aktivního dokumentu:", e);
+        }
+    }
+
+    async saveActiveDocumentState() {
+        try {
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const title = text.substring(0, 30).trim() || "Nový dokument";
+            
+            const state = {
+                id: 'doc_active',
+                html: html,
+                text: text,
+                title: title,
+                status: this.documentStatus || 'draft',
+                deadline: this.currentDocumentDeadline || null,
+                cj: this.currentDocumentCj || '',
+                updatedAt: new Date().toISOString()
+            };
+            
+            await this.core.storage.set('documents', state);
+        } catch (e) {
+            console.error("Chyba při ukládání stavu aktivního dokumentu:", e);
+        }
+    }
+
+    updateDeadlineBadge() {
+        const badge = document.getElementById('doc-deadline-badge');
+        if (!badge) return;
+        
+        if (!this.currentDocumentDeadline) {
+            badge.style.display = 'none';
+            return;
+        }
+        
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        
+        const due = new Date(this.currentDocumentDeadline.dueDate);
+        due.setHours(0,0,0,0);
+        
+        const diffTime = due - now;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const dateStr = due.toLocaleDateString('cs-CZ');
+        
+        badge.style.display = 'inline-block';
+        
+        if (diffDays <= 3) {
+            badge.style.background = '#fee2e2';
+            badge.style.color = '#991b1b';
+            badge.style.borderColor = '#fca5a5';
+        } else if (diffDays <= 7) {
+            badge.style.background = '#ffedd5';
+            badge.style.color = '#c2410c';
+            badge.style.borderColor = '#fed7aa';
+        } else {
+            badge.style.background = '#dcfce7';
+            badge.style.color = '#15803d';
+            badge.style.borderColor = '#bbf7d0';
+        }
+        
+        const daysText = diffDays < 0 ? 'Expirovala!' : (diffDays === 0 ? 'Dnes!' : `Za ${diffDays} dní`);
+        badge.innerHTML = `⏰ Lhůta: ${daysText} (${dateStr})`;
+    }
+
+    showDeadlineInfo() {
+        if (!this.currentDocumentDeadline) return;
+        
+        const dl = this.currentDocumentDeadline;
+        const due = new Date(dl.dueDate);
+        const dateStr = due.toLocaleDateString('cs-CZ');
+        
+        this.customAlert(`⏰ <b>Podrobnosti sledované lhůty</b><br><br>` +
+            `<b>Název úkonu:</b> ${dl.title}<br>` +
+            `<b>Spis. zn. / Číslo jednací:</b> ${this.currentDocumentCj || 'Nespecifikováno'}<br>` +
+            `<b>Termín splnění:</b> ${dateStr}<br><br>` +
+            `<div style="font-size: 11px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; font-style: italic; line-height: 1.4;">` +
+            `Lhůta je bezpečně uložena v interní paměti dokumentu a synchronizována se systémovým hlídačem lhůt.` +
+            `</div>`);
+    }
+
+    updateDocumentOutline() {
+        const listContainer = document.getElementById('document-outline-list');
+        if (!listContainer) return;
+        
+        const headings = this.core.quill.root.querySelectorAll('h1, h2, h3');
+        if (headings.length === 0) {
+            listContainer.innerHTML = `<div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Prázdná osnova. Použijte styl Nadpis pro zobrazení osnovy.</div>`;
+            return;
+        }
+        
+        listContainer.innerHTML = '';
+        headings.forEach((heading, index) => {
+            const level = heading.tagName.toLowerCase(); // h1, h2, h3
+            const text = heading.textContent.trim() || `Bez názvu (${level.toUpperCase()})`;
+            
+            const item = document.createElement('div');
+            item.className = 'outline-item';
+            
+            // Indentation based on heading level
+            let indent = '0px';
+            let fontSize = '12px';
+            let fontWeight = '500';
+            let color = '#1e293b';
+            
+            if (level === 'h1') {
+                indent = '0px';
+                fontSize = '12px';
+                fontWeight = '700';
+                color = 'var(--word-blue)';
+            } else if (level === 'h2') {
+                indent = '10px';
+                fontSize = '11px';
+                fontWeight = '600';
+                color = '#475569';
+            } else if (level === 'h3') {
+                indent = '20px';
+                fontSize = '10px';
+                fontWeight = '500';
+                color = '#64748b';
+            }
+            
+            item.style = `padding: 4px 6px; border-radius: 4px; cursor: pointer; margin-left: ${indent}; font-size: ${fontSize}; font-weight: ${fontWeight}; color: ${color}; transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
+            item.innerText = text;
+            
+            // Hover effect
+            item.onmouseover = () => {
+                item.style.background = '#f1f5f9';
+            };
+            item.onmouseout = () => {
+                item.style.background = 'none';
+            };
+            
+            // Click to scroll
+            item.onclick = () => {
+                heading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Briefly flash the target heading
+                const originalBackground = heading.style.background;
+                heading.style.transition = 'background 0.3s';
+                heading.style.background = '#fef08a'; // yellow highlight
+                setTimeout(() => {
+                    heading.style.background = originalBackground;
+                }, 1000);
+            };
+            
+            listContainer.appendChild(item);
+        });
+    }
+
+    async initDeadlines() {
+        try {
+            const saved = await this.core.storage.get('settings', 'active-deadlines');
+            this.activeDeadlines = saved || [];
+            this.renderDeadlines();
+        } catch (e) {
+            console.error("Chyba při načítání lhůt:", e);
+            this.activeDeadlines = [];
+        }
+    }
+
+    scanTextForDeadlines(text, source) {
+        if (!text) return;
+        
+        // Czech legal deadline patterns
+        const regexes = [
+            // "lhůta/lhůtě/lhůtu/termín do/činí XX dnů/dní"
+            /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-ž]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi,
+            // "do XX dnů/dní" (contextual)
+            /\bdo\s+(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi
+        ];
+        
+        const detected = [];
+        const lines = text.split('\n');
+        
+        for (const line of lines) {
+            if (line.trim().length < 10) continue; // Skip too short lines
+            
+            for (const regex of regexes) {
+                let match;
+                regex.lastIndex = 0;
+                while ((match = regex.exec(line)) !== null) {
+                    const days = parseInt(match[1]);
+                    const context = line.trim().replace(/\s+/g, ' ');
+                    
+                    if (!detected.some(d => d.days === days && d.context === context)) {
+                        detected.push({ days, context });
+                    }
+                }
+            }
+        }
+        
+        const detectedSection = document.getElementById('detected-deadlines-section');
+        const detectedList = document.getElementById('detected-list');
+        
+        if (!detectedList || !detectedSection) return;
+        
+        if (detected.length > 0) {
+            detectedSection.style.display = 'block';
+            detectedList.innerHTML = detected.map((d, index) => `
+                <div style="background: white; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #78350f;">
+                    <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span>⚠️ Detekována lhůta: ${d.days} dní</span>
+                        <button onclick="window.saveDetectedDeadline(${d.days}, '${encodeURIComponent(d.context)}')" style="background: #f59e0b; color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s;">➕ Uložit</button>
+                    </div>
+                    <div style="font-style: italic; color: #92400e; max-height: 45px; overflow-y: auto; line-height: 1.3;">"${d.context.substring(0, 100)}${d.context.length > 100 ? '...' : ''}"</div>
+                </div>
+            `).join('');
+        } else {
+            detectedSection.style.display = 'none';
+        }
+    }
+
+    promptAddDeadline(defaultDays, context) {
+        this.customPrompt(`💡 <b>Uložit lhůtu do hlídače</b><br><br>Zadejte název nebo popis úkonu (např. <i>Vyjádření k žalobě</i>):`, `Lhůta ${defaultDays} dní`, async (title) => {
+            if (!title) return;
+            
+            const id = 'dl_' + Date.now();
+            const date = new Date();
+            date.setDate(date.getDate() + defaultDays);
+            
+            const newDl = {
+                id: id,
+                title: title,
+                days: defaultDays,
+                dueDate: date.toISOString().split('T')[0],
+                context: context,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+            
+            this.activeDeadlines.push(newDl);
+            await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+            this.renderDeadlines();
+            
+            const detectedSection = document.getElementById('detected-deadlines-section');
+            if (detectedSection) detectedSection.style.display = 'none';
+            
+            this.customAlert(`⏰ <b>Lhůta uložena!</b><br><br>Úkon <b>${title}</b> byl přidán do vašeho hlídače lhůt na datum <b>${newDl.dueDate}</b>.`);
+        });
+    }
+
+    renderDeadlines() {
+        const listContainer = document.getElementById('deadlines-list');
+        if (!listContainer) return;
+        
+        if (this.activeDeadlines.length === 0) {
+            listContainer.innerHTML = `
+                <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Žádné aktivní lhůty ke sledování.</div>
+            `;
+            return;
+        }
+        
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        
+        const sorted = [...this.activeDeadlines].sort((a, b) => {
+            return new Date(a.dueDate) - new Date(b.dueDate);
+        });
+        
+        listContainer.innerHTML = sorted.map(dl => {
+            const due = new Date(dl.dueDate);
+            due.setHours(0,0,0,0);
+            
+            const diffTime = due - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            let badgeBg = '#22c55e';
+            let badgeColor = 'white';
+            if (diffDays <= 3) {
+                badgeBg = '#ef4444';
+            } else if (diffDays <= 7) {
+                badgeBg = '#f97316';
+            }
+            
+            const daysText = diffDays < 0 ? 'Expirovala' : (diffDays === 0 ? 'Dnes!' : `Za ${diffDays} dní`);
+            const dateStr = due.toLocaleDateString('cs-CZ');
+            
+            return `
+                <div class="clause-item" style="cursor: default; display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 12px; gap: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="flex-grow: 1; min-width: 0;">
+                        <div style="font-weight: 700; font-size: 11px; color: #1e293b; margin-bottom: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${dl.title}</div>
+                        <div style="font-size: 10px; color: #64748b;">Do: ${dateStr}</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0;">
+                        <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 9999px; background: ${badgeBg}; color: ${badgeColor};">${daysText}</span>
+                        <span onclick="window.removeActiveDeadline('${dl.id}')" style="cursor: pointer; font-size: 10px; color: #94a3b8; transition: color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'" title="Smazat upozornění">🗑️</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async removeActiveDeadline(id) {
+        this.activeDeadlines = this.activeDeadlines.filter(dl => dl.id !== id);
+        await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+        this.renderDeadlines();
     }
 }
 

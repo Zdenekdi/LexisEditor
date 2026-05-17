@@ -418,3 +418,19 @@ body.split-view #reference-panel { width: 500px; display: block; padding: 20px; 
     background: rgba(255, 255, 255, 0.08);
     color: white;
 }
+
+/* PDF Side-by-Side Viewer Mode */
+body.pdf-active #editor-wrapper {
+    width: 150mm !important;
+    min-height: 212mm !important;
+}
+body.pdf-active .page-header, body.pdf-active .page-footer {
+    padding: 10mm 20mm 5mm 20mm !important;
+}
+body.pdf-active .ql-editor {
+    padding: 10mm 15mm 15mm 15mm !important;
+}
+body.pdf-active #pdf-viewer-pane {
+    display: flex !important;
+}
+

@@ -421,7 +421,7 @@ ipcMain.handle('test-post-connection', async (event, creds) => {
 ipcMain.handle('import-pdf', async () => {
     try {
         const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-            title: 'Importovat text z PDF',
+            title: 'Otevřít PDF v integrovaném prohlížeči',
             filters: [{ name: 'PDF Dokumenty', extensions: ['pdf'] }],
             properties: ['openFile']
         });
@@ -429,13 +429,15 @@ ipcMain.handle('import-pdf', async () => {
         if (canceled || filePaths.length === 0) return { success: false, canceled: true };
 
         const dataBuffer = fs.readFileSync(filePaths[0]);
+        const base64 = dataBuffer.toString('base64');
         const data = await pdf(dataBuffer);
 
         return { 
             success: true, 
             text: data.text,
             info: data.info,
-            pages: data.numpages
+            pages: data.numpages,
+            base64: base64
         };
     } catch (error) {
         console.error('PDF Import Error:', error);
