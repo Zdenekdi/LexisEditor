@@ -85,6 +85,13 @@ class LexisCore {
     registerBlots() {
         const Block = Quill.import('blots/block');
         const Inline = Quill.import('blots/inline');
+        const Parchment = Quill.import('parchment');
+
+        const LineHeightStyle = new Parchment.Attributor.Style('lineheight', 'line-height', {
+            scope: Parchment.Scope.BLOCK,
+            whitelist: ['1.0', '1.15', '1.5', '2.0', 'normal']
+        });
+        Quill.register(LineHeightStyle, true);
 
         class ArticleBlot extends Block {}
         ArticleBlot.blotName = 'article';

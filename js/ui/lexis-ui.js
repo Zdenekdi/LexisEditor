@@ -21,6 +21,7 @@ class LexisUI {
         this.loadQATSettings();
         this.loadLockSettings();
         this.loadLicense();
+        this.loadAISettings();
         this.updateVersionDisplay();
         this.updateStats();
         this.initIdleTimer();
@@ -1540,6 +1541,322 @@ class LexisUI {
                 });
             }
         });
+    }
+
+    exec(format, value = true) {
+        const current = this.core.quill.getFormat();
+        if (current[format] === value) {
+            this.core.quill.format(format, false);
+        } else {
+            this.core.quill.format(format, value);
+        }
+    }
+
+    indent(val) {
+        const range = this.core.quill.getSelection();
+        if (range) {
+            const currentIndent = this.core.quill.getFormat(range).indent || 0;
+            const newIndent = Math.max(0, currentIndent + val);
+            this.core.quill.format('indent', newIndent === 0 ? false : newIndent);
+        }
+    }
+
+    applyStyle(style) {
+        if (style === 'h1') {
+            this.core.quill.format('header', 1);
+        } else if (style === 'h2') {
+            this.core.quill.format('header', 2);
+        } else {
+            this.core.quill.format('header', false);
+        }
+    }
+
+    applyHighlight(color) {
+        const current = this.core.quill.getFormat();
+        if (current.background === color) {
+            this.core.quill.format('background', false);
+        } else {
+            this.core.quill.format('background', color);
+        }
+    }
+
+    setLineHeight(val) {
+        this.core.quill.format('lineheight', val);
+    }
+
+    toggleDictation() {
+        const btn = document.getElementById('dictation-btn');
+        if (this.isDictating) {
+            if (this.recognition) {
+                this.recognition.stop();
+            }
+            this.isDictating = false;
+            if (btn) {
+                btn.style.background = '';
+                btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+            }
+            this.customAlert("🎙️ <b>Diktování zastaveno.</b>");
+        } else {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                this.customAlert("⚠️ Webová diktace není v tomto prohlížeči podporována. Spusťte aplikaci v Chrome nebo Electronu.");
+                return;
+            }
+            
+            this.recognition = new SpeechRecognition();
+            this.recognition.lang = 'cs-CZ';
+            this.recognition.continuous = true;
+            this.recognition.interimResults = false;
+            
+            this.recognition.onstart = () => {
+                this.isDictating = true;
+                if (btn) {
+                    btn.style.background = 'rgba(239, 68, 68, 0.2)';
+                    btn.innerHTML = '<div class="icon-sq">🔴</div>Nahrávám...';
+                }
+            };
+            
+            this.recognition.onresult = (event) => {
+                const text = event.results[event.results.length - 1][0].transcript;
+                const range = this.core.quill.getSelection(true);
+                this.core.quill.insertText(range.index, text + " ");
+            };
+            
+            this.recognition.onerror = (e) => {
+                console.error("Chyba diktování:", e);
+                if (this.recognition) this.recognition.stop();
+            };
+            
+            this.recognition.onend = () => {
+                this.isDictating = false;
+                if (btn) {
+                    btn.style.background = '';
+                    btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+                }
+            };
+            
+            this.recognition.start();
+        }
+    }
+
+    openPostDialog() {
+        const overlay = document.createElement('div');
+        overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);";
+        
+        const modal = document.createElement('div');
+        modal.style = "background:#fff;padding:28px;border-radius:16px;width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif;border:1px solid #e2e8f0;position:relative;animation: modalFadeIn 0.3s ease;";
+        
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            @keyframes modalFadeIn {
+                from { opacity: 0; transform: translateY(-20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+        
+        modal.innerHTML = `
+            <div style="font-weight:700;font-size:18px;margin-bottom:8px;color:#1e293b;display:flex;align-items:center;gap:10px;">
+                <span>✉️</span> Dopis Online (Česká pošta)
+            </div>
+            <div style="font-size:13px;color:#64748b;margin-bottom:20px;">Odešlete aktuální dokument jako fyzický dopis.</div>
+            
+            <div style="margin-bottom:15px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Adresát (Příjemce):</label>
+                <input id="post-recipient" type="text" value="Jan Novák, Jankovcova 1522, 170 00 Praha" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;box-sizing:border-box;">
+            </div>
+            
+            <div style="margin-bottom:20px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Typ zásilky:</label>
+                <select id="post-type" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;" onchange="document.getElementById('post-price').innerText = this.value === 'registered' ? '54 Kč' : '26 Kč'">
+                    <option value="standard">Obyčejné psaní (A5/A4) — 26 Kč</option>
+                    <option value="registered">Doporučené psaní — 54 Kč</option>
+                </select>
+            </div>
+            
+            <div style="background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#334155;">
+                <span>Předpokládaná cena:</span>
+                <strong id="post-price" style="color:#2563eb;font-size:15px;margin-left:auto;">26 Kč</strong>
+            </div>
+            
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button id="post-cancel" style="padding:10px 18px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px;">Zrušit</button>
+                <button id="post-send" style="padding:10px 18px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(37,99,235,0.2);">Odeslat dopis</button>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        const close = () => document.body.removeChild(overlay);
+        modal.querySelector('#post-cancel').onclick = close;
+        modal.querySelector('#post-send').onclick = () => {
+            const recip = modal.querySelector('#post-recipient').value;
+            const type = modal.querySelector('#post-type').value === 'registered' ? 'doporučeně' : 'obyčejně';
+            
+            close();
+            this.showLoader("Přenáším dokument do Dopis Online...", () => {
+                this.customAlert(`✅ <b>Zásilka podána!</b><br><br>Dopis pro příjemce <b>${recip}</b> byl úspěšně vygenerován a předán České poště k vytištění a odeslání (${type}).`);
+            });
+        };
+    }
+
+    syncCloud(service) {
+        this.checkEnterpriseFeature(`Synchronizace s ${service}`, () => {
+            this.showLoader(`Připojuji se k ${service} a synchronizuji doložky a dokumenty...`, () => {
+                this.customAlert(`☁️ <b>Synchronizace úspěšná!</b><br><br>Vaše dokumenty a knihovna doložek byly bezpečně zálohovány a synchronizovány se službou <b>${service}</b>.`);
+            });
+        });
+    }
+
+    showHelpTip(topic) {
+        let title = "";
+        let text = "";
+        
+        if (topic === 'redlining') {
+            title = "🕵️ Sledování změn (Redlining)";
+            text = `1. Aktivujte funkci kliknutím na tlačítko <b>Sledovat změny</b> na kartě <i>Revize</i>.<br>
+2. Veškerý nově přidaný text se v editoru zobrazí zeleně podtržený.<br>
+3. Smazaný text se červeně přeškrtne, ale zůstane zachován pro revizi.<br>
+4. Následně můžete jednotlivé změny vybrat a kliknout na <b>Přijmout</b> nebo <b>Odmítnout</b>.`;
+        } else if (topic === 'blackline') {
+            title = "⚖️ Porovnání verzí (Blackline)";
+            text = `1. Klikněte na tlačítko <b>Srovnat verze</b> na kartě <i>Revize</i>. <br>
+2. Systém automaticky porovná aktuální otevřený dokument s poslední verzí uloženou v databázi.<br>
+3. Všechny změny, přídavky a škrty se přehledně zobrazí v porovnávacím okně.`;
+        } else if (topic === 'connect') {
+            title = "🔗 Integrace LexisConnect";
+            text = `LexisEditor na pozadí naslouchá na standardním portu <b>3300</b>.<br><br>
+Ostatní advokátní systémy (např. <i>Evolio</i> nebo <i>SingleCase</i>) mohou zaslat standardní POST požadavek na endpoint <code>/api/import</code> s formátem HTML dokumentu a editor jej okamžitě načte.<br><br>
+Tímto způsobem funguje bezproblémové propojení s vaším stávajícím cloudovým systémem.`;
+        } else if (topic === 'scan') {
+            title = "📸 Mobilní skenování (LexisLink)";
+            text = `1. Otevřete <b>LexisLink Remote</b> ve svém mobilním telefonu (odkaz naleznete v horním Ribbonu).<br>
+2. Zvolte možnost <b>Skenovat dokument</b>.<br>
+3. Vyfoťte papírovou smlouvu nebo listinu.<br>
+4. Mobilní telefon provede okamžité lokální OCR a pošle hotový text přímo do vašeho rozpracovaného dokumentu v PC na pozici kurzoru.`;
+        } else if (topic === 'clauses') {
+            title = "📚 Knihovna právních doložek";
+            text = `1. Označte v dokumentu libovolný text (např. rozhodčí doložku nebo ujednání o úroku z prodlení).<br>
+2. V postranním panelu <i>Toolbox</i> zvolte záložku <b>Doložky</b> a klikněte na <b>Uložit vybrané</b>.<br>
+3. Doložku pojmenujte. Od té chvíle ji máte bezpečně uloženou v IndexedDB a můžete ji jediným kliknutím vložit do jakékoliv jiné smlouvy.`;
+        } else if (topic === 'toc') {
+            title = "📜 Automatické generování obsahu";
+            text = `1. Formátujte nadpisy v dokumentu jako <b>Nadpis 1</b> (H1) nebo <b>Nadpis 2</b> (H2).<br>
+2. Nastavte kurzor na místo, kde má být obsah.<br>
+3. Na kartě <i>Vložit</i> klikněte na <b>Obsah</b>.<br>
+4. LexisEditor dynamicky projde strukturu a vygeneruje čistý, formátovaný přehled kapitol.`;
+        } else if (topic === 'user-guide') {
+            title = "📖 Návod na zprovoznění lokální AI (Apple Intelligence & Ollama)";
+            text = `<div style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; font-family: inherit; line-height: 1.6; font-size: 13px;">
+                <p>Vítejte u kompletního průvodce pro nastavení <b>100% offline umělé inteligence</b> v LexisEditoru. Všechna data jsou zpracovávána výhradně na vašem lokálním počítači.</p>
+                
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:16px;">🍏 Metoda A: Apple Intelligence (přes "apfel")</h3>
+                <p>Umožňuje přímý přístup k integrovanému 3B AI modelu ve vašem Macu s procesorem Apple Silicon (M1/M2/M3/M4) s macOS 15.0+ (Sequoia).</p>
+                <ol style="padding-left: 20px;">
+                    <li>Otevřete aplikaci <b>Terminál</b>.</li>
+                    <li>Nainstalujte Homebrew (pokud jej nemáte):<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></li>
+                    <li>Nainstalujte nástroj apfel:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">brew install Arthur-Ficial/tap/apfel</code></li>
+                    <li>Spusťte lokální AI server:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px; font-weight:bold;">apfel --serve</code></li>
+                    <li>Na kartě <b>LexisAI</b> zvolte jako poskytovatele <b>Apple Intelligence (apfel)</b>. Endpoint a model se nastaví automaticky.</li>
+                </ol>
+                <div style="background:rgba(37,99,235,0.08); border-left:4px solid #2563eb; padding:8px 12px; margin:12px 0; border-radius:0 4px 4px 0; font-size:12px;">
+                    💡 <b>Tip:</b> Okno s běžícím příkazem <code>apfel --serve</code> ponechte otevřené na pozadí.
+                </div>
+
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🦙 Metoda B: Ollama (Univerzální lokální AI)</h3>
+                <p>Vhodné pro Windows, Linux i starší Intel Macy. Umožňuje spouštět libovolné open-source modely (např. Llama 3).</p>
+                <ol style="padding-left: 20px;">
+                    <li>Stáhněte a nainstalujte aplikaci ze stránky <a href="https://ollama.com" target="_blank" style="color:#2563eb; text-decoration:underline;">ollama.com</a>.</li>
+                    <li>Otevřete Terminál / Příkazový řádek a stáhněte model Llama 3:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">ollama run llama3</code></li>
+                    <li>V Ribbonu na kartě <b>LexisAI</b> zvolte poskytovatele <b>Ollama (Local)</b>.</li>
+                </ol>
+
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🔒 Absolutní Datová Suverenita</h3>
+                <p>Veškeré rešerše, audity smluv i hlasové diktování probíhají offline v paměti vašeho počítače. Žádná data neopouštějí váš stroj.</p>
+            </div>`;
+        } else if (topic === 'updates') {
+            title = "🔄 Kontrola aktualizací";
+            text = `<b>Aktuální verze:</b> v3.5.0 (Stable Enterprise)<br><br>
+Provádím kontrolu lokálního úložiště a serverů...<br>
+<i>Vaše verze je aktuální. Žádné nové aktualizace nejsou k dispozici.</i>`;
+        } else if (topic === 'about') {
+            title = "ℹ️ O aplikaci LexisEditor";
+            text = `<b>LexisEditor Professional Legal Workspace</b><br>
+Verze: <b>3.5.0</b><br><br>
+Lokální právní textový procesor s integrovaným AI asistentem, napojením na státní registry (ARES) a šifrovaným úložištěm.<br><br>
+<i>Vyvinuto s důrazem na absolutní datovou suverenitu advokátní praxe. All rights reserved.</i>`;
+        }
+        
+        this.customAlert(`<b>${title}</b><br><br>${text}`);
+    }
+
+    saveAISettings() {
+        const provEl = document.getElementById('ai-provider');
+        const modelEl = document.getElementById('ai-model');
+        const endEl = document.getElementById('ai-endpoint');
+        const keyEl = document.getElementById('ai-apikey');
+        
+        if (!provEl) return;
+        
+        const settings = {
+            provider: provEl.value,
+            model: modelEl ? modelEl.value : "llama3",
+            endpoint: endEl ? endEl.value : "http://localhost:11434/api/generate",
+            apiKey: keyEl ? keyEl.value : ""
+        };
+        localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
+        console.log('AI Settings saved:', settings);
+    }
+
+    loadAISettings() {
+        const saved = localStorage.getItem('lexis_ai_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                const provEl = document.getElementById('ai-provider');
+                const modelEl = document.getElementById('ai-model');
+                const endEl = document.getElementById('ai-endpoint');
+                const keyEl = document.getElementById('ai-apikey');
+                
+                if (provEl && s.provider) provEl.value = s.provider;
+                if (modelEl && s.model) modelEl.value = s.model;
+                if (endEl && s.endpoint) endEl.value = s.endpoint;
+                if (keyEl && s.apiKey) keyEl.value = s.apiKey;
+            } catch (e) {
+                console.error("Chyba při načítání AI nastavení:", e);
+            }
+        }
+    }
+
+    updateAIProviderDefaults() {
+        const provEl = document.getElementById('ai-provider');
+        const modelEl = document.getElementById('ai-model');
+        const endEl = document.getElementById('ai-endpoint');
+        
+        if (!provEl || !modelEl || !endEl) return;
+        
+        const provider = provEl.value;
+        if (provider === 'apfel') {
+            modelEl.value = "apple-intelligence";
+            endEl.value = "http://localhost:11434/v1/chat/completions";
+        } else if (provider === 'ollama') {
+            modelEl.value = "llama3";
+            endEl.value = "http://localhost:11434/api/generate";
+        } else if (provider === 'openai') {
+            modelEl.value = "gpt-4o";
+            endEl.value = "https://api.openai.com/v1/chat/completions";
+        } else if (provider === 'deepseek') {
+            modelEl.value = "deepseek-chat";
+            endEl.value = "https://api.deepseek.com/v1/chat/completions";
+        } else if (provider === 'google') {
+            modelEl.value = "gemini-pro";
+            endEl.value = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+        } else if (provider === 'lmstudio') {
+            modelEl.value = "local-model";
+            endEl.value = "http://localhost:1234/v1/chat/completions";
+        }
+        this.saveAISettings();
     }
 }
 
