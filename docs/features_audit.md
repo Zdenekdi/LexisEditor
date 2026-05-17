@@ -20,7 +20,8 @@ Tento dokument poskytuje vyčerpávající a strukturovaný přehled všech inte
 | **TouchID Biometrika** | ✅ Aktivní / Plně funkční | Nativní macOS Keychain & dialogy | [main.js](../main.js) |
 | **Import / Export Engine** | ✅ Aktivní / Plně funkční | Mammoth, DOCX, PDF offscreen render | [main.js](../main.js) |
 | **ZFO & PDF Parser** | ✅ Aktivní / Plně funkční | Extrakce textu, příloh a metadat | [main.js](../main.js) |
-| **Právní kalkulačky** | ✅ Aktivní / Plně funkční | Mimosmluvní odměna, úroky z prodlení | [lexis-ui.js](../js/ui/lexis-ui.js) |
+| **Právní kalkulačky** | ✅ Aktivní / Plně funkční | Soudní poplatky, úroky z prodlení (modulární) | [lexis-dialogs.js](../js/ui/lexis-dialogs.js) |
+| **Pomocné dialogy a generátory**| ✅ Aktivní / Plně funkční | Modulární popupy, generátor Plné moci | [lexis-dialogs.js](../js/ui/lexis-dialogs.js) |
 | **Diktování hlasem** | ✅ Aktivní / Plně funkční | HTML5 Speech Recognition v češtině | [lexis-ui.js](../js/ui/lexis-ui.js) |
 | **Stavové workflow (Novinka)**| ✅ Aktivní / Plně funkční | Dynamické odznaky, AI auto-status | [lexis-ui.js](../js/ui/lexis-ui.js) |
 | **Deadline Guard (Hlídač lhůt)**| ✅ Aktivní / Plně funkční | Skenování PDF/Editoru, ukládání v IndexedDB | [lexis-ui.js](../js/ui/lexis-ui.js) |

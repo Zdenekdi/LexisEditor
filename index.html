@@ -1010,6 +1010,7 @@
     <script src="js/core/lexis-storage.js"></script>
     <script src="js/core/lexis-core.js"></script>
     <script src="js/ui/lexis-ui.js"></script>
+    <script src="js/ui/lexis-dialogs.js"></script>
 
     <script>
         // --- SDK INITIALIZATION & BRIDGE ---
@@ -1108,6 +1109,7 @@
         window.toggleQATItem = (id) => lexisUI.toggleQATItem(id);
         window.saveSelectedAsClause = () => lexisUI.saveSelectedAsClause();
         window.sendAIQuery = () => lexisUI.sendAIQuery();
+        window.openPoweOfAttorneyDialog = () => lexisUI.dialogs.openPoweOfAttorneyDialog();
         
         window.insertFootnote = () => lexisUI.insertFootnote();
         window.openLexisLink = () => lexisUI.openLexisLink();
