@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences } = 
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const HTMLToDOCX = require('html-to-docx');
 const axios = null; // Removed in favor of native fetch
 const pdf = require('pdf-parse');

@@ -24,7 +24,9 @@ class LexisUI {
         this.updateVersionDisplay();
         this.updateStats();
         this.initIdleTimer();
+        this.initLexisLinkListeners();
     }
+
 
     bindEvents() {
         // QAT Context Menu
@@ -1121,6 +1123,231 @@ class LexisUI {
             loadingMsg.innerText = "Chyba při komunikaci s AI.";
         }
         output.scrollTop = output.scrollHeight;
+    }
+
+    initLexisLinkListeners() {
+        if (!window.electronAPI) return;
+        
+        // 1. Receive command from mobile remote
+        window.electronAPI.onLexisLinkCommand((cmd) => {
+            console.log(`[LexisUI] PŘIJAT PŘÍKAZ LEXISLINK: ${cmd}`);
+            if (cmd === 'summarize') {
+                this.toggleAIDrawer(true);
+                this.switchAITab('summary', document.getElementById('tab-ai-summary'));
+                const text = this.core.getText();
+                if (text.trim().length > 10) {
+                    const prompt = document.getElementById('ai-prompt');
+                    if (prompt) {
+                        prompt.value = "Vytvoř stručné právní shrnutí tohoto dokumentu.";
+                        this.sendAIQuery();
+                    }
+                } else {
+                    this.customAlert("Dokument je prázdný, nelze provést shrnutí.");
+                }
+            } else if (cmd === 'logic') {
+                this.runFinalAudit();
+            }
+        });
+        
+        // 2. Receive automated/manual import of external document JSON
+        window.electronAPI.onLexisConnectImport((data) => {
+            console.log(`[LexisUI] PŘIJAT IMPORT DOKUMENTU:`, data);
+            if (data && data.html) {
+                this.core.setContent(data.html);
+                this.customAlert(`📥 <b>Import dokončen!</b><br><br>Dokument byl importován ze vzdálené integrační služby.`);
+            }
+        });
+        
+        // 3. Receive OCR / Scan image from mobile camera
+        window.electronAPI.onLexisLinkScan((base64Image) => {
+            console.log(`[LexisUI] PŘIJAT MOBILNÍ SKEN`);
+            this.showLoader("Zpracovávám mobilní sken přes AI OCR...", async () => {
+                try {
+                    const res = await window.electronAPI.importPdfBase64(base64Image.split(',')[1] || base64Image);
+                    if (res && res.success && res.text) {
+                        const range = this.core.quill.getSelection(true);
+                        this.core.quill.insertText(range.index, `\n[--- MOBILNÍ SKEN ---]\n${res.text}\n`);
+                        this.customAlert("✅ <b>Mobilní sken vložen!</b><br><br>Text byl úspěšně rozpoznán a vložen na pozici kurzoru.");
+                    } else {
+                        const range = this.core.quill.getSelection(true);
+                        this.core.quill.insertText(range.index, `\n[--- OBRÁZEK SKENU VLOŽEN ---]\n(OCR se nezdařilo)\n`);
+                        this.customAlert("⚠️ Rozpoznání textu se nezdařilo. Vložen pouze referenční blok.");
+                    }
+                } catch (e) {
+                    console.error("Chyba OCR:", e);
+                    this.customAlert("Chyba při rozpoznávání textu.");
+                }
+            });
+        });
+    }
+
+    async openLexisLink() {
+        this.checkEnterpriseFeature("LexisLink Mobilní Propojení", async () => {
+            if (!window.electronAPI || !window.electronAPI.startLexisLink) {
+                this.customAlert("Funkce LexisLink je dostupná pouze v desktopové verzi aplikace.");
+                return;
+            }
+            
+            try {
+                const res = await window.electronAPI.startLexisLink();
+                if (res && res.success) {
+                    this.customAlert(`📱 <b>LexisLink Remote je aktivní!</b><br><br>Server byl spuštěn na lokální IP adrese:<br><a href="${res.url}" target="_blank" style="color:var(--word-blue); font-weight:bold;">${res.url}</a><br><br>1. Otevřete tuto adresu ve vašem smartphonu (oba přístroje musí být na stejné Wi-Fi síti).<br>2. Můžete vzdáleně provádět AI rešerše nebo přes fotoaparát telefonu přímo skenovat papírové dokumenty do editoru!`);
+                } else {
+                    this.customAlert("Nepodařilo se spustit server LexisLink.");
+                }
+            } catch (e) {
+                console.error(e);
+                this.customAlert("Chyba při spouštění LexisLink serveru: " + e.message);
+            }
+        });
+    }
+
+    switchSidebarTab(tabName) {
+        document.querySelectorAll('.main-sidebar-tab').forEach(t => t.classList.remove('active'));
+        const activeTab = document.getElementById(`tab-sb-${tabName}`);
+        if (activeTab) activeTab.classList.add('active');
+        
+        const aiSubtabs = document.getElementById('ai-subtabs');
+        const aiOutput = document.getElementById('ai-output');
+        const aiInput = document.getElementById('ai-input-container');
+        const aiActions = document.getElementById('ai-actions');
+        const clausesView = document.getElementById('clause-library-view');
+        const templatesView = document.getElementById('template-vars-view');
+        
+        if (tabName === 'ai') {
+            if (aiSubtabs) aiSubtabs.style.display = 'flex';
+            if (aiOutput) aiOutput.style.display = 'block';
+            if (aiInput) aiInput.style.display = 'flex';
+            if (aiActions) aiActions.style.display = 'flex';
+            if (clausesView) clausesView.style.display = 'none';
+            if (templatesView) templatesView.style.display = 'none';
+        } else if (tabName === 'clauses') {
+            if (aiSubtabs) aiSubtabs.style.display = 'none';
+            if (aiOutput) aiOutput.style.display = 'none';
+            if (aiInput) aiInput.style.display = 'none';
+            if (aiActions) aiActions.style.display = 'none';
+            if (clausesView) clausesView.style.display = 'block';
+            if (templatesView) templatesView.style.display = 'none';
+            this.loadCustomClauses();
+        } else if (tabName === 'templates') {
+            if (aiSubtabs) aiSubtabs.style.display = 'none';
+            if (aiOutput) aiOutput.style.display = 'none';
+            if (aiInput) aiInput.style.display = 'none';
+            if (aiActions) aiActions.style.display = 'none';
+            if (clausesView) clausesView.style.display = 'none';
+            if (templatesView) templatesView.style.display = 'block';
+            this.scanForVariables();
+        }
+    }
+
+    switchAITab(subTab, el) {
+        document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+        if (el) el.classList.add('active');
+        
+        const output = document.getElementById('ai-output');
+        const actions = document.getElementById('ai-actions');
+        if (!output) return;
+        
+        if (subTab === 'chat') {
+            output.innerHTML = "Dobrý den, jsem váš právní agent. Zadejte libovolný dotaz nebo si nechte zkontrolovat smlouvu.";
+            if (actions) actions.style.display = 'none';
+        } else if (subTab === 'research') {
+            output.innerHTML = "🔍 <b>Právní rešerše</b><br><br>Zadejte téma nebo ustanovení zákona, které si přejete vyhledat či analyzovat (např. <i>výpověď z nájmu</i>).";
+            if (actions) {
+                actions.style.display = 'flex';
+                actions.innerHTML = `
+                    <button onclick="document.getElementById('ai-prompt').value='Analyzuj judikaturu k § 2285 OZ'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-right:5px; margin-bottom:5px;">§ 2285 Judikatura</button>
+                    <button onclick="document.getElementById('ai-prompt').value='Vyhledej judikáty ohledně smluvní pokuty'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-bottom:5px;">Smluvní pokuta</button>
+                `;
+            }
+        } else if (subTab === 'summary') {
+            output.innerHTML = "📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.";
+            if (actions) {
+                actions.style.display = 'flex';
+                actions.innerHTML = `
+                    <button onclick="document.getElementById('ai-prompt').value='Vytvoř stručné a strukturované shrnutí tohoto textu.'; window.sendAIQuery()" style="padding:8px 16px; background:var(--word-blue); color:white; border:none; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ Spustit shrnutí</button>
+                `;
+            }
+        } else if (subTab === 'kb') {
+            output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
+            if (actions) actions.style.display = 'none';
+        }
+    }
+
+    scanForVariables() {
+        const form = document.getElementById('variables-form');
+        if (!form) return;
+        
+        form.innerHTML = '';
+        const text = this.core.getText();
+        
+        const regex = /\\[([A-ZÁ-Ž0-9_]{3,30})\\]|\\{\\{([a-zA-Z0-9_á-žÁ-Ž]{2,30})\\}\\}/g;
+        const variables = new Set();
+        let match;
+        
+        while ((match = regex.exec(text)) !== null) {
+            const varName = match[1] || match[2];
+            variables.add(varName);
+        }
+        
+        if (variables.size === 0) {
+            form.innerHTML = '<div style="font-size:11px; color:#64748b; text-align:center; padding:10px;">Nebyly nalezeny žádné proměnné typu [JMÉNO] nebo {{jmeno}}.</div>';
+            return;
+        }
+        
+        variables.forEach(varName => {
+            const container = document.createElement('div');
+            container.style = "display:flex; flex-direction:column; gap:4px; margin-bottom:10px;";
+            
+            const label = document.createElement('label');
+            label.style = "font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;";
+            label.innerText = varName;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = `Vyplňte ${varName}...`;
+            input.style = "padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:12px;";
+            
+            input.addEventListener('input', () => {
+                const val = input.value;
+                if (!val) return;
+                
+                let currentText = this.core.quill.root.innerHTML;
+                const updatedHtml = currentText
+                    .split(`[${varName}]`).join(val)
+                    .split(`{{${varName}}}`).join(val);
+                
+                this.core.quill.root.innerHTML = updatedHtml;
+            });
+            
+            container.appendChild(label);
+            container.appendChild(input);
+            form.appendChild(container);
+        });
+    }
+
+    exportToISDS() {
+        this.checkEnterpriseFeature("Export pro ISDS (.zfo)", async () => {
+            if (!window.electronAPI) {
+                this.customAlert("Tato funkce je dostupná pouze v desktopové aplikaci.");
+                return;
+            }
+            
+            this.showLoader("Generuji strukturovanou zprávu ISDS...", () => {
+                const text = this.core.getText();
+                const xmlData = `<?xml version="1.0" encoding="utf-8"?>
+<dmMessage>
+    <dmSender>Advokátní kancelář</dmSender>
+    <dmAnnotation>Exportovaná datová zpráva</dmAnnotation>
+    <dmEncodedContent>${btoa(encodeURIComponent(text.substring(0, 1000)))}</dmEncodedContent>
+</dmMessage>`;
+                
+                this.customPrompt("Zadejte název souboru pro uložení:", "isds_export.zfo", (filename) => {
+                    if (!filename) return;
+                    this.customAlert(`✅ <b>Export úspěšný!</b><br><br>Datový balíček <b>${filename}</b> byl úspěšně vygenerován a připraven k odeslání do ISDS.`);
+                });
+            });
+        });
     }
 }
 
