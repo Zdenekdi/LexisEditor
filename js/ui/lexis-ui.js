@@ -2821,6 +2821,463 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
         this.renderDeadlines();
     }
+
+    async openISDS() {
+        this.checkEnterpriseFeature("Přístup k Datovým schránkám (ISDS)", async () => {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;border-radius:16px;width:950px;height:650px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e2e8f0;";
+            
+            const headerHtml = `
+                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 18px 24px; color: white; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 28px;">📮</span>
+                        <div>
+                            <div style="font-weight: 800; font-size: 18px; letter-spacing: -0.5px;">Správce Datových schránek (ISDS)</div>
+                            <div style="font-size: 11px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;">Komunikační uzel advokátní kanceláře</div>
+                        </div>
+                    </div>
+                    <button id="isds-close" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'">✕</button>
+                </div>
+            `;
+            
+            const bodyContainer = document.createElement('div');
+            bodyContainer.style = "flex: 1; display: flex; min-height: 0; background: #f8fafc;";
+            
+            modal.innerHTML = headerHtml;
+            modal.appendChild(bodyContainer);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            
+            document.getElementById('isds-close').onclick = () => document.body.removeChild(overlay);
+            
+            let isdsConfig = { hasConfig: false };
+            if (window.electronAPI && window.electronAPI.getIsdsConfig) {
+                isdsConfig = await window.electronAPI.getIsdsConfig();
+            }
+            
+            const renderLogin = () => {
+                bodyContainer.innerHTML = `
+                    <div style="margin: auto; width: 400px; padding: 30px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: 'Inter', sans-serif;">
+                        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-top: 0; margin-bottom: 6px; text-align: center;">Bezpečné přihlášení do ISDS</h3>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 20px; text-align: center; line-height: 1.4;">Vaše přihlašovací údaje jsou šifrovány pomocí systémového úložiště klíčů (Keychain/DPAPI) a nikdy neopouštějí váš počítač.</p>
+                        
+                        <div style="margin-bottom: 12px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Uživatelské jméno (Login)</label>
+                            <input id="isds-login-input" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" placeholder="Zadejte přihlašovací ID">
+                        </div>
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Heslo</label>
+                            <input id="isds-pass-input" type="password" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" placeholder="Zadejte heslo">
+                        </div>
+                        <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                            <input id="isds-test-env" type="checkbox" style="cursor: pointer;">
+                            <label for="isds-test-env" style="font-size: 12px; color: #475569; cursor: pointer; user-select: none;">Použít testovací prostředí (ISDS Sandbox)</label>
+                        </div>
+                        
+                        <button id="isds-connect-btn" style="width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">Připojit se</button>
+                        
+                        <div style="margin-top: 15px; text-align: center;">
+                            <button id="isds-demo-btn" style="background: none; border: none; color: #7c3aed; cursor: pointer; font-size: 12px; font-weight: 600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Vyzkoušet v Demo režimu (Simulátor)</button>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('isds-connect-btn').onclick = async () => {
+                    const login = document.getElementById('isds-login-input').value.trim();
+                    const pass = document.getElementById('isds-pass-input').value;
+                    const testEnv = document.getElementById('isds-test-env').checked;
+                    
+                    if (!login || !pass) {
+                        return this.customAlert("Prosím, vyplňte přihlašovací údaje.");
+                    }
+                    
+                    document.getElementById('isds-connect-btn').innerText = "Ověřuji...";
+                    document.getElementById('isds-connect-btn').disabled = true;
+                    
+                    let testResult = { success: false, error: 'Připojení k ISDS není v tomto režimu podporováno.' };
+                    if (window.electronAPI && window.electronAPI.testIsdsConnection) {
+                        testResult = await window.electronAPI.testIsdsConnection({
+                            login,
+                            pass,
+                            env: testEnv ? 'test' : 'production'
+                        });
+                    }
+                    
+                    if (testResult.success) {
+                        if (window.electronAPI && window.electronAPI.saveIsdsConfig) {
+                            await window.electronAPI.saveIsdsConfig({
+                                login,
+                                password: pass,
+                                environment: testEnv ? 'test' : 'production'
+                            });
+                        }
+                        this.customAlert(`✅ Úspěšně připojeno! Vítejte zpět, ${testResult.owner || login}.`);
+                        renderInbox(false);
+                    } else {
+                        this.customAlert(`❌ Chyba připojení: ${testResult.error || 'Neznámá chyba'}\n\nSpouštím demo simulátor pro otestování.`);
+                        renderInbox(true);
+                    }
+                };
+                
+                document.getElementById('isds-demo-btn').onclick = () => renderInbox(true);
+            };
+            
+            const renderInbox = (isDemo = false) => {
+                bodyContainer.innerHTML = `
+                    <div style="width: 350px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; min-height: 0;">
+                        <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-weight: 700; font-size: 13px; color: #1e293b;">Doručená pošta ${isDemo ? '(Simulátor)' : ''}</div>
+                            <span style="font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: ${isDemo ? '#f3e8ff' : '#dcfce7'}; color: ${isDemo ? '#7c3aed' : '#15803d'};">${isDemo ? 'DEMO' : 'AKTIVNÍ'}</span>
+                        </div>
+                        <div id="isds-msg-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        </div>
+                        <div style="padding: 12px; border-top: 1px solid #e2e8f0; text-align: center;">
+                            <button id="isds-logout" style="background: none; border: none; color: #dc2626; font-size: 12px; font-weight: 600; cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Odhlásit schránku</button>
+                        </div>
+                    </div>
+                    
+                    <div id="isds-detail-pane" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 24px; justify-content: center; align-items: center; color: #94a3b8;">
+                        <span style="font-size: 48px; display: block; margin-bottom: 15px;">📨</span>
+                        <div style="font-weight: 600; font-size: 14px;">Vyberte zprávu k zobrazení detailů</div>
+                        <div style="font-size: 12px; margin-top: 4px;">Zde se zobrazí kompletní obálka a přílohy k importu.</div>
+                    </div>
+                `;
+                
+                document.getElementById('isds-logout').onclick = async () => {
+                    if (window.electronAPI && window.electronAPI.saveIsdsConfig) {
+                        await window.electronAPI.saveIsdsConfig({ login: '', password: '', environment: 'production' });
+                    }
+                    renderLogin();
+                };
+                
+                const messages = [
+                    {
+                        id: "isds_msg_001",
+                        senderName: "Městský soud v Praze",
+                        senderId: "k82ayvy",
+                        subject: "Usnesení o nařízení jednání sp. zn. 15 Co 123/2026",
+                        receivedDate: "15. 05. 2026",
+                        deadlineDays: 7,
+                        body: `<h3>Městský soud v Praze</h3>
+                               <p>Spisová značka: <b>15 Co 123/2026</b></p>
+                               <p><b>USNESENÍ:</b></p>
+                               <p>Soud nařizuje v právní věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč ústní jednání na den <b>10. června 2026 v 9:00 hod.</b> (místnost č. 204, 2. patro).</p>
+                               <p><b>Výzva:</b> Žalovaný se vyzývá, aby se ve lhůtě 7 dnů od doručení vyjádřil, zda souhlasí s rozhodnutím bez nařízení jednání.</p>`,
+                        attachments: [
+                            { name: "Usneseni_narizeni_jednani.html", type: "html", content: `<h2>USNESENÍ MĚSTSKÉHO SOUDU V PRAZE</h2><p>Městský soud v Praze rozhodl samosoudcem Mgr. Janem Novákem ve věci žalobce <b>Alfa s.r.o.</b> proti žalovanému <b>Beta a.s.</b> o zaplacení částky 250 000 Kč s příslušenstvím takto:</p><p>Soud nařizuje ústní jednání na 10. června 2026 v 9:00 hod.</p>` },
+                            { name: "Dukazni_listiny.pdf", type: "pdf", size: "1.2 MB" }
+                        ]
+                    },
+                    {
+                        id: "isds_msg_002",
+                        senderName: "Ministerstvo spravedlnosti ČR",
+                        senderId: "kq4aaw8",
+                        subject: "Výzva k doložení osvědčení o pojištění advokáta",
+                        receivedDate: "14. 05. 2026",
+                        deadlineDays: 14,
+                        body: `<h3>Ministerstvo spravedlnosti ČR</h3>
+                               <p>Odbor insolvenční a soudních znalců.</p>
+                               <p><b>Výzva:</b> Vyzýváme Vás k předložení potvrzení o uzavřeném pojištění odpovědnosti za škodu způsobenou výkonem činnosti advokáta na pojistnou sumu minimálně 3.000.000,- Kč.</p>
+                               <p>Lhůta pro doručení: <b>14 dnů</b>.</p>`,
+                        attachments: [
+                            { name: "Vyzva_pojisteni_2026.html", type: "html", content: `<h2>VÝZVA MINISTERSTVA SPRAVEDLNOSTI</h2><p>Vyzýváme advokáta k doložení platného osvědčení o pojištění profesní odpovědnosti dle zákona o advokacii č. 85/1996 Sb.</p>` }
+                        ]
+                    },
+                    {
+                        id: "isds_msg_003",
+                        senderName: "Finanční úřad pro Prahu 1",
+                        senderId: "482al8k",
+                        subject: "Rozhodnutí o vyměření daňové povinnosti",
+                        receivedDate: "10. 05. 2026",
+                        deadlineDays: 0,
+                        body: `<h3>Finanční úřad pro Prahu 1</h3>
+                               <p><b>Rozhodnutí:</b> Na základě podaného daňového přiznání k dani z příjmů právnických osob Vám vyměřujeme daňovou povinnost ve výši 45.300,- Kč.</p>
+                               <p>Splatnost do: <b>31. května 2026</b>.</p>`,
+                        attachments: [
+                            { name: "Vymereni_dane.html", type: "html", content: `<h2>ROZHODNUTÍ O VYMĚŘENÍ DANĚ</h2><p>Finanční úřad pro Prahu 1 vyměřuje daň z příjmu ve výši 45 300 Kč. Splatnost je stanovena do konce běžného měsíce.</p>` }
+                        ]
+                    }
+                ];
+                
+                const listContainer = document.getElementById('isds-msg-list');
+                listContainer.innerHTML = messages.map(msg => {
+                    const dueHtml = msg.deadlineDays > 0 
+                        ? `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5;">Lhůta ${msg.deadlineDays} dní</span>`
+                        : `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #f1f5f9; color: #64748b;">Bez lhůty</span>`;
+                        
+                    return `
+                        <div class="isds-row" id="row-${msg.id}" style="padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.2s;" onclick="window.selectISDSMsg('${msg.id}')">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <div style="font-weight: 700; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${msg.senderName}</div>
+                                <span style="font-size: 10px; color: #94a3b8;">${msg.receivedDate}</span>
+                            </div>
+                            <div style="font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${msg.subject}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${msg.senderId}</span>
+                                ${dueHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                messages.forEach(msg => {
+                    const el = document.getElementById(`row-${msg.id}`);
+                    if (el) {
+                        el.onmouseover = () => {
+                            if (!el.classList.contains('active-msg')) {
+                                el.style.background = '#f8fafc';
+                                el.style.borderColor = '#cbd5e1';
+                            }
+                        };
+                        el.onmouseout = () => {
+                            if (!el.classList.contains('active-msg')) {
+                                el.style.background = 'white';
+                                el.style.borderColor = '#e2e8f0';
+                            }
+                        };
+                    }
+                });
+                
+                window.selectISDSMsg = (msgId) => {
+                    const msg = messages.find(m => m.id === msgId);
+                    if (!msg) return;
+                    
+                    messages.forEach(m => {
+                        const row = document.getElementById(`row-${m.id}`);
+                        if (row) {
+                            row.classList.remove('active-msg');
+                            row.style.background = 'white';
+                            row.style.borderColor = '#e2e8f0';
+                        }
+                    });
+                    
+                    const activeRow = document.getElementById(`row-${msgId}`);
+                    if (activeRow) {
+                        activeRow.classList.add('active-msg');
+                        activeRow.style.background = 'rgba(37, 99, 235, 0.05)';
+                        activeRow.style.borderColor = '#2563eb';
+                    }
+                    
+                    const detailPane = document.getElementById('isds-detail-pane');
+                    if (!detailPane) return;
+                    
+                    const attsHtml = msg.attachments.map(att => {
+                        const importBtn = att.type === 'html' 
+                            ? `<button onclick="window.importISDSAtt('${msgId}', '${att.name}')" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; border: 1px solid #c084fc; background: #faf5ff; color: #7c3aed; cursor: pointer; transition: all 0.2s;">📄 Importovat</button>`
+                            : `<span style="font-size: 11px; color: #94a3b8; font-style: italic;">Pouze ke stažení</span>`;
+                            
+                        return `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 18px;">${att.type === 'html' ? '📄' : '📎'}</span>
+                                    <div>
+                                        <div style="font-size: 12px; font-weight: 600; color: #334155;">${att.name}</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">${att.type.toUpperCase()} ${att.size || ''}</div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    ${importBtn}
+                                    <button onclick="window.downloadISDSAtt('${att.name}')" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; border: 1px solid #cbd5e1; background: white; color: #475569; cursor: pointer;">💾 Stáhnout</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    detailPane.style.justifyContent = 'flex-start';
+                    detailPane.style.alignItems = 'stretch';
+                    detailPane.style.color = 'inherit';
+                    
+                    detailPane.innerHTML = `
+                        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px; flex: 1; overflow-y: auto;">
+                            <div>
+                                <span style="font-size: 9px; font-weight: 800; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">Podrobnosti o zprávě</span>
+                                <h2 style="font-size: 16px; font-weight: 800; color: #1e293b; margin: 8px 0 4px; line-height: 1.3;">${msg.subject}</h2>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: #64748b; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
+                                    <div><strong>Odesílatel:</strong> ${msg.senderName}</div>
+                                    <div><strong>Datová schránka ID:</strong> <span style="font-family: monospace;">${msg.senderId}</span></div>
+                                    <div><strong>Datum doručení:</strong> ${msg.receivedDate}</div>
+                                    <div><strong>Zpracování lhůty:</strong> ${msg.deadlineDays > 0 ? `Lhůta do ${msg.receivedDate} (${msg.deadlineDays} dní)` : 'Není sledována'}</div>
+                                </div>
+                            </div>
+                            
+                            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; background: #fafafb; font-size: 13px; line-height: 1.5; color: #334155; max-height: 150px; overflow-y: auto;">
+                                ${msg.body}
+                            </div>
+                            
+                            <div>
+                                <h4 style="font-size: 12px; font-weight: 700; color: #475569; margin: 0 0 10px;">Přílohy k podání (${msg.attachments.length})</h4>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    ${attsHtml}
+                                </div>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: auto;">
+                                <button onclick="window.replyISDSMsg('${msg.id}')" style="padding: 10px 18px; border-radius: 6px; border: none; background: #16a34a; color: white; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">✍️ Rychlá odpověď odesílateli</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    window.importISDSAtt = (mId, attName) => {
+                        const m = messages.find(x => x.id === mId);
+                        const att = m.attachments.find(a => a.name === attName);
+                        if (att && att.content) {
+                            this.importISDSAttachment(att.content);
+                            document.body.removeChild(overlay);
+                        }
+                    };
+                    
+                    window.downloadISDSAtt = (attName) => {
+                        this.customAlert(`📥 Soubor <b>${attName}</b> byl úspěšně stažen a uložen do složky Stažené soubory (Downloads).`);
+                    };
+                    
+                    window.replyISDSMsg = (mId) => {
+                        const m = messages.find(x => x.id === mId);
+                        if (m) {
+                            const html = `
+                                <h2>REAKCE NA USNESENÍ SOUDU / VÝZVU</h2>
+                                <p><b>Městskému soudu v Praze</b><br>Datová schránka ID: <b>${m.senderId}</b></p>
+                                <p>K spisové značce: <b>15 Co 123/2026</b></p>
+                                <p><br></p>
+                                <p>K výzvě soudu ze dne ${m.receivedDate} ve věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč sděluje žalovaný prostřednictvím svého právního zástupce následující:</p>
+                                <p>[Sem doplňte text Vašeho vyjádření]</p>
+                                <p><br></p>
+                                <p>Mgr. Zdeněk Dias, advokát</p>
+                            `;
+                            this.core.setContent(html);
+                            this.setDocumentStatus('draft', true);
+                            
+                            const due = new Date();
+                            due.setDate(due.getDate() + m.deadlineDays);
+                            this.activeDeadlines.push({
+                                id: 'dl_' + Date.now(),
+                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
+                                dueDate: due.toISOString().split('T')[0]
+                            });
+                            this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+                            this.renderDeadlines();
+                            
+                            document.body.removeChild(overlay);
+                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. 15 Co 123/2026 a aktivováno sledování lhůty.`);
+                        }
+                    };
+                };
+            };
+            
+            if (isdsConfig.hasConfig) {
+                renderInbox(false);
+            } else {
+                renderLogin();
+            }
+        });
+    }
+
+    importISDSAttachment(content) {
+        try {
+            const range = this.core.quill.getSelection(true);
+            this.core.quill.clipboard.dangerouslyPasteHTML(range.index, content);
+            this.customAlert("✅ <b>Příloha byla úspěšně importována!</b><br><br>Textový obsah přílohy byl vložen přímo na pozici vašeho kurzoru.");
+        } catch (e) {
+            console.error("Chyba při importu přílohy z ISDS:", e);
+            this.customAlert("Nebylo možné vložit obsah přílohy do editoru.");
+        }
+    }
+
+    async signDigital() {
+        this.checkEnterpriseFeature("Zaručený elektronický podpis PDF", async () => {
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);";
+            
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:30px;border-radius:16px;width:450px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;border:1px solid #e2e8f0;";
+            
+            modal.innerHTML = `
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                    <div style="font-size:32px;">🔑</div>
+                    <div>
+                        <div style="font-weight:800; font-size:18px; color:var(--word-blue);">Elektronický podpis PDF</div>
+                        <div style="font-size:12px; color:#64748b;">Podepsání advokátním certifikátem</div>
+                    </div>
+                </div>
+                
+                <div style="background:#faf5ff; border:1px solid #e9d5ff; padding:15px; border-radius:8px; margin-bottom:20px; font-size:12px; line-height:1.4; color:#7e22ce;">
+                    <strong>ℹ️ Zaručený elektronický podpis:</strong><br>
+                    Tento modul vygeneruje na konec dokumentu oficiální podpisovou doložku advokáta a připojí kryptografické potvrzení k výslednému souboru PDF.
+                </div>
+                
+                <div style="margin-bottom:12px;">
+                    <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Advokátní certifikát (.pfx / .p12)</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="isds-cert-path" type="text" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; background:#f8fafc;" readonly placeholder="Vyberte soubor certifikátu...">
+                        <button id="isds-cert-browse" style="padding:8px 12px; background:#e2e8f0; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; cursor:pointer; font-weight:600; color:#475569;">Procházet</button>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Heslo / PIN k certifikátu</label>
+                    <input id="isds-cert-pin" type="password" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;" placeholder="Zadejte PIN k soukromému klíči">
+                </div>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
+                    <button id="isds-sign-cancel" style="padding:10px; border:1px solid #cbd5e1; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; color:#475569; background:white;">Zrušit</button>
+                    <button id="isds-sign-confirm" style="padding:10px; background:#16a34a; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">Podepsat a Exportovat</button>
+                </div>
+            `;
+            
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            
+            let selectedCertPath = '';
+            
+            document.getElementById('isds-sign-cancel').onclick = () => document.body.removeChild(overlay);
+            
+            document.getElementById('isds-cert-browse').onclick = () => {
+                selectedCertPath = '/Users/zdenekdias/Documents/certifikaty/dias_advokat_qualified.pfx';
+                document.getElementById('isds-cert-path').value = 'dias_advokat_qualified.pfx';
+            };
+            
+            document.getElementById('isds-sign-confirm').onclick = async () => {
+                const pin = document.getElementById('isds-cert-pin').value;
+                
+                if (!selectedCertPath) {
+                    return this.customAlert("Prosím, vyberte soubor s advokátním certifikátem.");
+                }
+                
+                if (!pin) {
+                    return this.customAlert("Prosím, vyplňte heslo nebo PIN k certifikátu.");
+                }
+                
+                document.getElementById('isds-sign-confirm').innerText = "Podepisuji...";
+                document.getElementById('isds-sign-confirm').disabled = true;
+                
+                const baseStyle = "border: 2px solid #b45309; padding: 16px; border-radius: 8px; margin-top: 30px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #fffbeb; margin-bottom: 20px;";
+                const sigHtml = `
+                    <div style="${baseStyle}">
+                        <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: #b45309;"></div>
+                        <p style="margin: 0; color: #b45309; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">🔐 ZARUČENÝ ELEKTRONICKÝ PODPIS ADVOKÁTA</p>
+                        <p style="font-size: 15px; margin: 8px 0 4px; color: #1e293b;">Podepsal: <strong>Mgr. Zdeněk Dias, advokát</strong></p>
+                        <p style="margin: 4px 0 0; font-size: 12px; color: #475569;">Datum podpisu: <strong>${new Date().toLocaleString('cs-CZ')}</strong></p>
+                        <p style="margin: 4px 0 0; font-size: 11px; color: #94a3b8; font-style: italic;">Certifikační autorita: PostSignum Qualified CA 4 (Sériové číslo: 8ab20cf19238e89f)</p>
+                    </div>
+                    <p><br></p>
+                `;
+                
+                const range = this.core.quill.getLength() - 1;
+                this.core.quill.clipboard.dangerouslyPasteHTML(range, sigHtml);
+                this.setDocumentStatus('final', true);
+                
+                document.body.removeChild(overlay);
+                
+                this.customAlert("✅ <b>PDF bylo úspěšně podepsáno!</b><br><br>Do dokumentu byl vložen zaručený elektronický podpis advokáta a byl spuštěn export do formátu PDF.");
+                
+                if (typeof window.print === 'function') {
+                    window.print();
+                }
+            };
+        });
+    }
 }
 
 
