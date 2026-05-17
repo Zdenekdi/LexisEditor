@@ -707,7 +707,32 @@ class LexisUI {
         if (okBtn) {
             okBtn.focus();
             okBtn.onclick = () => document.body.removeChild(overlay);
-        }
+    }
+
+    customConfirm(text, okLabel, cancelLabel, callback) {
+        const overlay = document.createElement('div');
+        overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
+        const modal = document.createElement('div');
+        modal.style = "background:#fff;padding:24px;border-radius:12px;width:360px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+        modal.innerHTML = `
+            <div style="margin:0 0 20px 0;font-size:14px;color:#1e293b;line-height:1.5;white-space:pre-wrap;">${text}</div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button id="cc-cancel" style="padding:8px 16px;background:#f1f5f9;color:#475569;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${cancelLabel}</button>
+                <button id="cc-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${okLabel}</button>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        document.getElementById('cc-cancel').onclick = () => {
+            document.body.removeChild(overlay);
+            callback(false);
+        };
+        
+        document.getElementById('cc-ok').onclick = () => {
+            document.body.removeChild(overlay);
+            callback(true);
+        };
     }
 
     customPrompt(title, defaultValue, callback) {
@@ -2130,7 +2155,27 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         badge.innerText = label;
         
         if (!suppressNotification) {
-            this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b>`);
+            if (status === 'final') {
+                this.customConfirm(
+                    `💼 <b>Stav dokumentu změněn na: ✅ Hotové</b><br><br>` +
+                    `Přejete si tento dokument automaticky <b>převést na čistý úřední formát</b>?<br><br>` +
+                    `Tento proces:<br>` +
+                    `• Převede hypertextové odkazy (Legal Linker) na běžný text.<br>` +
+                    `• Schválí všechny sledované změny (smazaný text zmizí, přidaný se sloučí).<br>` +
+                    `• Vypne režim sledování změn.`,
+                    `Vyčistit a dokončit`,
+                    `Ponechat s revizemi`,
+                    (shouldClean) => {
+                        if (shouldClean) {
+                            this.cleanDocumentForOfficialSubmission();
+                        } else {
+                            this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b> (odkazy a revize byly ponechány beze změny).`);
+                        }
+                    }
+                );
+            } else {
+                this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b>`);
+            }
         }
         
         this.saveActiveDocumentState();
@@ -2242,6 +2287,135 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             `<div style="font-size: 11px; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 6px; font-style: italic; line-height: 1.4;">` +
             `Lhůta je bezpečně uložena v interní paměti dokumentu a synchronizována se systémovým hlídačem lhůt.` +
             `</div>`);
+    }
+
+    convertCitationsToLinks() {
+        const quill = this.core.quill;
+        const html = quill.root.innerHTML;
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // Comprehensive Czech legal citation patterns
+        const citationRegex = /(§\s*\d+[a-z]?(?:\s+(?:odst\.|odstavce)\s*\d+)?\s*(?:zákona\s+)?(?:č\.\s*)?(?:\d+\/\d+\s+Sb\.|[a-zá-žA-Z0-9.\s]{2,}))/gi;
+        const lawRegex = /(zákon(?:a|u)?\s+(?:č\.\s*)?\d+\/\d+\s*Sb\.)/gi;
+        
+        let linkCount = 0;
+        
+        const walkAndReplace = (parent) => {
+            const children = Array.from(parent.childNodes);
+            for (const child of children) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    const text = child.nodeValue;
+                    
+                    if (parent.tagName && parent.tagName.toLowerCase() === 'a') continue;
+                    
+                    let newHtml = text;
+                    let replaced = false;
+                    
+                    // Replace matching citations with clean links targeting Zákony pro lidi
+                    newHtml = newHtml.replace(citationRegex, (match) => {
+                        // Check if we are matching valid target text
+                        const trimmed = match.trim();
+                        // Filter out common noise
+                        if (trimmed.length < 5) return match;
+                        
+                        const query = encodeURIComponent(trimmed);
+                        replaced = true;
+                        linkCount++;
+                        return `<a href="https://www.zakonyprolidi.cz/hledani?q=${query}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
+                    });
+                    
+                    newHtml = newHtml.replace(lawRegex, (match) => {
+                        if (match.includes('href=')) return match;
+                        const trimmed = match.trim();
+                        
+                        const query = encodeURIComponent(trimmed);
+                        replaced = true;
+                        linkCount++;
+                        return `<a href="https://www.zakonyprolidi.cz/hledani?q=${query}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
+                    });
+                    
+                    if (replaced && newHtml !== text) {
+                        const span = document.createElement('span');
+                        span.innerHTML = newHtml;
+                        parent.replaceChild(span, child);
+                    }
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    walkAndReplace(child);
+                }
+            }
+        };
+        
+        walkAndReplace(tempDiv);
+        
+        if (linkCount > 0) {
+            // Restore back to Quill
+            quill.root.innerHTML = tempDiv.innerHTML;
+            this.customAlert(`🔗 <b>Legal Linker dokončen</b><br><br>Automaticky bylo detekováno a vytvořeno <b>${linkCount}</b> klikatelných odkazů na portál Zákony pro lidi.`);
+            this.saveActiveDocumentState();
+            this.updateDocumentOutline();
+        } else {
+            this.customAlert(`ℹ️ <b>Legal Linker</b><br><br>V dokumentu nebyly nalezeny žádné textové citace zákonů (např. § 2201 občanského zákoníku).`);
+        }
+    }
+
+    cleanDocumentForOfficialSubmission() {
+        const quill = this.core.quill;
+        const html = quill.root.innerHTML;
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // 1. Remove all deleted text (elements with class ql-deletion)
+        const deletions = tempDiv.querySelectorAll('.ql-deletion');
+        deletions.forEach(el => el.remove());
+        
+        // 2. Accept all insertions (convert elements with class ql-insertion to plain text/unwrap them)
+        const insertions = tempDiv.querySelectorAll('.ql-insertion');
+        insertions.forEach(el => {
+            const parent = el.parentNode;
+            if (parent) {
+                while (el.firstChild) {
+                    parent.insertBefore(el.firstChild, el);
+                }
+                el.remove();
+            }
+        });
+        
+        // 3. Remove all hypertext legal links (elements with class legal-link)
+        const legalLinks = tempDiv.querySelectorAll('.legal-link');
+        legalLinks.forEach(el => {
+            const parent = el.parentNode;
+            if (parent) {
+                while (el.firstChild) {
+                    parent.insertBefore(el.firstChild, el);
+                }
+                el.remove();
+            }
+        });
+        
+        // 4. Update the editor content
+        quill.root.innerHTML = tempDiv.innerHTML;
+        
+        // Disable Track Changes so further typing is clean
+        if (this.core.trackChangesActive) {
+            this.core.toggleTrackChanges(false);
+            const btn = document.getElementById('btn-track-changes');
+            if (btn) {
+                btn.classList.remove('active');
+                btn.style.background = '';
+                btn.style.color = '';
+            }
+        }
+        
+        this.saveActiveDocumentState();
+        this.updateDocumentOutline();
+        
+        this.customAlert(`✨ <b>Úřední vyčištění dokončeno</b><br><br>` +
+            `Dokument byl úspěšně zbaven všech rušivých prvků. ` +
+            `Hypertextové odkazy byly převedeny na čistý text a veškeré sledované změny byly schváleny a sloučeny.<br><br>` +
+            `Nyní se jedná o <b>čisté, profesionální advokátní podání</b> připravené k tisku, odeslání datovou schránkou nebo exportu do PDF/Wordu.`);
     }
 
     updateDocumentOutline() {

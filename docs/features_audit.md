@@ -25,6 +25,8 @@ Tento dokument poskytuje vyčerpávající a strukturovaný přehled všech inte
 | **Stavové workflow (Novinka)**| ✅ Aktivní / Plně funkční | Dynamické odznaky, AI auto-status | [lexis-ui.js](../js/ui/lexis-ui.js) |
 | **Deadline Guard (Hlídač lhůt)**| ✅ Aktivní / Plně funkční | Skenování PDF/Editoru, ukládání v IndexedDB | [lexis-ui.js](../js/ui/lexis-ui.js) |
 | **Document Memory & AutoSave** | ✅ Aktivní / Plně funkční | Paměť dokumentu, lhůt, č.j., IndexedDB záloha | [lexis-ui.js](../js/ui/lexis-ui.js) |
+| **Legal Linker (Zákony pro lidi)**| ✅ Aktivní / Plně funkční | Auto-generování odkazů na zákony v ČR | [lexis-ui.js](../js/ui/lexis-ui.js) |
+
 
 ---
 
@@ -144,14 +146,8 @@ Nástroj pro správu životního cyklu dokumentů.
 Na základě hloubkového auditu a požadavků uživatele byly do backlogu zařazeny tyto prioritní body:
 
 ## ⏳ Fáze 1: Workflow & Metadata (Vysoká priorita)
-## ⏳ Fáze 1: Workflow & Metadata (Vysoká priorita)
 1.  **[BACKLOG] Filtrování dokumentů v seznamu na startovací obrazovce**:
     *   *Popis*: Umožnit uživateli na úvodní obrazovce filtrovat uložené dokumenty podle jejich stavu (např. ukázat pouze ty, které jsou "Ke kontrole").
-
-
-## ⚖️ Fáze 2: Pokročilá automatizace (Střední priorita)
-3.  **[BACKLOG] Legal Linker (Zákony pro lidi)**:
-    *   *Popis*: Automatická transformace textových odkazů na zákony (např. "§ 2201 občanského zákoníku") na klikatelné hypertextové odkazy vedoucí přímo na příslušný paragraf na portálu Zákony pro lidi.
 
 ## 🛡️ Fáze 3: Enterprise integrace (Nízká priorita)
 5.  **[BACKLOG] Podepisování dokumentů pomocí PDF Signatur**:
