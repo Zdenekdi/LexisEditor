@@ -16,6 +16,7 @@ class LexisUI {
         
         // Metadata fields for document memory
         this.currentDocumentId = 'doc_active';
+        this.currentDocumentTitle = '';
         this.currentDocumentDeadline = null;
         this.currentDocumentCj = '';
 
@@ -344,6 +345,7 @@ class LexisUI {
 
     openStartDocument(type) {
         this.currentDocumentId = 'doc_' + Date.now();
+        this.currentDocumentTitle = '';
         this.currentDocumentDeadline = null;
         this.currentDocumentCj = '';
         this.updateDeadlineBadge();
@@ -2116,6 +2118,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         this.setDocumentStatus(saved.status, true);
                     }
                     
+                    this.currentDocumentTitle = saved.title || '';
                     this.currentDocumentDeadline = saved.deadline || null;
                     this.currentDocumentCj = saved.cj || '';
                     this.updateDeadlineBadge();
@@ -2154,7 +2157,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             
             const html = this.core.getContent();
             const text = this.core.getText();
-            const title = text.substring(0, 30).trim() || "Nový dokument";
+            const title = this.currentDocumentTitle || text.substring(0, 30).trim() || "Nový dokument";
             
             const state = {
                 id: this.currentDocumentId,
@@ -2184,6 +2187,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             // Mark active-document-id as null so next reload shows start screen
             await this.core.storage.set('settings', { key: 'active-document-id', value: null });
             this.currentDocumentId = null;
+            this.currentDocumentTitle = '';
             this.currentDocumentDeadline = null;
             this.currentDocumentCj = '';
             
@@ -2371,6 +2375,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         this.setDocumentStatus(saved.status, true);
                     }
                     
+                    this.currentDocumentTitle = saved.title || '';
                     this.currentDocumentDeadline = saved.deadline || null;
                     this.currentDocumentCj = saved.cj || '';
                     this.updateDeadlineBadge();
@@ -3146,21 +3151,44 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                                 <p><br></p>
                                 <p>Mgr. Zdeněk Dias, advokát</p>
                             `;
-                            this.core.setContent(html);
-                            this.setDocumentStatus('draft', true);
                             
                             const due = new Date();
                             due.setDate(due.getDate() + m.deadlineDays);
+                            const dueDateStr = due.toISOString().split('T')[0];
+                            
+                            // Initialize fresh document state and metadata
+                            this.currentDocumentId = 'doc_' + Date.now();
+                            this.currentDocumentTitle = `Odpověď: ${m.subject}`;
+                            this.currentDocumentCj = '15 Co 123/2026';
+                            this.currentDocumentDeadline = {
+                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
+                                dueDate: dueDateStr
+                            };
+                            
+                            this.core.setContent(html);
+                            this.setDocumentStatus('draft', true);
+                            
+                            // Track in activeDeadlines
                             this.activeDeadlines.push({
                                 id: 'dl_' + Date.now(),
                                 title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
-                                dueDate: due.toISOString().split('T')[0]
+                                dueDate: dueDateStr
                             });
                             this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
                             this.renderDeadlines();
+                            this.updateDeadlineBadge();
+                            this.updateDocumentOutline();
+                            
+                            // Transition view from start screen to editor
+                            const startScreen = document.getElementById('start-screen');
+                            const appContainer = document.getElementById('app-container');
+                            if (startScreen && appContainer) {
+                                startScreen.style.display = 'none';
+                                appContainer.style.display = 'flex';
+                            }
                             
                             document.body.removeChild(overlay);
-                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. 15 Co 123/2026 a aktivováno sledování lhůty.`);
+                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. 15 Co 123/2026, aktivováno sledování lhůty a načteno do editoru.`);
                         }
                     };
                 };
