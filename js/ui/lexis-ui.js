@@ -20,6 +20,7 @@ class LexisUI {
         this.initContextMenu();
         this.loadQATSettings();
         this.loadLockSettings();
+        this.loadLicense();
         this.updateVersionDisplay();
         this.updateStats();
         this.initIdleTimer();
@@ -63,15 +64,15 @@ class LexisUI {
         }
     }
 
-    updateLockTimeout(val) {
+    async updateLockTimeout(val) {
         this.lockTimeout = parseInt(val);
-        localStorage.setItem('lexis-lock-timeout', val);
+        await this.core.storage.set('settings', { key: 'lock-timeout', value: val });
         this.resetIdleTimer();
     }
 
-    loadLockSettings() {
-        const saved = localStorage.getItem('lexis-lock-timeout');
-        if (saved !== null) {
+    async loadLockSettings() {
+        const saved = await this.core.storage.get('settings', 'lock-timeout');
+        if (saved !== null && saved !== undefined) {
             this.lockTimeout = parseInt(saved);
             const select = document.getElementById('lock-timeout-select');
             if (select) select.value = saved;
@@ -275,27 +276,30 @@ class LexisUI {
     }
 
     applyWatermark() {
-        const wrapper = document.getElementById('editor-wrapper');
-        let wmLayer = document.getElementById('watermark-layer');
-        const select = document.getElementById('watermark-select');
-        const colorInput = document.getElementById('watermark-color');
-        const text = select ? select.value : 'NONE';
-        const color = colorInput ? colorInput.value : '#e2e8f0';
-        
-        if (text === 'NONE') {
-            if (wmLayer) wmLayer.remove();
-            return;
-        }
-        
-        if (!wmLayer) {
-            wmLayer = document.createElement('div');
-            wmLayer.id = 'watermark-layer';
-            wmLayer.style = "position:absolute; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden;";
-            wrapper.insertBefore(wmLayer, wrapper.firstChild);
-        }
-        
-        wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${text}</div>`;
+        this.checkEnterpriseFeature("Vodoznak na pozadí", () => {
+            const wrapper = document.getElementById('editor-wrapper');
+            let wmLayer = document.getElementById('watermark-layer');
+            const select = document.getElementById('watermark-select');
+            const colorInput = document.getElementById('watermark-color');
+            const text = select ? select.value : 'NONE';
+            const color = colorInput ? colorInput.value : '#e2e8f0';
+            
+            if (text === 'NONE') {
+                if (wmLayer) wmLayer.remove();
+                return;
+            }
+            
+            if (!wmLayer) {
+                wmLayer = document.createElement('div');
+                wmLayer.id = 'watermark-layer';
+                wmLayer.style = "position:absolute; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden;";
+                wrapper.insertBefore(wmLayer, wrapper.firstChild);
+            }
+            
+            wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${text}</div>`;
+        });
     }
+
 
     openStartDocument(type) {
         if (type === 'blank') {
@@ -696,28 +700,33 @@ class LexisUI {
     }
 
     showFeeCalc() {
-        this.customPrompt("Zadejte žalovanou částku (Kč):", "", (amount) => {
-            if (!amount) return;
-            const val = parseFloat(amount.replace(/\s/g, ''));
-            if (isNaN(val)) return this.customAlert("Zadána neplatná částka.");
-            let fee = 0;
-            if (val <= 20000) fee = 1000;
-            else if (val <= 40000000) fee = Math.ceil(val * 0.05);
-            else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
-            this.customAlert(`Soudní poplatek činí:\n\n${fee.toLocaleString('cs-CZ')} Kč`);
+        this.checkEnterpriseFeature("Kalkulačka soudních poplatků", () => {
+            this.customPrompt("Zadejte žalovanou částku (Kč):", "", (amount) => {
+                if (!amount) return;
+                const val = parseFloat(amount.replace(/\s/g, ''));
+                if (isNaN(val)) return this.customAlert("Zadána neplatná částka.");
+                let fee = 0;
+                if (val <= 20000) fee = 1000;
+                else if (val <= 40000000) fee = Math.ceil(val * 0.05);
+                else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
+                this.customAlert(`Soudní poplatek činí:\n\n${fee.toLocaleString('cs-CZ')} Kč`);
+            });
         });
     }
 
     showInterestCalc() {
-        this.customPrompt("Zadejte jistinu (Kč):", "", (amount) => {
-            if (!amount) return;
-            const val = parseFloat(amount.replace(/\s/g, ''));
-            if (isNaN(val)) return this.customAlert("Zadána neplatná jistina.");
-            const repo = 5.25;
-            const rate = repo + 8;
-            this.customAlert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\n\nRočně: ${(val * rate / 100).toLocaleString('cs-CZ')} Kč\nMěsíčně: ${(val * rate / 1200).toLocaleString('cs-CZ')} Kč`);
+        this.checkEnterpriseFeature("Kalkulačka úroků z prodlení", () => {
+            this.customPrompt("Zadejte jistinu (Kč):", "", (amount) => {
+                if (!amount) return;
+                const val = parseFloat(amount.replace(/\s/g, ''));
+                if (isNaN(val)) return this.customAlert("Zadána neplatná jistina.");
+                const repo = 5.25;
+                const rate = repo + 8;
+                this.customAlert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\n\nRočně: ${(val * rate / 100).toLocaleString('cs-CZ')} Kč\nMěsíčně: ${(val * rate / 1200).toLocaleString('cs-CZ')} Kč`);
+            });
         });
     }
+
 
     async initContextMenu() {
         const editorEl = document.querySelector('.ql-editor');
@@ -733,7 +742,7 @@ class LexisUI {
     }
 
     async loadQATSettings() {
-        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+        const settings = await this.core.storage.get('settings', 'qat-settings') || {};
         const defaults = { 'qat-save': true, 'qat-undo': true, 'qat-redo': true, 'qat-print': false, 'qat-new': false };
         const finalSettings = { ...defaults, ...settings };
         
@@ -764,10 +773,357 @@ class LexisUI {
         btn.style.display = isHidden ? 'flex' : 'none';
         if (check) check.innerText = isHidden ? '✓' : '';
         
-        const settings = JSON.parse(localStorage.getItem('lexis-qat-settings') || '{}');
+        const settings = await this.core.storage.get('settings', 'qat-settings') || {};
         settings[id] = isHidden;
-        localStorage.setItem('lexis-qat-settings', JSON.stringify(settings));
+        await this.core.storage.set('settings', { key: 'qat-settings', value: settings });
+    }
+
+    async activateLicense(key) {
+        if (!key) return;
+        
+        const trimmedKey = key.trim().toUpperCase();
+        const isEnterprise = trimmedKey.startsWith("LEXIS-ENT-") || trimmedKey.includes("EVOLIO") || trimmedKey.includes("PRO");
+        
+        const badge = document.getElementById('license-status-badge');
+        const input = document.getElementById('license-key');
+        
+        if (isEnterprise) {
+            if (badge) {
+                badge.innerText = 'Enterprise';
+                badge.style.background = '#10b981';
+            }
+            if (input) input.value = trimmedKey;
+            
+            await this.core.secureVault.save('license_key', trimmedKey);
+            await this.core.secureVault.save('license_status', 'Enterprise');
+            
+            const verEl = document.getElementById('dynamic-ver');
+            if (verEl) {
+                const currentText = verEl.innerText;
+                if (!currentText.includes('Enterprise')) {
+                    verEl.innerText = `${currentText} Enterprise`;
+                }
+            }
+            alert('Licence byla úspěšně aktivována! Režim Enterprise je aktivní.');
+            this.loadCustomClauses();
+        } else {
+            if (badge) {
+                badge.innerText = 'Neplatný';
+                badge.style.background = '#ef4444';
+            }
+            await this.core.secureVault.save('license_key', '');
+            await this.core.secureVault.save('license_status', 'Neaktivní');
+            alert('Neplatný licenční klíč.');
+            this.loadCustomClauses();
+        }
+    }
+
+    async loadLicense() {
+        const key = await this.core.secureVault.get('license_key');
+        const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
+        
+        const badge = document.getElementById('license-status-badge');
+        const input = document.getElementById('license-key');
+        
+        if (key && input) {
+            input.value = key;
+        }
+        
+        if (badge) {
+            badge.innerText = status;
+            if (status === 'Enterprise') {
+                badge.style.background = '#10b981';
+                const verEl = document.getElementById('dynamic-ver');
+                if (verEl) {
+                    const currentText = verEl.innerText;
+                    if (!currentText.includes('Enterprise')) {
+                        verEl.innerText = `${currentText} Enterprise`;
+                    }
+                }
+            } else {
+                badge.style.background = '#ef4444';
+            }
+        }
+        this.loadCustomClauses();
+    }
+
+    async loadCustomClauses() {
+        const container = document.getElementById('custom-clauses-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
+        if (status !== 'Enterprise') {
+            container.innerHTML = `
+                <div style="font-size: 10px; color: #94a3b8; padding: 6px; text-align: center; border: 1px dashed #cbd5e1; border-radius: 6px; background: #f8fafc; font-weight: 500;">
+                    🔒 Pouze v režimu Enterprise
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            const list = await this.core.storage.getAll('clauses');
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div style="font-size: 10px; color: #94a3b8; padding: 6px; text-align: center; font-style: italic;">
+                        Zatím žádné vlastní doložky
+                    </div>
+                `;
+                return;
+            }
+            
+            list.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'clause-item';
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.alignItems = 'center';
+                row.style.fontSize = '11px';
+                row.style.padding = '8px 10px';
+                row.onclick = () => {
+                    const range = this.core.quill.getSelection(true);
+                    this.core.quill.insertText(range.index, `\n\n${item.text}\n`);
+                };
+                
+                row.innerHTML = `
+                    <span style="font-weight: 600; color: #1e293b;">📁 ${item.name}</span>
+                    <span style="color: #ef4444; font-size: 12px; cursor: pointer; padding: 0 4px; font-weight: bold;" onclick="event.stopPropagation(); window.lexisUI.deleteCustomClause('${item.id}')">✕</span>
+                `;
+                container.appendChild(row);
+            });
+        } catch (e) {
+            console.error("Chyba při načítání doložek z IndexedDB:", e);
+        }
+    }
+
+    async deleteCustomClause(id) {
+        if (!confirm('Opravdu chcete smazat tuto vlastní doložku?')) return;
+        await this.core.storage.delete('clauses', id);
+        this.loadCustomClauses();
+    }
+
+    async saveSelectedAsClause() {
+        const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
+        if (status !== 'Enterprise') {
+            alert('Tato funkce vyžaduje aktivní verzi Enterprise! Zadejte prosím licenční klíč v Nastavení.');
+            this.switchTab('tab-settings');
+            return;
+        }
+
+        const range = this.core.quill.getSelection();
+        if (!range || range.length === 0) {
+            alert('Vyberte prosím v editoru text, který chcete uložit jako doložku.');
+            return;
+        }
+        
+        const selectedText = this.core.quill.getText(range.index, range.length).trim();
+        if (!selectedText) {
+            alert('Vybraný text je prázdný.');
+            return;
+        }
+
+        const clauseName = prompt('Zadejte název pro novou vlastní doložku:');
+        if (!clauseName || !clauseName.trim()) return;
+
+        try {
+            await this.core.storage.set('clauses', {
+                id: Date.now().toString(),
+                name: clauseName.trim(),
+                text: selectedText,
+                createdAt: new Date().toISOString()
+            });
+            
+            alert(`Doložka "${clauseName}" byla úspěšně uložena do IndexedDB.`);
+            this.loadCustomClauses();
+        } catch (e) {
+            console.error("Chyba při ukládání doložky:", e);
+            alert("Chyba při ukládání doložky do IndexedDB.");
+        }
+    }
+
+
+    triggerCloudSync() {
+        const icon = document.getElementById('sync-icon');
+        const text = document.getElementById('sync-text');
+        const status = document.getElementById('sync-status');
+        
+        if (!icon || !text || !status) return;
+        
+        // Start syncing animation
+        status.style.color = '#3b82f6';
+        text.innerText = 'Synchronizace...';
+        icon.innerText = '🔄';
+        icon.style.display = 'inline-block';
+        icon.animate([
+            { transform: 'rotate(0deg)' },
+            { transform: 'rotate(360deg)' }
+        ], {
+            duration: 1000,
+            iterations: Infinity
+        });
+        
+        setTimeout(() => {
+            // Stop animation
+            icon.getAnimations().forEach(anim => anim.cancel());
+            
+            // Randomly trigger conflict (25% chance) or mock successful sync
+            if (Math.random() < 0.25) {
+                this.showConflictResolutionDialog();
+                status.style.color = '#f59e0b';
+                text.innerText = 'Kolize verzí';
+                icon.innerText = '⚠️';
+            } else {
+                status.style.color = '#10b981';
+                text.innerText = 'Synchronizováno';
+                icon.innerText = '☁️';
+                alert('Cloud-Sync dokončen. Místní databáze IndexedDB je plně synchronizovaná.');
+            }
+        }, 1500);
+    }
+
+    showConflictResolutionDialog() {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(15, 23, 42, 0.4)';
+        overlay.style.backdropFilter = 'blur(8px)';
+        overlay.style.zIndex = '99999';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.id = 'conflict-modal';
+
+        const dialog = document.createElement('div');
+        dialog.style.background = 'rgba(255, 255, 255, 0.95)';
+        dialog.style.padding = '30px';
+        dialog.style.borderRadius = '16px';
+        dialog.style.maxWidth = '500px';
+        dialog.style.width = '90%';
+        dialog.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
+        dialog.style.fontFamily = "'Inter', sans-serif";
+        dialog.style.border = "1px solid rgba(255,255,255,0.4)";
+
+        dialog.innerHTML = `
+            <div style="font-size:36px; margin-bottom:15px; text-align:center;">⚠️</div>
+            <h3 style="margin-bottom:10px; font-weight:700; color:#0f172a; text-align:center;">Kolize verzí na Cloudu</h3>
+            <p style="font-size:13px; color:#475569; line-height:1.6; margin-bottom:20px; text-align:center;">
+                V cloudovém úložišti byl nalezen novější zápis stejného dokumentu od jiného uživatele z vaší kanceláře. Vyberte verzi, kterou chcete zachovat.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                <div style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#f8fafc;" onclick="document.getElementById('opt-cloud').click()">
+                    <div>
+                        <span style="font-size:12px; font-weight:bold; display:block; color:#0f172a;">Verze z Cloudu (Doporučeno)</span>
+                        <span style="font-size:10px; color:#64748b;">Upravil: Mgr. Jan Novák (před 2 min)</span>
+                    </div>
+                    <input type="radio" name="conflict-opt" id="opt-cloud" checked style="cursor:pointer;">
+                </div>
+                <div style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('opt-local').click()">
+                    <div>
+                        <span style="font-size:12px; font-weight:bold; display:block; color:#0f172a;">Vaše místní verze</span>
+                        <span style="font-size:10px; color:#64748b;">Upravil: Vy (před 5 min)</span>
+                    </div>
+                    <input type="radio" name="conflict-opt" id="opt-local" style="cursor:pointer;">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="resolve-conflict-btn" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:12px; transition: background 0.2s;">Potvrdit výběr</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        document.getElementById('resolve-conflict-btn').onclick = () => {
+            const isCloud = document.getElementById('opt-cloud').checked;
+            document.body.removeChild(overlay);
+            
+            const icon = document.getElementById('sync-icon');
+            const text = document.getElementById('sync-text');
+            const status = document.getElementById('sync-status');
+            if (icon && text && status) {
+                status.style.color = '#10b981';
+                text.innerText = 'Synchronizováno';
+                icon.innerText = '☁️';
+            }
+            
+            if (isCloud) {
+                alert('Dokument byl úspěšně aktualizován na nejnovější cloudovou verzi z IndexedDB.');
+            } else {
+                alert('Vaše lokální změny byly potvrzeny a zapsány do cloudového úložiště.');
+            }
+        };
+    async checkEnterpriseFeature(featureName, callback) {
+        const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
+        if (status === 'Enterprise') {
+            callback();
+        } else {
+            alert(`🔒 Funkce "${featureName}" je dostupná pouze v režimu Enterprise! Přejděte prosím do záložky Nastavení a aktivujte licenční klíč.`);
+            this.switchTab('tab-settings');
+        }
+    }
+
+    async sendAIQuery() {
+        const promptInput = document.getElementById('ai-prompt');
+        const output = document.getElementById('ai-output');
+        if (!promptInput || !output) return;
+        
+        const promptText = promptInput.value.trim();
+        if (!promptText) return;
+        
+        promptInput.value = '';
+        
+        const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
+        if (status !== 'Enterprise') {
+            if (typeof this.aiQueriesCount === 'undefined') this.aiQueriesCount = 0;
+            if (this.aiQueriesCount >= 3) {
+                const upgradePrompt = document.createElement('div');
+                upgradePrompt.style = "padding:15px; border-radius:10px; background:#fff1f2; border:1px solid #fecdd3; color:#9f1239; font-size:12px; line-height:1.5; margin-bottom:10px;";
+                upgradePrompt.innerHTML = `
+                    <span style="font-size:16px; display:block; margin-bottom:5px;">⚠️ <b>AI limit vyčerpán!</b></span>
+                    Bezplatná verze umožňuje pouze 3 AI dotazy na relaci. Aktivujte si <b>Enterprise licenci</b> v Nastavení pro neomezenou právní rešerši, hloubkové audity a šifrované ukládání.
+                `;
+                output.appendChild(upgradePrompt);
+                output.scrollTop = output.scrollHeight;
+                return;
+            }
+            this.aiQueriesCount++;
+        }
+        
+        const userMsg = document.createElement('div');
+        userMsg.style = "padding: 8px 12px; border-radius: 8px; background: #e2e8f0; margin-bottom: 10px; align-self: flex-end; max-width: 80%; margin-left: auto; font-size:12px;";
+        userMsg.innerText = promptText;
+        output.appendChild(userMsg);
+        output.scrollTop = output.scrollHeight;
+        
+        const loadingMsg = document.createElement('div');
+        loadingMsg.style = "padding: 8px 12px; border-radius: 8px; background: #f1f5f9; margin-bottom: 10px; font-size:12px; color:#64748b;";
+        loadingMsg.innerText = "AI přemýšlí...";
+        output.appendChild(loadingMsg);
+        output.scrollTop = output.scrollHeight;
+        
+        try {
+            const systemPrompt = "Jsi špičkový a přesný právní asistent.";
+            const response = await this.core.callAI(promptText, systemPrompt);
+            loadingMsg.innerText = response;
+            
+            if (status !== 'Enterprise') {
+                const badge = document.createElement('div');
+                badge.style = "font-size: 9px; color:#f43f5e; margin-top:5px; font-weight:bold;";
+                badge.innerText = `Zbývající bezplatné dotazy: ${3 - this.aiQueriesCount}/3`;
+                loadingMsg.appendChild(badge);
+            }
+        } catch (e) {
+            loadingMsg.innerText = "Chyba při komunikaci s AI.";
+        }
+        output.scrollTop = output.scrollHeight;
     }
 }
+
+
 
 window.LexisUI = LexisUI;

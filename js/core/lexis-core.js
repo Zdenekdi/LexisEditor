@@ -41,7 +41,8 @@ class LexisCore {
         this.containerId = containerId;
         this.options = options;
         this.quill = null;
-        this.knowledgeBase = JSON.parse(localStorage.getItem('lexis_kb') || '[]');
+        this.storage = new LexisStorage();
+        this.knowledgeBase = [];
         this.isTrackChangesActive = false;
         this.scanTimeout = null;
         this.secureVault = new SecureVault();

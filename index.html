@@ -672,8 +672,21 @@
                     <span style="font-size: 9px; color: #94a3b8;">Webhook URL</span>
                 </div>
             </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 10px; align-items: center;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Licenční klíč:</span>
+                        <div style="display:flex; gap:5px; align-items: center;">
+                            <input type="text" id="license-key" placeholder="XXXX-XXXX-XXXX-XXXX" class="combo-box" style="width:120px" onchange="lexisUI.activateLicense(this.value)">
+                            <span id="license-status-badge" style="padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #ef4444; color: white; white-space: nowrap;">Neaktivní</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="group-label">Seat Management</div>
+            </div>
         </div>
     </div>
+
 
     <div id="sidebar-tab" class="sidebar-side-tab" onclick="toggleSidebar('sidebar')">
         <span>📚 KNIHOVNA</span>
@@ -750,9 +763,11 @@
                     <div class="clause-item" onclick="insertClause('gdpr')">🛡️ GDPR ustanovení</div>
                     <div class="clause-item" onclick="insertClause('confidentiality')">🤐 Mlčenlivost (NDA)</div>
                     
-                    <div class="category-header">Ostatní</div>
+                    <div class="category-header">Vlastní doložky</div>
+                    <div id="custom-clauses-container" style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;"></div>
                     <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ Uložit vybrané...</div>
                 </div>
+
                 
                 <div class="panel-section" id="active-deadlines-section">
                     <div class="panel-title">⏰ Aktivní lhůty</div>
@@ -951,12 +966,16 @@
         <div id="app-version-status" style="margin-right:15px; font-size:11px; color:#64748b;">LexisEditor <span id="dynamic-ver">...</span></div>
         <span>✨ AI: Aktivní</span>
         <span id="save-status">✓ Uloženo</span>
+        <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()">
+            <span id="sync-icon">☁️</span> <span id="sync-text">Synchronizováno</span>
+        </span>
     </div>
 
     </div> <!-- Konec app-container -->
 
     <!-- SDK & UI Modules -->
     <script src="js/providers/ai-provider.js"></script>
+    <script src="js/core/lexis-storage.js"></script>
     <script src="js/core/lexis-core.js"></script>
     <script src="js/ui/lexis-ui.js"></script>
 
@@ -979,6 +998,15 @@
                     // Logic for background scans
                 }
             });
+
+            // Asynchronní inicializace lokálního úložiště (IndexedDB)
+            await lexisCore.storage.init();
+
+            // Načtení dat z úložiště do Core
+            const savedKB = await lexisCore.storage.get('settings', 'knowledge-base');
+            if (savedKB) {
+                lexisCore.knowledgeBase = savedKB;
+            }
 
             // 2. Initialize UI
             lexisUI = new LexisUI(lexisCore);
@@ -1046,8 +1074,12 @@
         window.printDocument = () => lexisUI.printDocument();
         window.importDocument = () => lexisUI.importDocument();
         window.toggleQATItem = (id) => lexisUI.toggleQATItem(id);
+        window.saveSelectedAsClause = () => lexisUI.saveSelectedAsClause();
+        window.sendAIQuery = () => lexisUI.sendAIQuery();
         
         window.insertFootnote = () => lexisUI.insertFootnote();
+
+
         window.insertLink = () => lexisUI.insertLink();
         window.insertDate = () => lexisUI.insertDate();
         window.insertSymbol = (sym) => lexisUI.insertSymbol(sym);
