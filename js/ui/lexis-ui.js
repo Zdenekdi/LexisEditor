@@ -42,6 +42,8 @@ class LexisUI {
             if (contextMenu) contextMenu.style.display = 'none';
             const qatMenu = document.getElementById('qat-custom-menu');
             if (qatMenu) qatMenu.style.display = 'none';
+            const statusDropdown = document.getElementById('status-dropdown');
+            if (statusDropdown) statusDropdown.style.display = 'none';
         });
 
         // Idle activity listeners
@@ -199,6 +201,13 @@ class LexisUI {
             const file = e.target.files[0];
             if (!file) return;
             
+            // Update document title in the top bar
+            const titleEl = document.getElementById('window-doc-title');
+            if (titleEl) {
+                const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+                titleEl.innerText = cleanTitle;
+            }
+            
             const reader = new FileReader();
             if (file.name.endsWith('.docx')) {
                 reader.onload = (re) => {
@@ -309,8 +318,10 @@ class LexisUI {
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
             this.core.setContent('<p><br></p>');
+            this.setDocumentStatus('draft', true);
         } else if (type === 'file') {
             this.importDocument();
+            this.setDocumentStatus('draft', true);
         } else {
             this.showLoader("Načítání šablony...", async () => {
                 document.getElementById('start-screen').style.display = 'none';
@@ -320,6 +331,7 @@ class LexisUI {
                     const content = await window.electronAPI.getTemplateContent(type);
                     this.core.setContent(content);
                 }
+                this.setDocumentStatus('draft', true);
             });
         }
     }
@@ -807,7 +819,7 @@ class LexisUI {
                     verEl.innerText = `${currentText} Enterprise`;
                 }
             }
-            alert('Licence byla úspěšně aktivována! Režim Enterprise je aktivní.');
+            this.customAlert('🔑 <b>Licence aktivována!</b><br><br>Licence byla úspěšně ověřena. Režim <b>Enterprise</b> je nyní plně aktivní a všechny pokročilé funkce jsou k dispozici.');
             this.loadCustomClauses();
         } else {
             if (badge) {
@@ -816,7 +828,7 @@ class LexisUI {
             }
             await this.core.secureVault.save('license_key', '');
             await this.core.secureVault.save('license_status', 'Neaktivní');
-            alert('Neplatný licenční klíč.');
+            this.customAlert('❌ <b>Neplatný licenční klíč</b><br><br>Zadaný licenční klíč nebyl rozpoznán. Zkontrolujte prosím správnost zadání.');
             this.loadCustomClauses();
         }
     }
@@ -910,20 +922,20 @@ class LexisUI {
     async saveSelectedAsClause() {
         const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
         if (status !== 'Enterprise') {
-            alert('Tato funkce vyžaduje aktivní verzi Enterprise! Zadejte prosím licenční klíč v Nastavení.');
+            this.customAlert('🔒 <b>Vyžadována verze Enterprise</b><br><br>Tato funkce vyžaduje aktivní verzi Enterprise! Zadejte prosím licenční klíč v Nastavení.');
             this.switchTab('tab-settings');
             return;
         }
 
         const range = this.core.quill.getSelection();
         if (!range || range.length === 0) {
-            alert('Vyberte prosím v editoru text, který chcete uložit jako doložku.');
+            this.customAlert('📝 <b>Žádný výběr</b><br><br>Vyberte prosím v editoru text, který chcete uložit jako doložku.');
             return;
         }
         
         const selectedText = this.core.quill.getText(range.index, range.length).trim();
         if (!selectedText) {
-            alert('Vybraný text je prázdný.');
+            this.customAlert('⚠️ <b>Prázdný výběr</b><br><br>Vybraný text je prázdný.');
             return;
         }
 
@@ -938,11 +950,11 @@ class LexisUI {
                 createdAt: new Date().toISOString()
             });
             
-            alert(`Doložka "${clauseName}" byla úspěšně uložena do IndexedDB.`);
+            this.customAlert(`✅ <b>Doložka uložena</b><br><br>Doložka "<b>${clauseName}</b>" byla úspěšně uložena do lokální databáze IndexedDB.`);
             this.loadCustomClauses();
         } catch (e) {
             console.error("Chyba při ukládání doložky:", e);
-            alert("Chyba při ukládání doložky do IndexedDB.");
+            this.customAlert("❌ <b>Chyba ukládání</b><br><br>Nepodařilo se uložit doložku do databáze IndexedDB.");
         }
     }
 
@@ -981,7 +993,7 @@ class LexisUI {
                 status.style.color = '#10b981';
                 text.innerText = 'Synchronizováno';
                 icon.innerText = '☁️';
-                alert('Cloud-Sync dokončen. Místní databáze IndexedDB je plně synchronizovaná.');
+                this.customAlert('☁️ <b>Cloud-Sync dokončen</b><br><br>Místní databáze IndexedDB je plně synchronizovaná se vzdáleným cloudovým úložištěm.');
             }
         }, 1500);
     }
@@ -1055,9 +1067,9 @@ class LexisUI {
             }
             
             if (isCloud) {
-                alert('Dokument byl úspěšně aktualizován na nejnovější cloudovou verzi z IndexedDB.');
+                this.customAlert('☁️ <b>Verze stažena</b><br><br>Dokument byl úspěšně aktualizován na nejnovější cloudovou verzi z IndexedDB.');
             } else {
-                alert('Vaše lokální změny byly potvrzeny a zapsány do cloudového úložiště.');
+                this.customAlert('☁️ <b>Změny odeslány</b><br><br>Vaše lokální změny byly potvrzeny a zapsány do cloudového úložiště.');
             }
         };
     async checkEnterpriseFeature(featureName, callback) {
@@ -1065,7 +1077,7 @@ class LexisUI {
         if (status === 'Enterprise') {
             callback();
         } else {
-            alert(`🔒 Funkce "${featureName}" je dostupná pouze v režimu Enterprise! Přejděte prosím do záložky Nastavení a aktivujte licenční klíč.`);
+            this.customAlert(`🔒 <b>Vyžadována verze Enterprise</b><br><br>Funkce "<b>${featureName}</b>" je dostupná pouze v režimu Enterprise! Přejděte prosím do záložky Nastavení a aktivujte licenční klíč.`);
             this.switchTab('tab-settings');
         }
     }
@@ -1857,6 +1869,45 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             endEl.value = "http://localhost:1234/v1/chat/completions";
         }
         this.saveAISettings();
+    }
+
+    toggleStatusDropdown(event) {
+        event.stopPropagation();
+        const dd = document.getElementById('status-dropdown');
+        if (dd) {
+            const isShown = dd.style.display === 'block';
+            dd.style.display = isShown ? 'none' : 'block';
+        }
+    }
+
+    setDocumentStatus(status, suppressNotification = false) {
+        this.documentStatus = status;
+        const badge = document.getElementById('doc-status-badge');
+        if (!badge) return;
+        
+        // Remove all previous status classes
+        badge.className = 'status-pill';
+        
+        let label = '';
+        if (status === 'draft') {
+            badge.classList.add('status-draft');
+            label = '✍️ Rozpracované';
+        } else if (status === 'ai') {
+            badge.classList.add('status-ai');
+            label = '✨ Generované AI';
+        } else if (status === 'review') {
+            badge.classList.add('status-review');
+            label = '🔍 Ke kontrole';
+        } else if (status === 'final') {
+            badge.classList.add('status-final');
+            label = '✅ Hotové';
+        }
+        
+        badge.innerText = label;
+        
+        if (!suppressNotification) {
+            this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b>`);
+        }
     }
 }
 

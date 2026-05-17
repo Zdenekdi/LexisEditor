@@ -109,6 +109,13 @@
 
             <div class="doc-title-center">
                 LexisEditor - <span id="window-doc-title">Nepojmenovaný dokument</span>
+                <span id="doc-status-badge" class="status-pill status-draft" onclick="lexisUI.toggleStatusDropdown(event)">✍️ Rozpracované</span>
+                <div id="status-dropdown" class="status-dropdown-menu">
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('draft')">✍️ Rozpracované</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('ai')">✨ Generované AI</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('review')">🔍 Ke kontrole</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('final')">✅ Hotové</div>
+                </div>
             </div>
 
             <div class="title-right-tools">
@@ -1113,6 +1120,24 @@
         window.showHelpTip = (topic) => lexisUI.showHelpTip(topic);
         window.saveAISettings = () => lexisUI.saveAISettings();
         window.updateAIProviderDefaults = () => lexisUI.updateAIProviderDefaults();
+        
+        window.askAIAboutSelection = () => {
+            const range = lexisCore.quill.getSelection();
+            if (range && range.length > 0) {
+                const text = lexisCore.quill.getText(range.index, range.length);
+                lexisUI.toggleAIDrawer(true);
+                const input = document.getElementById('ai-prompt');
+                if (input) {
+                    input.value = `Analyzuj a navrhni úpravy pro následující smluvní doložku:\n\n"${text}"`;
+                }
+            } else {
+                lexisUI.customAlert("ℹ️ <b>Žádný výběr</b><br><br>Nejprve prosím označte myší část textu, kterou chcete analyzovat pomocí LexisAI.");
+            }
+        };
+        
+        window.anonymizeSelection = () => {
+            lexisUI.anonymize();
+        };
         
         window.addEventListener('DOMContentLoaded', () => {
             // Start screen handled by openStartDocument

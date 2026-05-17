@@ -75,7 +75,12 @@ body {
 .doc-title-center {
     position: absolute; left: 50%; transform: translateX(-50%);
     color: white; font-size: 12px; font-weight: 500; opacity: 0.9;
-    white-space: nowrap; pointer-events: none;
+    white-space: nowrap; pointer-events: auto;
+    -webkit-app-region: no-drag;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 9999;
 }
 
 .title-right-tools {
@@ -336,3 +341,80 @@ body.split-view #reference-panel { width: 500px; display: block; padding: 20px; 
 }
 
 .error-highlight { background: #fef08a; border-bottom: 2px solid #eab308; cursor: help; }
+
+/* Document Workflow Status Pill */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    -webkit-app-region: no-drag;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.status-pill:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+/* Specific States styling */
+.status-draft {
+    background-color: rgba(59, 130, 246, 0.25);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.status-ai {
+    background-color: rgba(167, 139, 250, 0.25);
+    color: #c4b5fd;
+    border: 1px solid rgba(167, 139, 250, 0.4);
+}
+
+.status-review {
+    background-color: rgba(245, 158, 11, 0.25);
+    color: #fde047;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.status-final {
+    background-color: rgba(16, 185, 129, 0.25);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+/* Status Dropdown Menu */
+.status-dropdown-menu {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    padding: 4px;
+    min-width: 150px;
+    display: none;
+}
+
+.status-dropdown-item {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #e2e8f0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s;
+    text-align: left;
+    -webkit-app-region: no-drag;
+}
+
+.status-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
