@@ -2,6 +2,13 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.1.0] - 2026-05-17
+### Přidáno
+- **ISDS Manager**: Plnohodnotný prohlížeč Datových schránek s inboxem, detailem zpráv a simulátorem.
+- **ISDS attachment import**: Možnost jednosměrného importu textového obsahu příloh do editoru.
+- **Digital PDF Signatures**: Zaručený elektronický podpis PDF advokátním certifikátem s vizuální doložkou.
+- **Legal Dashboard**: Přehledná historie nedávných dokumentů na úvodní obrazovce se sledováním lhůt a workflow fázemi.
+
 ## [3.0.0] - 2026-05-16
 ### Přidáno
 - **AI Privacy Suite**: Upgrade anonymizátoru o detekci entit (jména, firmy) pomocí LLM.
