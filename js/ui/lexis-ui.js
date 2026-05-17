@@ -343,6 +343,7 @@ class LexisUI {
 
 
     openStartDocument(type) {
+        this.currentDocumentId = 'doc_' + Date.now();
         this.currentDocumentDeadline = null;
         this.currentDocumentCj = '';
         this.updateDeadlineBadge();
@@ -2096,42 +2097,67 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     async initActiveDocumentState() {
         try {
-            const saved = await this.core.storage.get('documents', 'doc_active');
-            if (saved && saved.html) {
-                // Restore active document content and title
-                this.core.setContent(saved.html);
-                if (saved.status) {
-                    this.setDocumentStatus(saved.status, true);
+            let lastId = await this.core.storage.get('settings', 'active-document-id');
+            
+            // Upgrade fallback: if active-document-id is not set, check if legacy 'doc_active' exists
+            if (!lastId) {
+                const legacy = await this.core.storage.get('documents', 'doc_active');
+                if (legacy && legacy.html) {
+                    lastId = 'doc_active';
                 }
-                
-                this.currentDocumentDeadline = saved.deadline || null;
-                this.currentDocumentCj = saved.cj || '';
-                this.updateDeadlineBadge();
-                this.updateDocumentOutline();
-                
-                // Hide start screen if active document was restored
-                const startScreen = document.getElementById('start-screen');
-                const appContainer = document.getElementById('app-container');
-                if (startScreen && appContainer) {
-                    startScreen.style.display = 'none';
-                    appContainer.style.display = 'flex';
-                }
-                
-                console.log("Aktivní stav dokumentu byl úspěšně obnoven ze zálohy.");
             }
+            
+            if (lastId) {
+                const saved = await this.core.storage.get('documents', lastId);
+                if (saved && saved.html) {
+                    this.currentDocumentId = lastId;
+                    this.core.setContent(saved.html);
+                    if (saved.status) {
+                        this.setDocumentStatus(saved.status, true);
+                    }
+                    
+                    this.currentDocumentDeadline = saved.deadline || null;
+                    this.currentDocumentCj = saved.cj || '';
+                    this.updateDeadlineBadge();
+                    this.updateDocumentOutline();
+                    
+                    const startScreen = document.getElementById('start-screen');
+                    const appContainer = document.getElementById('app-container');
+                    if (startScreen && appContainer) {
+                        startScreen.style.display = 'none';
+                        appContainer.style.display = 'flex';
+                    }
+                    console.log(`Dokument ${lastId} byl úspěšně načten ze zálohy.`);
+                    return;
+                }
+            }
+            
+            // If no document was restored, show start screen and render recent files
+            const startScreen = document.getElementById('start-screen');
+            const appContainer = document.getElementById('app-container');
+            if (startScreen && appContainer) {
+                startScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+            this.renderRecentDocuments();
         } catch (e) {
             console.error("Chyba při obnově stavu aktivního dokumentu:", e);
+            this.renderRecentDocuments();
         }
     }
 
     async saveActiveDocumentState() {
         try {
+            if (!this.currentDocumentId) {
+                this.currentDocumentId = 'doc_' + Date.now();
+            }
+            
             const html = this.core.getContent();
             const text = this.core.getText();
             const title = text.substring(0, 30).trim() || "Nový dokument";
             
             const state = {
-                id: 'doc_active',
+                id: this.currentDocumentId,
                 html: html,
                 text: text,
                 title: title,
@@ -2142,9 +2168,258 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             };
             
             await this.core.storage.set('documents', state);
+            await this.core.storage.set('settings', { key: 'active-document-id', value: this.currentDocumentId });
         } catch (e) {
             console.error("Chyba při ukládání stavu aktivního dokumentu:", e);
         }
+    }
+
+    async goToStartScreen() {
+        try {
+            // Auto-save currently open document
+            if (this.currentDocumentId) {
+                await this.saveActiveDocumentState();
+            }
+            
+            // Mark active-document-id as null so next reload shows start screen
+            await this.core.storage.set('settings', { key: 'active-document-id', value: null });
+            this.currentDocumentId = null;
+            this.currentDocumentDeadline = null;
+            this.currentDocumentCj = '';
+            
+            // Clear editor content & outline
+            this.core.setContent('<p><br></p>');
+            this.updateDeadlineBadge();
+            this.updateDocumentOutline();
+            
+            // Transition view
+            const startScreen = document.getElementById('start-screen');
+            const appContainer = document.getElementById('app-container');
+            if (startScreen && appContainer) {
+                startScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+            
+            this.renderRecentDocuments();
+        } catch (e) {
+            console.error("Chyba při přechodu na úvodní obrazovku:", e);
+        }
+    }
+
+    async renderRecentDocuments(filterType = 'all') {
+        const recentSection = document.getElementById('recent-docs-section');
+        const recentList = document.getElementById('recent-docs-list');
+        if (!recentSection || !recentList) return;
+        
+        try {
+            const allDocs = await this.core.storage.getAll('documents');
+            recentList.innerHTML = '';
+            
+            // Filter out empty or template items, keep only actual user document records
+            const userDocs = allDocs.filter(d => d && d.id && d.id.startsWith('doc_'));
+            
+            if (userDocs.length === 0) {
+                recentSection.style.display = 'block';
+                recentList.innerHTML = `
+                    <div style="padding: 30px; text-align: center; color: #94a3b8; font-family: 'Inter', sans-serif;">
+                        <span style="font-size: 32px; display: block; margin-bottom: 10px;">📝</span>
+                        <div style="font-size: 13px; font-weight: 500;">Nemáte žádné nedávné dokumenty</div>
+                        <div style="font-size: 11px; margin-top: 4px;">Vytvořte nový nebo vyberte šablonu z mřížky výše.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Sort by updatedAt descending
+            userDocs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            
+            let renderedCount = 0;
+            
+            for (const doc of userDocs) {
+                // Apply filter
+                if (filterType !== 'all' && doc.status !== filterType) {
+                    continue;
+                }
+                
+                renderedCount++;
+                
+                // Formulate badges
+                let statusHtml = '';
+                switch (doc.status) {
+                    case 'draft':
+                        statusHtml = `<span style="padding: 4px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; font-family:'Inter',sans-serif;">✍️ Rozpracované</span>`;
+                        break;
+                    case 'ai':
+                        statusHtml = `<span style="padding: 4px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #f5f3ff; border: 1px solid #ddd6fe; color: #7c3aed; font-family:'Inter',sans-serif;">✨ AI</span>`;
+                        break;
+                    case 'review':
+                        statusHtml = `<span style="padding: 4px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #fff7ed; border: 1px solid #ffedd5; color: #ea580c; font-family:'Inter',sans-serif;">🔍 Ke kontrole</span>`;
+                        break;
+                    case 'final':
+                        statusHtml = `<span style="padding: 4px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; background: #f0fdf4; border: 1px solid #dcfce7; color: #16a34a; font-family:'Inter',sans-serif;">✅ Hotové</span>`;
+                        break;
+                }
+                
+                let deadlineHtml = '';
+                if (doc.deadline) {
+                    const due = new Date(doc.deadline.dueDate);
+                    const daysLeft = Math.ceil((due - new Date()) / (1000 * 60 * 60 * 24));
+                    let dlColor = '#ef4444';
+                    let dlBg = '#fef2f2';
+                    let dlText = `⏰ Lhůta: ${due.toLocaleDateString('cs-CZ')}`;
+                    
+                    if (daysLeft < 0) {
+                        dlText = `⚠️ Zmeškáno: ${due.toLocaleDateString('cs-CZ')}`;
+                    } else if (daysLeft > 7) {
+                        dlColor = '#16a34a';
+                        dlBg = '#f0fdf4';
+                    } else if (daysLeft > 2) {
+                        dlColor = '#eab308';
+                        dlBg = '#fefce8';
+                    }
+                    
+                    deadlineHtml = `<span style="padding: 4px 8px; font-size: 11px; font-weight: 600; border-radius: 6px; background: ${dlBg}; color: ${dlColor}; font-family:'Inter',sans-serif; margin-right: 5px;">${dlText}</span>`;
+                }
+                
+                const dateStr = new Date(doc.updatedAt).toLocaleString('cs-CZ', {
+                    day: 'numeric',
+                    month: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const row = document.createElement('div');
+                row.className = 'recent-doc-row';
+                row.onclick = () => this.openRecentDocument(doc.id);
+                row.style = "display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif; margin-bottom: 5px;";
+                
+                // Add hover style directly
+                row.onmouseover = () => {
+                    row.style.background = '#f1f5f9';
+                    row.style.borderColor = '#cbd5e1';
+                };
+                row.onmouseout = () => {
+                    row.style.background = '#f8fafc';
+                    row.style.borderColor = '#e2e8f0';
+                };
+                
+                row.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                        <span style="font-size: 20px; flex-shrink: 0;">📄</span>
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 13px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${doc.title}</div>
+                            <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Aktualizováno: ${dateStr}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 10px;">
+                        ${deadlineHtml}
+                        ${statusHtml}
+                        <button onclick="event.stopPropagation(); deleteRecentDocument('${doc.id}')" style="background: transparent; border: none; cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'">🗑️</button>
+                    </div>
+                `;
+                recentList.appendChild(row);
+            }
+            
+            if (renderedCount === 0) {
+                recentList.innerHTML = `
+                    <div style="padding: 30px; text-align: center; color: #94a3b8; font-family: 'Inter', sans-serif;">
+                        <span style="font-size: 32px; display: block; margin-bottom: 10px;">🔍</span>
+                        <div style="font-size: 13px; font-weight: 500;">Žádné dokumenty neodpovídají filtru</div>
+                    </div>
+                `;
+            }
+            
+            recentSection.style.display = 'block';
+        } catch (e) {
+            console.error("Chyba při vykreslování nedávných dokumentů:", e);
+        }
+    }
+
+    filterRecentDocs(status) {
+        // Update active class on filter buttons
+        const container = document.getElementById('recent-filters');
+        if (container) {
+            const buttons = container.getElementsByClassName('filter-btn');
+            for (const btn of buttons) {
+                btn.classList.remove('active');
+                btn.style.background = '#f8fafc';
+                btn.style.color = '#64748b';
+                btn.style.borderColor = '#e2e8f0';
+            }
+            
+            // Find clicked button
+            const activeBtn = Array.from(buttons).find(b => b.getAttribute('onclick').includes(`'${status}'`));
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.background = '#2563eb';
+                activeBtn.style.color = 'white';
+                activeBtn.style.borderColor = 'transparent';
+            }
+        }
+        this.renderRecentDocuments(status);
+    }
+
+    async openRecentDocument(id) {
+        this.showLoader("Načítání dokumentu...", async () => {
+            try {
+                const saved = await this.core.storage.get('documents', id);
+                if (saved && saved.html) {
+                    this.currentDocumentId = id;
+                    this.core.setContent(saved.html);
+                    if (saved.status) {
+                        this.setDocumentStatus(saved.status, true);
+                    }
+                    
+                    this.currentDocumentDeadline = saved.deadline || null;
+                    this.currentDocumentCj = saved.cj || '';
+                    this.updateDeadlineBadge();
+                    this.updateDocumentOutline();
+                    
+                    // Save active-document-id to settings
+                    await this.core.storage.set('settings', { key: 'active-document-id', value: id });
+                    
+                    // Transition view
+                    const startScreen = document.getElementById('start-screen');
+                    const appContainer = document.getElementById('app-container');
+                    if (startScreen && appContainer) {
+                        startScreen.style.display = 'none';
+                        appContainer.style.display = 'flex';
+                    }
+                }
+            } catch (e) {
+                console.error("Chyba při otevírání vybraného dokumentu:", e);
+                this.customAlert("Nepodařilo se načíst vybraný dokument.");
+            }
+        });
+    }
+
+    async deleteRecentDocument(id) {
+        this.dialogs.customConfirm(
+            "Opravdu chcete tento dokument trvale smazat z paměti aplikace?",
+            "Smazat",
+            "Zrušit",
+            async (yes) => {
+                if (!yes) return;
+                
+                try {
+                    await this.core.storage.delete('documents', id);
+                    
+                    // If deleted document is currently active, clear state
+                    if (this.currentDocumentId === id) {
+                        this.currentDocumentId = null;
+                        this.currentDocumentDeadline = null;
+                        this.currentDocumentCj = '';
+                        await this.core.storage.set('settings', { key: 'active-document-id', value: null });
+                    }
+                    
+                    this.renderRecentDocuments();
+                } catch (e) {
+                    console.error("Chyba při mazání dokumentu:", e);
+                    this.customAlert("Nepodařilo se smazat vybraný dokument.");
+                }
+            }
+        );
     }
 
     updateDeadlineBadge() {
