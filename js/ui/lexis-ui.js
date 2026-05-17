@@ -1349,6 +1349,198 @@ class LexisUI {
             });
         });
     }
+
+    sendViaEmail() {
+        const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+        const subject = "Dokument z LexisEditoru: " + docTitle;
+        const body = "V příloze zasílám vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
+        window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
+
+    async saveAsTemplateDialog() {
+        this.checkEnterpriseFeature("Ukládání šablon", async () => {
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const title = text.substring(0, 30).trim() || "Nový vzor";
+            
+            this.customPrompt("Zadejte název nové šablony:", title, async (tplName) => {
+                if (!tplName) return;
+                
+                const templateKey = `tpl_${Date.now()}`;
+                const tplObj = {
+                    title: tplName,
+                    icon: '📄',
+                    desc: 'Uživatelská šablona z editoru',
+                    content: html
+                };
+                
+                // Uložit do IndexedDB
+                await this.core.storage.set('templates', templateKey, tplObj);
+                
+                // Také uložit přes Electron API, pokud existuje
+                if (window.electronAPI && window.electronAPI.saveTemplate) {
+                    try {
+                        await window.electronAPI.saveTemplate(templateKey, tplObj);
+                    } catch (e) {
+                        console.warn("Chyba při ukládání šablony do Electron FS:", e);
+                    }
+                }
+                
+                // Aktualizovat start screen
+                this.loadDynamicTemplates();
+                this.customAlert(`✅ <b>Šablona uložena!</b><br><br>Šablona <b>${tplName}</b> byla uložena a bude k dispozici na Úvodní obrazovce.`);
+            });
+        });
+    }
+
+    exportWebPreview() {
+        const html = this.core.getContent();
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+    }
+
+    indexCurrentDocument() {
+        this.checkEnterpriseFeature("Indexace Znalostní báze", async () => {
+            const text = this.core.getText();
+            if (text.trim().length < 10) {
+                this.customAlert("Dokument je příliš krátký pro indexaci.");
+                return;
+            }
+            
+            this.showLoader("Indexuji dokument do lokální Znalostní báze...", async () => {
+                const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+                const chunk = {
+                    title: docTitle,
+                    content: text,
+                    timestamp: new Date().toLocaleString('cs-CZ')
+                };
+                
+                if (!this.core.knowledgeBase) this.core.knowledgeBase = [];
+                this.core.knowledgeBase.push(chunk);
+                
+                await this.core.storage.set('settings', 'knowledge-base', this.core.knowledgeBase);
+                this.customAlert(`✅ <b>Indexace úspěšná!</b><br><br>Dokument <b>${docTitle}</b> byl indexován do lokální znalostní báze pro AI rešerše.`);
+            });
+        });
+    }
+
+    async exportToDocx() {
+        if (window.electronAPI && window.electronAPI.exportDocx) {
+            const html = this.core.getContent();
+            try {
+                const result = await window.electronAPI.exportDocx(html);
+                if (result && result.success) {
+                    this.customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}`);
+                } else if (result && !result.canceled) {
+                    this.customAlert(`Chyba při ukládání dokumentu:\n\n${result.error}`);
+                }
+            } catch (error) {
+                this.customAlert(`Neočekávaná chyba:\n\n${error.message}`);
+            }
+        } else {
+            this.customAlert("Export do DOCX je dostupný pouze v desktopové (Electron) verzi LexisEditoru.");
+        }
+    }
+
+    exportToBundle() {
+        this.checkEnterpriseFeature("Export do Lexis Bundle (.lexis)", async () => {
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+            
+            const bundle = {
+                title: docTitle,
+                html: html,
+                text: text,
+                exportedAt: new Date().toISOString(),
+                version: '3.5.0',
+                footnotes: this.core.footnotes || []
+            };
+            
+            const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${docTitle.replace(/[^a-zA-Z0-9-_\sá-žÁ-Ž]/g, '')}.lexis`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.customAlert(`📦 <b>Lexis Bundle vygenerován!</b><br><br>Soubor <b>.lexis</b> obsahuje kompletní text, formátování, zápatí a metadata a byl úspěšně stažen.`);
+        });
+    }
+
+    async searchAres() {
+        this.customPrompt("Zadejte IČO subjektu (8 číslic):", "", async (ico) => {
+            if (!ico) return;
+            const cleanIco = ico.replace(/\s/g, '');
+            
+            if (window.electronAPI && window.electronAPI.searchAres) {
+                this.showLoader("Lustruji subjekt v ARES...", async () => {
+                    try {
+                        const result = await window.electronAPI.searchAres(cleanIco);
+                        if (result && result.success) {
+                            const d = result.data;
+                            const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                            const html = `
+                                <div style="${baseStyle}">
+                                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
+                                    <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES: Právnická/Fyzická osoba</p>
+                                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
+                                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                        <div><strong>IČO:</strong> ${d.ico}</div>
+                                        <div><strong>DIČ:</strong> ${d.dic || 'Neuvedeno'}</div>
+                                        <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
+                                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Staženo z Rejstříku MFČR (${d.pravniForma})</div>
+                                    </div>
+                                </div>
+                                <p><br></p>
+                            `;
+                            
+                            const range = this.core.quill.getSelection(true);
+                            this.core.quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                        } else {
+                            this.customAlert(`ARES API nenašlo žádná data nebo selhalo:\n\n${result.error}`);
+                        }
+                    } catch (error) {
+                        this.customAlert(`Neočekávaná chyba při volání ARES:\n\n${error.message}`);
+                    }
+                });
+            } else {
+                // Lokální simulace, pokud jsme v prohlížeči (pro demo účely)
+                this.showLoader("Simuluji lustraci v ARES (prohlížeč)...", () => {
+                    const results = {
+                        "27082440": { obchodniJmeno: "Alza.cz a.s.", ico: "27082440", dic: "CZ27082440", sidlo: "Jankovcova 1522/53, Holešovice, 170 00 Praha 7", pravniForma: "Akciová společnost" },
+                        "25107354": { obchodniJmeno: "Seznam.cz, a.s.", ico: "25107354", dic: "CZ25107354", sidlo: "Radlická 3294/10, Smíchov, 150 00 Praha 5", pravniForma: "Akciová společnost" }
+                    };
+                    const d = results[cleanIco];
+                    if (d) {
+                        const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                        const html = `
+                            <div style="${baseStyle}">
+                                <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
+                                <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES (Simulace): Právnická osoba</p>
+                                <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
+                                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                    <div><strong>IČO:</strong> ${d.ico}</div>
+                                    <div><strong>DIČ:</strong> ${d.dic}</div>
+                                    <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
+                                    <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Simulovaná data pro prohlížeč (${d.pravniForma})</div>
+                                </div>
+                            </div>
+                            <p><br></p>
+                        `;
+                        const range = this.core.quill.getSelection(true);
+                        this.core.quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                    } else {
+                        this.customAlert("Subjekt nebyl v simulátoru ARES nalezen (použijte IČO: 27082440). Hledání v reálném registru vyžaduje spuštění v Electronu.");
+                    }
+                });
+            }
+        });
+    }
 }
 
 
