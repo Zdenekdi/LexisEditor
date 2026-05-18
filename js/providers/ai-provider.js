@@ -66,9 +66,14 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                 baseEndpoint = baseEndpoint.slice(0, -1);
             }
             
+            const headers = { "Content-Type": "application/json" };
+            if (apiKey) {
+                headers["X-API-Token"] = apiKey;
+            }
+            
             const response = await fetch(`${baseEndpoint}/api/agent/${agentId}`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: headers,
                 body: JSON.stringify({
                     prompt: prompt,
                     context: contextText,
