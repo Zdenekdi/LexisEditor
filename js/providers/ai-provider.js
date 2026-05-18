@@ -57,7 +57,16 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                 }
             }
             
-            const response = await fetch(`${endpoint}/api/agent/${agentId}`, {
+            // Heuristically adjust endpoint URL to LexisLocal server port (4000) if defaulted to Ollama (11434)
+            let baseEndpoint = endpoint;
+            if (baseEndpoint.includes("11434") || baseEndpoint.includes("/api/generate")) {
+                baseEndpoint = "http://localhost:4000";
+            }
+            if (baseEndpoint.endsWith("/")) {
+                baseEndpoint = baseEndpoint.slice(0, -1);
+            }
+            
+            const response = await fetch(`${baseEndpoint}/api/agent/${agentId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
