@@ -2036,7 +2036,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         
         // Notify backend about watcher state change
         try {
-            fetch(`http://localhost:4000/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST' })
+            const conn = this.getLexisLocalConnection();
+            fetch(`${conn.baseUrl}/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST', headers: conn.headers })
                 .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
         } catch (e) {
             console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
@@ -2067,7 +2068,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         
         // Notify backend about watch state
         try {
-            fetch(`http://localhost:4000/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST' })
+            const conn = this.getLexisLocalConnection();
+            fetch(`${conn.baseUrl}/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST', headers: conn.headers })
                 .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
         } catch (e) {
             console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
@@ -2108,6 +2110,43 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         this.toggleLexisLocalSelectors();
     }
 
+    getLexisLocalConnection() {
+        let endpoint = "http://localhost:4000";
+        let apiKey = "";
+
+        const endEl = document.getElementById('ai-endpoint');
+        const keyEl = document.getElementById('ai-apikey');
+
+        if (endEl && endEl.value) endpoint = endEl.value;
+        if (keyEl && keyEl.value) apiKey = keyEl.value;
+
+        const saved = localStorage.getItem('lexis_ai_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                if (s.endpoint) endpoint = s.endpoint;
+                if (s.apiKey) apiKey = s.apiKey;
+            } catch (e) {}
+        }
+
+        // Heuristically adjust port and protocol if it points to Ollama
+        let baseUrl = endpoint;
+        if (baseUrl.includes("11434") || baseUrl.includes("/api/generate")) {
+            const isHttps = endpoint.startsWith("https:");
+            baseUrl = `${isHttps ? "https" : "http"}://localhost:4000`;
+        }
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.slice(0, -1);
+        }
+
+        const headers = { "Content-Type": "application/json" };
+        if (apiKey) {
+            headers["X-API-Token"] = apiKey;
+        }
+
+        return { baseUrl, headers };
+    }
+
     toggleLexisLocalSelectors() {
         const provEl = document.getElementById('ai-provider');
         const container = document.getElementById('lexislocal-selectors-container');
@@ -2126,10 +2165,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (!modelSelect) return;
         
         try {
-            const endEl = document.getElementById('ai-endpoint');
-            const baseUrl = endEl ? endEl.value : "http://localhost:4000";
-            
-            const response = await fetch(`${baseUrl}/api/models`);
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/models`, { headers: conn.headers });
             if (response.ok) {
                 const data = await response.json();
                 if (data && data.models && data.models.length > 0) {
@@ -2458,7 +2495,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (!inboxSection || !inboxList) return;
         
         try {
-            const response = await fetch("http://localhost:4000/api/inbox");
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/inbox`, { headers: conn.headers });
             if (response.ok) {
                 const data = await response.json();
                 inboxList.innerHTML = '';
@@ -2534,7 +2572,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     async parseTestDocument() {
         try {
-            const response = await fetch("http://localhost:4000/api/inbox/parse-test", { method: "POST" });
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/inbox/parse-test`, { method: "POST", headers: conn.headers });
             if (response.ok) {
                 this.customAlert("<b>Úspěch</b><br><br>Testovací soudní spis (23 C 120/2026) byl naimportován a úspěšně zanalyzován!");
                 this.fetchInbox();
@@ -2548,9 +2587,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     async markInboxRead(fileName) {
         try {
-            const response = await fetch("http://localhost:4000/api/inbox/mark-read", {
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/inbox/mark-read`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: conn.headers,
                 body: JSON.stringify({ fileName })
             });
             if (response.ok) {
@@ -2644,7 +2684,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         
         this.showLoader("Lustruji subjekt v registrech...", async () => {
             try {
-                const response = await fetch(`http://localhost:4000/api/registry/check?ico=${ico}`);
+                const conn = this.getLexisLocalConnection();
+                const response = await fetch(`${conn.baseUrl}/api/registry/check?ico=${ico}`, { headers: conn.headers });
                 if (response.ok) {
                     const data = await response.json();
                     
@@ -3149,9 +3190,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             
             // Resilient hybrid background sync to LexisLocal calendar
             try {
-                fetch('http://localhost:4000/api/calendar/add', {
+                const conn = this.getLexisLocalConnection();
+                fetch(`${conn.baseUrl}/api/calendar/add`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: conn.headers,
                     body: JSON.stringify(newDl)
                 }).catch(e => console.log("LexisLocal je offline, ICS se nevygenerovalo."));
             } catch (e) {

@@ -60,7 +60,8 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
             // Heuristically adjust endpoint URL to LexisLocal server port (4000) if defaulted to Ollama (11434)
             let baseEndpoint = endpoint;
             if (baseEndpoint.includes("11434") || baseEndpoint.includes("/api/generate")) {
-                baseEndpoint = "http://localhost:4000";
+                const isHttps = endpoint.startsWith("https:");
+                baseEndpoint = `${isHttps ? "https" : "http"}://localhost:4000`;
             }
             if (baseEndpoint.endsWith("/")) {
                 baseEndpoint = baseEndpoint.slice(0, -1);
