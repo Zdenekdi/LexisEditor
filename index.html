@@ -77,22 +77,42 @@
                 </div>
             </div>
             
-            <!-- Nedávné dokumenty -->
-            <div id="recent-docs-section" style="margin-top: 30px; width: 100%; max-width: 800px; text-align: left; background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                    <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;">
-                        <span>📂</span> Nedávné dokumenty
-                    </h3>
-                    <div id="recent-filters" style="display: flex; gap: 6px;">
-                        <button class="filter-btn active" onclick="filterRecentDocs('all')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #cbd5e1; background: #2563eb; cursor: pointer; color: white; transition: all 0.2s; font-family: 'Inter', sans-serif;">Vše</button>
-                        <button class="filter-btn" onclick="filterRecentDocs('draft')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #64748b; transition: all 0.2s; font-family: 'Inter', sans-serif;">✍️ Rozpracované</button>
-                        <button class="filter-btn" onclick="filterRecentDocs('ai')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #7c3aed; transition: all 0.2s; font-family: 'Inter', sans-serif;">✨ AI</button>
-                        <button class="filter-btn" onclick="filterRecentDocs('review')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #ea580c; transition: all 0.2s; font-family: 'Inter', sans-serif;">🔍 Ke kontrole</button>
-                        <button class="filter-btn" onclick="filterRecentDocs('final')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #16a34a; transition: all 0.2s; font-family: 'Inter', sans-serif;">✅ Hotové</button>
+            <!-- Dokumenty & Složka Spisy -->
+            <div style="display: flex; gap: 20px; width: 100%; max-width: 900px; margin-top: 30px; flex-wrap: wrap; text-align: left;">
+                <!-- Nedávné dokumenty -->
+                <div id="recent-docs-section" style="flex: 1.2; min-width: 340px; background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;">
+                            <span>📂</span> Nedávné dokumenty
+                        </h3>
+                        <div id="recent-filters" style="display: flex; gap: 6px;">
+                            <button class="filter-btn active" onclick="filterRecentDocs('all')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #cbd5e1; background: #2563eb; cursor: pointer; color: white; transition: all 0.2s; font-family: 'Inter', sans-serif;">Vše</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('draft')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #64748b; transition: all 0.2s; font-family: 'Inter', sans-serif;">✍️ Rozpracované</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('ai')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #7c3aed; transition: all 0.2s; font-family: 'Inter', sans-serif;">✨ AI</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('review')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #ea580c; transition: all 0.2s; font-family: 'Inter', sans-serif;">🔍 Ke kontrole</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('final')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #16a34a; transition: all 0.2s; font-family: 'Inter', sans-serif;">✅ Hotové</button>
+                        </div>
+                    </div>
+                    <div id="recent-docs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 5px;">
+                        <!-- Dynamicky generované záznamy -->
                     </div>
                 </div>
-                <div id="recent-docs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 5px;">
-                    <!-- Dynamicky generované záznamy -->
+
+                <!-- Složka Spisy (LexisLocal) -->
+                <div id="inbox-docs-section" style="flex: 0.8; min-width: 300px; background: linear-gradient(135deg, #ffffff, #f8fafc); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;">
+                            <span>📥</span> Spisy & Doručená pošta
+                        </h3>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <button onclick="window.lexisUI.parseTestDocument()" style="background: #e2e8f0; border: none; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #475569; transition: background 0.2s;">➕ Test</button>
+                            <button onclick="window.lexisUI.fetchInbox()" style="background: none; border: none; font-size: 12px; cursor: pointer; color: var(--word-blue);">🔄</button>
+                        </div>
+                    </div>
+                    <div id="inbox-docs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 5px;">
+                        <!-- Dynamicky generované zprávy/spisy -->
+                        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 0;">Žádné nové spisy ke zpracování.</div>
+                    </div>
                 </div>
             </div>
 
@@ -999,6 +1019,17 @@
                         <option value="lia">lia</option>
                     </select>
                 </div>
+            </div>
+        </div>
+
+        <!-- ARES & ISIR Lustrace (Lokální) -->
+        <div id="ares-lookup-container" style="padding: 10px 15px; background: #fffbeb; border-top: 1px solid #fef08a; border-bottom: 1px solid #fef08a; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 9px; font-weight: 800; color: #b45309; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                <span>🔍</span> LUSTRACE SUBJEKTU (ARES & ISIR)
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <input type="text" id="ares-ico-input" placeholder="Zadejte IČO..." style="flex: 1; padding: 5px; font-size: 11px; border: 1px solid #fcd34d; border-radius: 4px; background: white;" onkeydown="if(event.key==='Enter') window.lexisUI.insertAresData()">
+                <button onclick="window.lexisUI.insertAresData()" style="padding: 5px 10px; font-size: 10px; font-weight: 700; color: white; background: #d97706; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">Ověřit</button>
             </div>
         </div>
 

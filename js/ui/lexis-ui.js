@@ -2379,9 +2379,263 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             }
             
             recentSection.style.display = 'block';
+            this.fetchInbox();
         } catch (e) {
             console.error("Chyba při vykreslování nedávných dokumentů:", e);
         }
+    }
+
+    async fetchInbox() {
+        const inboxSection = document.getElementById('inbox-docs-section');
+        const inboxList = document.getElementById('inbox-docs-list');
+        if (!inboxSection || !inboxList) return;
+        
+        try {
+            const response = await fetch("http://localhost:4000/api/inbox");
+            if (response.ok) {
+                const data = await response.json();
+                inboxList.innerHTML = '';
+                
+                if (data && data.inbox && data.inbox.length > 0) {
+                    data.inbox.forEach(doc => {
+                        const card = document.createElement('div');
+                        card.style = "background: white; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: transform 0.2s, box-shadow 0.2s;";
+                        card.onmouseover = () => {
+                            card.style.transform = "translateY(-1px)";
+                            card.style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.05)";
+                        };
+                        card.onmouseout = () => {
+                            card.style.transform = "translateY(0)";
+                            card.style.boxShadow = "0 1px 3px rgba(0,0,0,0.02)";
+                        };
+                        
+                        let deadlineBadge = '';
+                        if (doc.deadlineDays > 0) {
+                            const badgeColor = doc.deadlineDays <= 5 ? '#f43f5e' : '#f97316';
+                            const badgeBg = doc.deadlineDays <= 5 ? '#ffe4e6' : '#ffedd5';
+                            deadlineBadge = `<span style="font-size: 10px; font-weight: 700; color: ${badgeColor}; background: ${badgeBg}; padding: 2px 6px; border-radius: 4px; display: inline-block;">⚠️ Lhůta: ${doc.deadlineDays} dnů (vyprší ${doc.deadlineDate})</span>`;
+                        } else {
+                            deadlineBadge = `<span style="font-size: 10px; font-weight: 500; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; display: inline-block;">Bez lhůty</span>`;
+                        }
+                        
+                        let insolvencyBadge = '';
+                        if (doc.inInsolvency) {
+                            insolvencyBadge = `<span style="font-size: 9px; font-weight: 800; color: #be123c; background: #ffe4e6; border: 1px solid #fda4af; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">⚠️ V INSOLVENCI (${doc.insolvencyCase})</span>`;
+                        }
+                        
+                        card.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px;">
+                                <div style="font-weight: 700; font-size: 12px; color: #1e293b; display: flex; align-items: center; gap: 4px;">
+                                    <span>📄</span> ${doc.caseNumber}
+                                </div>
+                                ${deadlineBadge}
+                            </div>
+                            <div style="font-size: 11px; color: #475569;">
+                                <b>Žalobce:</b> ${doc.plaintiff}<br>
+                                <b>Žalovaný:</b> ${doc.defendant}
+                                ${insolvencyBadge}
+                            </div>
+                            <div style="font-size: 10px; color: #64748b; font-style: italic; background: #f8fafc; padding: 6px; border-radius: 4px; line-height: 1.3;">
+                                ${doc.summary}
+                            </div>
+                            <div style="display: flex; gap: 6px; margin-top: 4px;">
+                                <button id="prepare-reply-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}" style="flex: 1; padding: 5px 8px; font-size: 10px; font-weight: 700; color: white; background: var(--word-blue); border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">📝 Připravit odpověď</button>
+                                <button id="mark-done-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}" style="padding: 5px 8px; font-size: 10px; font-weight: 600; color: #64748b; background: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">🔕 Hotovo</button>
+                            </div>
+                        `;
+                        
+                        inboxList.appendChild(card);
+                        
+                        // Setup event listeners safely
+                        const prepBtn = card.querySelector(`[id="prepare-reply-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}"]`);
+                        const doneBtn = card.querySelector(`[id="mark-done-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}"]`);
+                        if (prepBtn) prepBtn.onclick = () => this.prepareReply(doc);
+                        if (doneBtn) doneBtn.onclick = () => this.markInboxRead(doc.fileName);
+                    });
+                } else {
+                    inboxList.innerHTML = `<div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 0;">Žádné nové spisy ke zpracování.</div>`;
+                }
+                inboxSection.style.display = 'block';
+            } else {
+                inboxSection.style.display = 'none';
+            }
+        } catch (e) {
+            console.log("⚠️ LexisLocal server není dostupný. Skrývám panel doručené pošty.");
+            inboxSection.style.display = 'none';
+        }
+    }
+
+    async parseTestDocument() {
+        try {
+            const response = await fetch("http://localhost:4000/api/inbox/parse-test", { method: "POST" });
+            if (response.ok) {
+                this.customAlert("<b>Úspěch</b><br><br>Testovací soudní spis (23 C 120/2026) byl naimportován a úspěšně zanalyzován!");
+                this.fetchInbox();
+            } else {
+                this.customAlert("<b>Chyba</b><br><br>Nepodařilo se naimportovat testovací spis.");
+            }
+        } catch (e) {
+            this.customAlert("<b>Chyba</b><br><br>Nelze se spojit s LexisLocal serverem. Ujistěte se, že běží na pozadí.");
+        }
+    }
+
+    async markInboxRead(fileName) {
+        try {
+            const response = await fetch("http://localhost:4000/api/inbox/mark-read", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fileName })
+            });
+            if (response.ok) {
+                this.fetchInbox();
+            }
+        } catch (e) {
+            console.error("Chyba při označování spisu za přečtený:", e);
+        }
+    }
+
+    async prepareReply(doc) {
+        this.showLoader("Zakládání spisu a generování odpovědi...", async () => {
+            try {
+                // 1. Transition view to editor
+                const startScreen = document.getElementById('start-screen');
+                const appContainer = document.getElementById('app-container');
+                if (startScreen && appContainer) {
+                    startScreen.style.display = 'none';
+                    appContainer.style.display = 'flex';
+                }
+                
+                // 2. Set active document state and metadata
+                this.currentDocumentId = 'doc_' + Date.now();
+                this.currentDocumentCj = doc.caseNumber;
+                this.currentDocumentDeadline = doc.deadlineDate;
+                this.currentDocumentTitle = `Vyjádření k žalobě - sp. zn. ${doc.caseNumber}`;
+                
+                // Set the title input field
+                const titleInput = document.getElementById('doc-title');
+                if (titleInput) titleInput.value = this.currentDocumentTitle;
+                
+                // 3. Draft formal response brief HTML
+                const generatedHtml = `
+                    <p style="text-align: right; font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Okresní soud v Brně</b><br>Polní 994/39<br>608 00 Brno</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>K sp. zn.:</b> ${doc.caseNumber}</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Žalobce:</b> ${doc.plaintiff}</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Žalovaný:</b> ${doc.defendant}</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <h2 style="text-align: center; font-weight: bold; font-size: 14pt; font-family: 'Times New Roman', serif;">VYJÁDŘENÍ ŽALOVANÉHO K ŽALOBĚ</h2>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;">K výzvě soudu podle § 114b o. s. ř. ze dne ${new Date().toLocaleDateString('cs-CZ')} se žalovaný vyjadřuje k podané žalobě následovně:</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;"><b>I.</b></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;">Žalovaný nárok žalobce v celém rozsahu popírá a navrhuje, aby soud žalobu jako zcela nedůvodnou zamítl a žalobci uložil povinnost nahradit žalovanému náklady tohoto soudního řízení.</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;"><b>II.</b></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;">Podaná žaloba postrádá věcné i právní opodstatnění. Žalobcem tvrzené nároky neodpovídají skutečnému stavu věci. Žalovaný se k jednotlivým tvrzením žalobce vyjádří podrobně v následném doplnění.</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;"><i>[Doporučení AI: Zvolte v pravém panelu Agenta 'Stylista' nebo 'Oponent' pro zformulování konkrétních námitek k žalobním tvrzením.]</i></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;">V Brně dne ${new Date().toLocaleDateString('cs-CZ')}</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+                    <p style="text-align: right; font-family: 'Times New Roman', serif; font-size: 12pt;">...........................................<br><b>${doc.defendant}</b><br>právně zastoupen advokátem</p>
+                `;
+                
+                this.core.setContent(generatedHtml);
+                this.setDocumentStatus('draft', true);
+                
+                // 4. Update UI elements and save to DB
+                this.updateDeadlineBadge();
+                await this.saveActiveDocumentState();
+                
+                // Mark this inbox item as read in the backend so it doesn't stay in inbox list
+                await this.markInboxRead(doc.fileName);
+                
+            } catch (err) {
+                console.error("Chyba při přípravě odpovědi:", err);
+            }
+        });
+    }
+
+    async insertAresData() {
+        let ico = document.getElementById('ares-ico-input').value.trim();
+        
+        // If empty input, attempt to fetch selection from editor
+        if (!ico) {
+            const range = this.core.editor.getSelection();
+            if (range && range.length > 0) {
+                const selectedText = this.core.editor.getText(range.index, range.length).trim();
+                const cleaned = selectedText.replace(/[^0-9]/g, '');
+                if (cleaned.length === 8) {
+                    ico = cleaned;
+                }
+            }
+        }
+        
+        if (!ico || ico.length !== 8) {
+            this.customAlert("<b>Ověření ARES & ISIR</b><br><br>Zadejte 8místné IČO do pole v panelu nebo jej označte v textu dokumentu.");
+            return;
+        }
+        
+        this.showLoader("Lustruji subjekt v registrech...", async () => {
+            try {
+                const response = await fetch(`http://localhost:4000/api/registry/check?ico=${ico}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    const textToInsert = `${data.name}, se sídlem ${data.seat}, IČO: ${data.ico}`;
+                    
+                    // Insert into Editor
+                    const range = this.core.editor.getSelection(true);
+                    if (range) {
+                        this.core.editor.deleteText(range.index, range.length);
+                        this.core.editor.insertText(range.index, textToInsert);
+                        this.core.editor.setSelection(range.index + textToInsert.length);
+                    }
+                    
+                    // Clear the input
+                    document.getElementById('ares-ico-input').value = '';
+                    
+                    // Insolvency check warning
+                    if (data.inInsolvency) {
+                        this.customAlert(`
+                            <div style="text-align: left; font-family: 'Inter', sans-serif;">
+                                <h3 style="color: #be123c; margin: 0 0 10px 0; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+                                    <span>⚠️</span> SUBJEKT JE V INSOLVENCI!
+                                </h3>
+                                <p style="font-size: 12px; line-height: 1.4; color: #475569; margin: 0 0 10px 0;">
+                                    Ověřený subjekt <b>${data.name}</b> je veden v Insolvenčním rejstříku ČR!
+                                </p>
+                                <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 10px; border-radius: 6px; font-size: 11px; color: #9f1239;">
+                                    <b>Spisová značka:</b> ${data.insolvencyCase}<br>
+                                    <b>Stav řízení:</b> ${data.insolvencyStatus || 'Probíhající insolvenční řízení'}
+                                </div>
+                                <p style="font-size: 10px; color: #64748b; margin-top: 10px; font-style: italic;">
+                                    Údaje o subjektu a jeho sídle byly přesto úspěšně vloženy do textu.
+                                </p>
+                            </div>
+                        `);
+                    } else {
+                        this.customAlert(`
+                            <div style="text-align: left; font-family: 'Inter', sans-serif;">
+                                <h3 style="color: #16a34a; margin: 0 0 10px 0; font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 6px;">
+                                    <span>✅</span> Lustrace úspěšná (ARES)
+                                </h3>
+                                <p style="font-size: 12px; line-height: 1.4; color: #475569; margin: 0;">
+                                    <b>Subjekt:</b> ${data.name}<br>
+                                    <b>Sídlo:</b> ${data.seat}<br>
+                                    <b>IČO:</b> ${data.ico}<br><br>
+                                    <i>Údaje byly automaticky vloženy do textu na pozici kurzoru. Subjekt nemá záznam v insolvenčním rejstříku.</i>
+                                </p>
+                            </div>
+                        `);
+                    }
+                } else {
+                    this.customAlert("<b>Ověření ARES</b><br><br>Subjekt s tímto IČO nebyl v databázi nalezen.");
+                }
+            } catch (err) {
+                console.error("Chyba lustrace:", err);
+                this.customAlert("<b>Chyba spojení</b><br><br>Nelze se spojit s LexisLocal serverem na pozadí.");
+            }
+        });
     }
 
     filterRecentDocs(status) {
