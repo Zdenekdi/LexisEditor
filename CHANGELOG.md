@@ -2,6 +2,11 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.3.0] - 2026-05-18
+### Přidáno
+- **Aktivní Heartbeat logování**: Automatické hlášení aktivity na pozadí do LexisLocal (odesílá se každých 30 sekund při úpravách dokumentu).
+- **Offline stabilita**: Heartbeat přenos obsahuje tichý bypass. Pokud server LexisLocal zrovna neběží, editor pokračuje v plynulém chodu bez chyb či varování.
+
 ## [3.2.0] - 2026-05-18
 ### Přidáno
 - **LexisLocal (Offline Swarm)**: Integrace s lokálním AI ekosystémem LexisLocal.
