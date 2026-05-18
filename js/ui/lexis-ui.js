@@ -78,14 +78,49 @@ class LexisUI {
     }
 
     initIdleTimer() {
+        this.lastHeartbeatTime = Date.now();
+        this.hadActivitySinceLastHeartbeat = false;
         this.resetIdleTimer();
+
+        // 30 seconds interval to report heartbeat activity back to LexisLocal
+        setInterval(() => {
+            this.sendLexisLocalHeartbeat();
+        }, 30 * 1000);
     }
 
     resetIdleTimer() {
+        this.hadActivitySinceLastHeartbeat = true;
         if (this.idleTimer) clearTimeout(this.idleTimer);
         this.idleTimer = setTimeout(() => {
             this.lockApp();
         }, this.lockTimeout);
+    }
+
+    async sendLexisLocalHeartbeat() {
+        if (!this.hadActivitySinceLastHeartbeat) return;
+        
+        try {
+            const { baseUrl, headers } = this.getLexisLocalConnection();
+            const title = this.currentDocumentTitle || "Nový dokument";
+
+            await fetch(`${baseUrl}/api/activity/heartbeat`, {
+                method: 'POST',
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    documentName: title,
+                    activeSeconds: 30
+                })
+            });
+
+            this.hadActivitySinceLastHeartbeat = false;
+            this.lastHeartbeatTime = Date.now();
+        } catch (e) {
+            // Silently log and ignore to allow LexisEditor to run perfectly even without LexisLocal
+            console.log("LexisLocal heartbeat transmission bypassed: ", e.message);
+        }
     }
 
     lockApp() {
