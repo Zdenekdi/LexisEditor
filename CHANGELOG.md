@@ -2,6 +2,11 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.1.1] - 2026-05-18
+### Opraveno
+- **Odstranění testovacích dat**: Hloubkové pročištění celého kódu od natvrdo zapsaných osobních údajů, jmen a lokálních cest k certifikátům.
+- **Dynamické šablony**: Všechny právní ribbonové nástroje, podpisy, záhlaví a generátory titulních stran nyní načítají údaje plně dynamicky z IndexedDB profilu advokáta.
+
 ## [3.1.0] - 2026-05-17
 ### Přidáno
 - **ISDS Manager**: Plnohodnotný prohlížeč Datových schránek s inboxem, detailem zpráv a simulátorem.
