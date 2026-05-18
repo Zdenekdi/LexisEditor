@@ -5,7 +5,6 @@
  */
 const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český právní asistent.") => {
     try {
-        // Načtení aktuálního nastavení z DOM nebo localStorage
         let provider = "ollama";
         let model = "llama3";
         let endpoint = "http://localhost:11434/api/generate";
@@ -21,7 +20,10 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
         if (endEl) endpoint = endEl.value;
         if (keyEl) apiKey = keyEl.value;
 
-        // Fallback do localStorage, pokud UI prvky ještě nebyly vykresleny
+        let enableOfflineFallback = true;
+        const fallbackEl = document.getElementById('ai-offline-fallback');
+        if (fallbackEl) enableOfflineFallback = fallbackEl.checked;
+
         const saved = localStorage.getItem('lexis_ai_settings');
         if (saved) {
             try {
@@ -30,6 +32,9 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                 if (!modelEl && s.model) model = s.model;
                 if (!endEl && s.endpoint) endpoint = s.endpoint;
                 if (!keyEl && s.apiKey) apiKey = s.apiKey;
+                if (s.enableOfflineFallback !== undefined) {
+                    if (!fallbackEl) enableOfflineFallback = s.enableOfflineFallback;
+                }
             } catch (e) {
                 console.error("Chyba při parsování localStorage AI nastavení:", e);
             }
@@ -148,7 +153,11 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
         }
 
     } catch (error) {
-        console.warn("[LexisAIProvider] Externí API selhalo, aktivuji inteligentní offline právní model.", error);
+        console.warn("[LexisAIProvider] Externí API selhalo, kontroluji stav záložního offline modelu.", error);
+        
+        if (!enableOfflineFallback) {
+            return `⚠️ <b>AI asistent je offline</b><br><br>Nepodařilo se připojit k poskytovateli AI a záložní offline právní model je v nastavení vypnutý.`;
+        }
         
         // 4. Vysoce kvalitní inteligentní offline český právní model (fallback pro maximální stabilitu)
         return new Promise((resolve) => {

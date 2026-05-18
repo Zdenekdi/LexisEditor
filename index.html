@@ -677,8 +677,33 @@
                         <span>API Klíč:</span>
                         <input type="password" id="ai-apikey" value="" onchange="saveAISettings()" class="combo-box" style="width:100px">
                     </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Záložní AI:</span>
+                        <input type="checkbox" id="ai-offline-fallback" checked onchange="saveAISettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
                 </div>
                 <div class="group-label">Připojení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Živé Lhůty:</span>
+                        <input type="checkbox" id="settings-live-deadline-scan" checked onchange="lexisUI.saveFeatureSettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Sledovat Spisy:</span>
+                        <input type="checkbox" id="settings-desktop-file-watcher" checked onchange="lexisUI.saveFeatureSettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Cíl Odkazů:</span>
+                        <select id="settings-legal-link-target" onchange="lexisUI.saveFeatureSettings()" class="combo-box">
+                            <option value="zakonyprolidi">Zákony pro lidi</option>
+                            <option value="google">Google</option>
+                            <option value="disabled">Vypnuto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Volitelné Funkce</div>
             </div>
             <div class="tool-group">
                 <div class="icons" style="gap: 15px;">

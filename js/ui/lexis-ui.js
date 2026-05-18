@@ -7,6 +7,9 @@ class LexisUI {
         this.core = core;
         this.currentTab = 'home';
         this.isDrawerOpen = false;
+        this.enableLiveDeadlineScan = true;
+        this.enableDesktopFileWatcher = true;
+        this.legalLinkTarget = "zakonyprolidi";
         this.currentAuditResults = [];
         this.idleTimer = null;
         this.lockTimeout = 5 * 60 * 1000; // 5 minut výchozí
@@ -42,6 +45,7 @@ class LexisUI {
         this.loadLockSettings();
         this.loadLicense();
         this.loadAISettings();
+        this.loadFeatureSettings();
         this.updateVersionDisplay();
         this.updateStats();
         this.initIdleTimer();
@@ -118,7 +122,9 @@ class LexisUI {
         // Throttled scan for deadlines in editor and auto-saving state
         clearTimeout(this.deadlineScanTimer);
         this.deadlineScanTimer = setTimeout(() => {
-            this.scanTextForDeadlines(text, 'editor');
+            if (this.enableLiveDeadlineScan) {
+                this.scanTextForDeadlines(text, 'editor');
+            }
             this.saveActiveDocumentState();
             this.updateDocumentOutline();
         }, 1500);
@@ -1973,6 +1979,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         const modelEl = document.getElementById('ai-model');
         const endEl = document.getElementById('ai-endpoint');
         const keyEl = document.getElementById('ai-apikey');
+        const fallbackEl = document.getElementById('ai-offline-fallback');
         
         if (!provEl) return;
         
@@ -1980,7 +1987,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             provider: provEl.value,
             model: modelEl ? modelEl.value : "llama3",
             endpoint: endEl ? endEl.value : "http://localhost:11434/api/generate",
-            apiKey: keyEl ? keyEl.value : ""
+            apiKey: keyEl ? keyEl.value : "",
+            enableOfflineFallback: fallbackEl ? fallbackEl.checked : true
         };
         localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
         console.log('AI Settings saved:', settings);
@@ -1995,16 +2003,75 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 const modelEl = document.getElementById('ai-model');
                 const endEl = document.getElementById('ai-endpoint');
                 const keyEl = document.getElementById('ai-apikey');
+                const fallbackEl = document.getElementById('ai-offline-fallback');
                 
                 if (provEl && s.provider) provEl.value = s.provider;
                 if (modelEl && s.model) modelEl.value = s.model;
                 if (endEl && s.endpoint) endEl.value = s.endpoint;
                 if (keyEl && s.apiKey) keyEl.value = s.apiKey;
+                if (fallbackEl && s.enableOfflineFallback !== undefined) fallbackEl.checked = s.enableOfflineFallback;
             } catch (e) {
                 console.error("Chyba při načítání AI nastavení:", e);
             }
         }
         this.toggleLexisLocalSelectors();
+    }
+
+    saveFeatureSettings() {
+        const liveDlEl = document.getElementById('settings-live-deadline-scan');
+        const watcherEl = document.getElementById('settings-desktop-file-watcher');
+        const linkTargetEl = document.getElementById('settings-legal-link-target');
+        
+        this.enableLiveDeadlineScan = liveDlEl ? liveDlEl.checked : true;
+        this.enableDesktopFileWatcher = watcherEl ? watcherEl.checked : true;
+        this.legalLinkTarget = linkTargetEl ? linkTargetEl.value : "zakonyprolidi";
+        
+        const settings = {
+            enableLiveDeadlineScan: this.enableLiveDeadlineScan,
+            enableDesktopFileWatcher: this.enableDesktopFileWatcher,
+            legalLinkTarget: this.legalLinkTarget
+        };
+        localStorage.setItem('lexis_feature_settings', JSON.stringify(settings));
+        console.log('Feature settings saved:', settings);
+        
+        // Notify backend about watcher state change
+        try {
+            fetch(`http://localhost:4000/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST' })
+                .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
+        } catch (e) {
+            console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
+        }
+    }
+
+    loadFeatureSettings() {
+        const saved = localStorage.getItem('lexis_feature_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                if (s.enableLiveDeadlineScan !== undefined) this.enableLiveDeadlineScan = s.enableLiveDeadlineScan;
+                if (s.enableDesktopFileWatcher !== undefined) this.enableDesktopFileWatcher = s.enableDesktopFileWatcher;
+                if (s.legalLinkTarget !== undefined) this.legalLinkTarget = s.legalLinkTarget;
+            } catch (e) {
+                console.error("Chyba při parsování nastavení volitelných funkcí:", e);
+            }
+        }
+        
+        // Set DOM elements state
+        const liveDlEl = document.getElementById('settings-live-deadline-scan');
+        const watcherEl = document.getElementById('settings-desktop-file-watcher');
+        const linkTargetEl = document.getElementById('settings-legal-link-target');
+        
+        if (liveDlEl) liveDlEl.checked = this.enableLiveDeadlineScan;
+        if (watcherEl) watcherEl.checked = this.enableDesktopFileWatcher;
+        if (linkTargetEl) linkTargetEl.value = this.legalLinkTarget;
+        
+        // Notify backend about watch state
+        try {
+            fetch(`http://localhost:4000/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST' })
+                .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
+        } catch (e) {
+            console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
+        }
     }
 
     updateAIProviderDefaults() {
@@ -2781,6 +2848,11 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     }
 
     convertCitationsToLinks() {
+        if (this.legalLinkTarget === 'disabled') {
+            this.customAlert("ℹ️ <b>Legal Linker je vypnutý</b><br><br>Funkci automatického odkazování na zákony můžete povolit v Nastavení -> Volitelné Funkce.");
+            return;
+        }
+
         const quill = this.core.quill;
         const html = quill.root.innerHTML;
         
@@ -2804,7 +2876,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     let newHtml = text;
                     let replaced = false;
                     
-                    // Replace matching citations with clean links targeting Zákony pro lidi
+                    // Replace matching citations with clean links targeting Zákony pro lidi or Google
                     newHtml = newHtml.replace(citationRegex, (match) => {
                         // Check if we are matching valid target text
                         const trimmed = match.trim();
@@ -2814,7 +2886,12 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         const query = encodeURIComponent(trimmed);
                         replaced = true;
                         linkCount++;
-                        return `<a href="https://www.zakonyprolidi.cz/hledani?q=${query}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
+                        
+                        const url = this.legalLinkTarget === 'google'
+                            ? `https://www.google.com/search?q=${query}`
+                            : `https://www.zakonyprolidi.cz/hledani?q=${query}`;
+
+                        return `<a href="${url}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
                     });
                     
                     newHtml = newHtml.replace(lawRegex, (match) => {
@@ -2824,7 +2901,12 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         const query = encodeURIComponent(trimmed);
                         replaced = true;
                         linkCount++;
-                        return `<a href="https://www.zakonyprolidi.cz/hledani?q=${query}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
+                        
+                        const url = this.legalLinkTarget === 'google'
+                            ? `https://www.google.com/search?q=${query}`
+                            : `https://www.zakonyprolidi.cz/hledani?q=${query}`;
+
+                        return `<a href="${url}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
                     });
                     
                     if (replaced && newHtml !== text) {
@@ -2843,11 +2925,12 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (linkCount > 0) {
             // Restore back to Quill
             quill.root.innerHTML = tempDiv.innerHTML;
-            this.customAlert(`🔗 <b>Legal Linker dokončen</b><br><br>Automaticky bylo detekováno a vytvořeno <b>${linkCount}</b> klikatelných odkazů na portál Zákony pro lidi.`);
+            const targetName = this.legalLinkTarget === 'google' ? 'Google' : 'portál Zákony pro lidi';
+            this.customAlert(`🔗 <b>Legal Linker dokončen</b><br><br>Automaticky bylo detekováno a vytvořeno <b>${linkCount}</b> klikatelných odkazů cílících na ${targetName}.`);
             this.saveActiveDocumentState();
             this.updateDocumentOutline();
         } else {
-            this.customAlert(`ℹ️ <b>Legal Linker</b><br><br>V dokumentu nebyly nalezeny žádné textové citace zákonů (např. § 2201 občanského zákoníku).`);
+            this.customAlert(`ℹ️ <b>Legal Linker</b><br><br>V dokumentu nebyly nalezeny žádné textové citace zákonů (např. § 2201 občanského zákoníku) k prolinkování.`);
         }
     }
 
@@ -3063,6 +3146,17 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             
             const detectedSection = document.getElementById('detected-deadlines-section');
             if (detectedSection) detectedSection.style.display = 'none';
+            
+            // Resilient hybrid background sync to LexisLocal calendar
+            try {
+                fetch('http://localhost:4000/api/calendar/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newDl)
+                }).catch(e => console.log("LexisLocal je offline, ICS se nevygenerovalo."));
+            } catch (e) {
+                console.log("LexisLocal je offline, ICS se nevygenerovalo.");
+            }
             
             this.customAlert(`⏰ <b>Lhůta uložena!</b><br><br>Úkon <b>${title}</b> byl přidán do vašeho hlídače lhůt na datum <b>${newDl.dueDate}</b>.`);
         });
