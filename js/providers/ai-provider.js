@@ -37,6 +37,38 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
 
         console.log(`[LexisAIProvider] Volám model ${model} přes poskytovatele ${provider} na endpoint ${endpoint}...`);
 
+        // 0. LexisLocal Swarm Swarm Orchestrator
+        if (provider === 'lexislocal') {
+            const agentSelect = document.getElementById('lexislocal-agent');
+            const modelSelect = document.getElementById('lexislocal-model');
+            const agentId = agentSelect ? agentSelect.value : 'resersnik';
+            const selectedModel = modelSelect ? modelSelect.value : 'llama3';
+            
+            let contextText = "";
+            if (window.quill) {
+                const range = window.quill.getSelection();
+                if (range && range.length > 0) {
+                    contextText = window.quill.getText(range.index, range.length);
+                }
+            }
+            
+            const response = await fetch(`${endpoint}/api/agent/${agentId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    context: contextText,
+                    model: selectedModel
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return data.response;
+            }
+            throw new Error(`LexisLocal Swarm vrátila status ${response.status}`);
+        }
+
         // 1. Apple Intelligence (apfel) / OpenAI / DeepSeek / LM Studio (OpenAI-kompatibilní API)
         if (provider === 'apfel' || provider === 'openai' || provider === 'deepseek' || provider === 'lmstudio') {
             const headers = { "Content-Type": "application/json" };

@@ -2004,6 +2004,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 console.error("Chyba při načítání AI nastavení:", e);
             }
         }
+        this.toggleLexisLocalSelectors();
     }
 
     updateAIProviderDefaults() {
@@ -2014,7 +2015,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (!provEl || !modelEl || !endEl) return;
         
         const provider = provEl.value;
-        if (provider === 'apfel') {
+        if (provider === 'lexislocal') {
+            modelEl.value = "swarm";
+            endEl.value = "http://localhost:4000";
+        } else if (provider === 'apfel') {
             modelEl.value = "apple-intelligence";
             endEl.value = "http://localhost:11434/v1/chat/completions";
         } else if (provider === 'ollama') {
@@ -2034,6 +2038,46 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             endEl.value = "http://localhost:1234/v1/chat/completions";
         }
         this.saveAISettings();
+        this.toggleLexisLocalSelectors();
+    }
+
+    toggleLexisLocalSelectors() {
+        const provEl = document.getElementById('ai-provider');
+        const container = document.getElementById('lexislocal-selectors-container');
+        if (!provEl || !container) return;
+        
+        if (provEl.value === 'lexislocal') {
+            container.style.display = 'flex';
+            this.fetchLexisLocalModels();
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    async fetchLexisLocalModels() {
+        const modelSelect = document.getElementById('lexislocal-model');
+        if (!modelSelect) return;
+        
+        try {
+            const endEl = document.getElementById('ai-endpoint');
+            const baseUrl = endEl ? endEl.value : "http://localhost:4000";
+            
+            const response = await fetch(`${baseUrl}/api/models`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.models && data.models.length > 0) {
+                    modelSelect.innerHTML = '';
+                    data.models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.name;
+                        opt.innerText = m.name;
+                        modelSelect.appendChild(opt);
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("⚠️ Nepodařilo se načíst modely z LexisLocal backendu:", e);
+        }
     }
 
     toggleStatusDropdown(event) {

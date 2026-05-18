@@ -2,6 +2,12 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.2.0] - 2026-05-18
+### Přidáno
+- **LexisLocal (Offline Swarm)**: Integrace s lokálním AI ekosystémem LexisLocal.
+- **Agent Swarm Control**: Možnost volby specializovaného agenta (Rešeršník, Stylista, Kontrolor) a lokálního modelu přímo v AI sidebar panelu.
+- **Kontextové vyhledávání (Highlight Context)**: Automatické odesílání označeného textu v editoru jako kontextu pro rychlou analýzu a úpravy právních doložek.
+
 ## [3.1.1] - 2026-05-18
 ### Opraveno
 - **Odstranění testovacích dat**: Hloubkové pročištění celého kódu od natvrdo zapsaných osobních údajů, jmen a lokálních cest k certifikátům.

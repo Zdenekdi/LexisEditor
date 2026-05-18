@@ -619,6 +619,7 @@
                     <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
                         <span>Poskytovatel:</span>
                         <select id="ai-provider" onchange="updateAIProviderDefaults()" class="combo-box">
+                            <option value="lexislocal">LexisLocal (Offline Swarm)</option>
                             <option value="apfel">Apple Intelligence (apfel)</option>
                             <option value="ollama">Ollama (Local)</option>
                             <option value="openai">OpenAI (Cloud)</option>
@@ -977,6 +978,28 @@
                 <!-- Form inputs will be here -->
             </div>
             <button onclick="exportToISDS()" style="width:100%; padding:10px; margin-top:20px; background:#16a34a; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:700;">📤 Exportovat pro ISDS (.zfo data)</button>
+        </div>
+
+        <!-- LexisLocal Swarm Controls (Dynamic) -->
+        <div id="lexislocal-selectors-container" style="display: none; padding: 10px 15px; background: #f8fafc; border-top: 1px solid #eee; border-bottom: 1px solid #eee; gap: 8px; flex-direction: column;">
+            <div style="display: flex; gap: 8px; width: 100%;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 0.5px;">🤖 AGENT SWARMU:</span>
+                    <select id="lexislocal-agent" class="combo-box" style="width: 100%; padding: 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                        <option value="resersnik">📚 Rešeršník</option>
+                        <option value="stylista">✍️ Stylista</option>
+                        <option value="kontrolor">⚖️ Kontrolor</option>
+                    </select>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 0.5px;">🧠 MODEL:</span>
+                    <select id="lexislocal-model" class="combo-box" style="width: 100%; padding: 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                        <option value="llama3">llama3</option>
+                        <option value="mistral">mistral</option>
+                        <option value="lia">lia</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <!-- AI Input Area -->
