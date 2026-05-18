@@ -1200,6 +1200,37 @@
         window.anonymizeSelection = () => {
             lexisUI.anonymize();
         };
+
+        // Missing Ribbon/Legal UI helpers
+        window.customAlert = (text) => lexisUI.customAlert(text);
+        window.showQATMenu = (e) => lexisUI.showQATMenu(e);
+        window.showProfileModal = () => lexisUI.showProfileModal();
+        window.insertTOC = () => lexisUI.insertTOC();
+        window.generateToC = () => lexisUI.insertTOC();
+        window.insertCurrentDate = () => lexisUI.insertDate();
+        window.insertTitlePage = () => lexisUI.insertTitlePage();
+        window.insertSubjectHeader = (type) => lexisUI.insertSubjectHeader(type);
+        window.insertIllustration = () => lexisUI.insertIllustration();
+        window.insertBookmark = () => lexisUI.insertBookmark();
+        window.editHeader = () => lexisUI.editHeader();
+        window.editFooter = () => lexisUI.editFooter();
+        window.insertPageNumber = () => lexisUI.insertPageNumber();
+        window.calculateFee = () => lexisUI.showFeeCalc();
+        window.calculateInterests = () => lexisUI.showInterestCalc();
+        window.openDeadlineCalc = () => lexisUI.showDeadlineCalc();
+        window.insertSignatureBlock = () => lexisUI.insertSignatureBlock();
+        window.insertMySignature = () => lexisUI.insertMySignature();
+        window.insertArticle = () => lexisUI.insertArticle();
+        window.insertParagraph = () => lexisUI.insertParagraph();
+        window.insertCitation = () => lexisUI.insertCitation();
+        window.insertSectionSign = () => lexisUI.insertSectionSign();
+        window.lookupCaseLaw = () => lexisUI.lookupCaseLaw();
+        window.logTime = () => lexisUI.logTime();
+        window.exportTimesheet = () => lexisUI.exportTimesheet();
+        window.setMargins = (m) => lexisUI.setMargins(m);
+        window.setOrientation = (o) => lexisUI.setOrientation(o);
+        window.setColumns = (c) => lexisUI.setColumns(c);
+        window.autoLinkLaws = () => lexisUI.convertCitationsToLinks();
         
         window.addEventListener('DOMContentLoaded', () => {
             // Start screen handled by openStartDocument

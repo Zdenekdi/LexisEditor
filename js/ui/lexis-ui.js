@@ -3138,9 +3138,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         this.customAlert(`📥 Soubor <b>${attName}</b> byl úspěšně stažen a uložen do složky Stažené soubory (Downloads).`);
                     };
                     
-                    window.replyISDSMsg = (mId) => {
+                    window.replyISDSMsg = async (mId) => {
                         const m = messages.find(x => x.id === mId);
                         if (m) {
+                            const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
                             const html = `
                                 <h2>REAKCE NA USNESENÍ SOUDU / VÝZVU</h2>
                                 <p><b>Městskému soudu v Praze</b><br>Datová schránka ID: <b>${m.senderId}</b></p>
@@ -3149,7 +3150,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                                 <p>K výzvě soudu ze dne ${m.receivedDate} ve věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč sděluje žalovaný prostřednictvím svého právního zástupce následující:</p>
                                 <p>[Sem doplňte text Vašeho vyjádření]</p>
                                 <p><br></p>
-                                <p>Mgr. Zdeněk Dias, advokát</p>
+                                <p>${savedName}, advokát</p>
                             `;
                             
                             const due = new Date();
@@ -3262,8 +3263,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             document.getElementById('isds-sign-cancel').onclick = () => document.body.removeChild(overlay);
             
             document.getElementById('isds-cert-browse').onclick = () => {
-                selectedCertPath = '/Users/zdenekdias/Documents/certifikaty/dias_advokat_qualified.pfx';
-                document.getElementById('isds-cert-path').value = 'dias_advokat_qualified.pfx';
+                selectedCertPath = 'advokat_qualified.pfx';
+                document.getElementById('isds-cert-path').value = 'advokat_qualified.pfx';
             };
             
             document.getElementById('isds-sign-confirm').onclick = async () => {
@@ -3280,12 +3281,13 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 document.getElementById('isds-sign-confirm').innerText = "Podepisuji...";
                 document.getElementById('isds-sign-confirm').disabled = true;
                 
+                const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
                 const baseStyle = "border: 2px solid #b45309; padding: 16px; border-radius: 8px; margin-top: 30px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #fffbeb; margin-bottom: 20px;";
                 const sigHtml = `
                     <div style="${baseStyle}">
                         <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: #b45309;"></div>
                         <p style="margin: 0; color: #b45309; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">🔐 ZARUČENÝ ELEKTRONICKÝ PODPIS ADVOKÁTA</p>
-                        <p style="font-size: 15px; margin: 8px 0 4px; color: #1e293b;">Podepsal: <strong>Mgr. Zdeněk Dias, advokát</strong></p>
+                        <p style="font-size: 15px; margin: 8px 0 4px; color: #1e293b;">Podepsal: <strong>${savedName}, advokát</strong></p>
                         <p style="margin: 4px 0 0; font-size: 12px; color: #475569;">Datum podpisu: <strong>${new Date().toLocaleString('cs-CZ')}</strong></p>
                         <p style="margin: 4px 0 0; font-size: 11px; color: #94a3b8; font-style: italic;">Certifikační autorita: PostSignum Qualified CA 4 (Sériové číslo: 8ab20cf19238e89f)</p>
                     </div>
@@ -3305,6 +3307,488 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 }
             };
         });
+    }
+
+    // ==========================================
+    // EXTRA LEGAL & RIBBON UI HELPERS (Resolving Blind Buttons)
+    // ==========================================
+
+    showProfileModal() {
+        this.checkEnterpriseFeature("Profil právníka", async () => {
+            const savedName = await this.core.storage.get('settings', 'lawyer-name') || "";
+            const savedFirm = await this.core.storage.get('settings', 'lawyer-firm') || "";
+            const savedLicense = await this.core.storage.get('settings', 'lawyer-license') || "";
+            const savedSignature = await this.core.storage.get('settings', 'lawyer-signature') || "";
+
+            const overlay = document.createElement('div');
+            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);";
+            const modal = document.createElement('div');
+            modal.style = "background:#fff;padding:28px;border-radius:16px;width:380px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif; border: 1px solid #e2e8f0;";
+            modal.innerHTML = `
+                <h3 style="margin:0 0 8px 0;font-size:18px;color:#1e293b;font-weight:700; display:flex; align-items:center; gap:8px;">👤 Profil právníka</h3>
+                <p style="margin:0 0 20px 0; font-size:12px; color:#64748b;">Nastavení osobních údajů pro automatické vkládání podpisů a hlaviček.</p>
+                
+                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:24px;">
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Jméno a příjmení:</label>
+                        <input type="text" id="prof-name" value="${savedName}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Název kanceláře:</label>
+                        <input type="text" id="prof-firm" value="${savedFirm}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Evidenční číslo ČAK:</label>
+                        <input type="text" id="prof-license" value="${savedLicense}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Podpisový vzor (text):</label>
+                        <input type="text" id="prof-sig" value="${savedSignature}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px; font-family:'Great Vibes', 'Brush Script MT', cursive; outline:none; box-sizing:border-box;">
+                    </div>
+                </div>
+                
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button id="prof-cancel" style="padding:10px 16px;background:#f1f5f9;color:#475569;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;">Zrušit</button>
+                    <button id="prof-save" style="padding:10px 16px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;">Uložit profil</button>
+                </div>
+            `;
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            document.getElementById('prof-cancel').onclick = () => document.body.removeChild(overlay);
+            document.getElementById('prof-save').onclick = async () => {
+                const name = document.getElementById('prof-name').value.trim();
+                const firm = document.getElementById('prof-firm').value.trim();
+                const license = document.getElementById('prof-license').value.trim();
+                const signature = document.getElementById('prof-sig').value.trim();
+
+                await this.core.storage.set('settings', 'lawyer-name', name);
+                await this.core.storage.set('settings', 'lawyer-firm', firm);
+                await this.core.storage.set('settings', 'lawyer-license', license);
+                await this.core.storage.set('settings', 'lawyer-signature', signature);
+
+                document.body.removeChild(overlay);
+                this.customAlert("✅ <b>Profil byl úspěšně uložen!</b><br><br>Vaše osobní údaje budou automaticky používány při generování dokumentů.");
+            };
+        });
+    }
+
+    insertTOC() {
+        const text = this.core.quill.getText();
+        const lines = text.split('\n');
+        let headings = [];
+        
+        lines.forEach((line) => {
+            if (line.trim().length > 3 && (line.startsWith('Článek') || line.startsWith('ČLÁNEK') || /^[I|V|X]+\.\s/.test(line.trim()) || (line.trim() === line.trim().toUpperCase() && line.trim().length < 50))) {
+                headings.push(line.trim());
+            }
+        });
+
+        if (headings.length === 0) {
+            headings = [
+                "I. Úvodní ustanovení",
+                "II. Předmět smlouvy",
+                "III. Práva a povinnosti stran",
+                "IV. Závěrečná ujednání"
+            ];
+        }
+
+        let tocHtml = `
+            <div style="margin: 20px 0; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Inter', sans-serif;">
+                <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 16px; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">📖 OBSAH DOKUMENTU</h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+        `;
+
+        headings.forEach((h, index) => {
+            tocHtml += `
+                <li style="display: flex; justify-content: space-between; border-bottom: 1px dotted #cbd5e1; padding-bottom: 4px;">
+                    <span style="color: #2563eb; font-weight: 500; cursor: pointer;">${h}</span>
+                    <span style="color: #64748b; font-weight: 600;">str. ${index + 2}</span>
+                </li>
+            `;
+        });
+
+        tocHtml += `
+                </ul>
+            </div>
+            <p><br></p>
+        `;
+
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : 0;
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, tocHtml);
+        this.saveActiveDocumentState();
+    }
+
+    async insertTitlePage() {
+        const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+        const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
+        const savedLicense = await this.core.storage.get('settings', 'lawyer-license') || "[ČÍSLO ČAK]";
+        
+        const titleHtml = `
+            <div style="text-align: center; padding: 100px 40px 60px 40px; font-family: 'Inter', sans-serif; height: 100%; display: flex; flex-direction: column; justify-content: space-between; min-height: 200mm; box-sizing: border-box;">
+                <div>
+                    <p style="font-size: 14px; letter-spacing: 3px; color: #475569; font-weight: 700; text-transform: uppercase;">PRÁVNÍ DOKUMENTACE</p>
+                    <div style="width: 60px; height: 4px; background: #2563eb; margin: 20px auto 40px auto;"></div>
+                </div>
+                <div style="margin: 60px 0;">
+                    <h1 style="font-size: 32px; color: #1e293b; font-weight: 800; line-height: 1.2; margin: 0 0 20px 0;">${docTitle.toUpperCase()}</h1>
+                    <p style="font-size: 16px; color: #64748b; font-style: italic; margin: 0;">Vyhotoveno pro účely právního zastoupení klienta</p>
+                </div>
+                <div style="margin-top: 100px; font-size: 13px; color: #475569; line-height: 1.6;">
+                    <p><strong>Zpracovatel:</strong> ${savedName}, advokát</p>
+                    <p><strong>Ev. č. ČAK:</strong> ${savedLicense}</p>
+                    <p><strong>Datum vyhotovení:</strong> ${new Date().toLocaleDateString('cs-CZ')}</p>
+                </div>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; page-break-after: always; margin: 40px 0;">
+            <p><br></p>
+        `.replace(/ {2,}/g, '');
+
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : 0;
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, titleHtml);
+        this.saveActiveDocumentState();
+        this.updateDocumentOutline();
+    }
+
+    insertIllustration() {
+        this.checkEnterpriseFeature("Vkládání schémat", () => {
+            const illHtml = `
+                <div style="margin: 25px 0; padding: 20px; background: #faf5ff; border: 2px dashed #c084fc; border-radius: 12px; text-align: center; font-family: 'Inter', sans-serif;">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📊</div>
+                    <div style="font-weight: 700; color: #6b21a8; font-size: 14px;">GRAFICKÉ SCHÉMA / STRUKTURA TRANSAKCE</div>
+                    <div style="font-size: 12px; color: #701a75; margin-top: 4px; font-style: italic;">[Zde bude vloženo vygenerované schéma struktury holdingu / převodu podílů]</div>
+                </div>
+                <p><br></p>
+            `;
+            const range = this.core.quill.getSelection(true);
+            const index = range ? range.index : this.core.quill.getLength();
+            this.core.quill.clipboard.dangerouslyPasteHTML(index, illHtml);
+            this.saveActiveDocumentState();
+        });
+    }
+
+    insertBookmark() {
+        this.customPrompt("Zadejte název záložky:", "zalozka_1", (name) => {
+            if (!name) return;
+            const cleanName = name.replace(/[^a-zA-Z0-9_]/g, '');
+            const bookmarkHtml = `<span id="${cleanName}" style="background: rgba(37,99,235,0.15); border-bottom: 2px dotted #2563eb; font-weight: 500;" title="Záložka: ${cleanName}">🔖 ${cleanName}</span>`;
+            const range = this.core.quill.getSelection(true);
+            const index = range ? range.index : this.core.quill.getLength();
+            this.core.quill.clipboard.dangerouslyPasteHTML(index, bookmarkHtml);
+            this.saveActiveDocumentState();
+        });
+    }
+
+    async editHeader() {
+        const savedFirm = await this.core.storage.get('settings', 'lawyer-firm') || "Advokátní kancelář";
+        this.customPrompt("Zadejte text záhlaví stránky:", savedFirm, (text) => {
+            if (text === null) return;
+            const editorScroll = document.querySelector('.editor-scroll');
+            let headerDiv = document.getElementById('document-custom-header');
+            if (!headerDiv) {
+                headerDiv = document.createElement('div');
+                headerDiv.id = 'document-custom-header';
+                headerDiv.style = "text-align: center; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; font-family:'Inter',sans-serif;";
+                editorScroll.prepend(headerDiv);
+            }
+            headerDiv.innerText = text;
+            this.customAlert("✅ <b>Záhlaví nastaveno!</b>");
+        });
+    }
+
+    editFooter() {
+        this.customPrompt("Zadejte text zápatí stránky:", "Strana {page} | Důvěrné", (text) => {
+            if (text === null) return;
+            const editorScroll = document.querySelector('.editor-scroll');
+            let footerDiv = document.getElementById('document-custom-footer');
+            if (!footerDiv) {
+                footerDiv = document.createElement('div');
+                footerDiv.id = 'document-custom-footer';
+                footerDiv.style = "text-align: center; font-size: 10px; color: #94a3b8; padding: 10px 0; border-top: 1px solid #e2e8f0; margin-top: 40px; font-family:'Inter',sans-serif;";
+                editorScroll.appendChild(footerDiv);
+            }
+            footerDiv.innerText = text.replace('{page}', '1');
+            this.customAlert("✅ <b>Zápatí nastaveno!</b>");
+        });
+    }
+
+    insertPageNumber() {
+        const numHtml = `<span style="padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: bold; color: #475569;" title="Dynamické číslo stránky">🔢 Strana 1</span>`;
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, numHtml);
+        this.saveActiveDocumentState();
+    }
+
+    showDeadlineCalc() {
+        this.customPrompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15", (days) => {
+            if (!days) return;
+            const target = new Date();
+            target.setDate(target.getDate() + parseInt(days));
+            this.customAlert(`Lhůta končí dne:\n\n${target.toLocaleDateString('cs-CZ')}`);
+        });
+    }
+
+    insertSignatureBlock() {
+        const sigBlockHtml = `
+            <div style="margin-top: 40px; font-family: 'Inter', sans-serif; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 13px; line-height: 1.5; color: #1e293b;">
+                <div>
+                    <p style="margin-bottom: 40px;">V Praze dne .............................</p>
+                    <p style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin: 0;">___________________________________<br><b>ZMOCNITEL</b><br>[Jméno zmocnitele]</p>
+                </div>
+                <div>
+                    <p style="margin-bottom: 40px;">V Praze dne .............................</p>
+                    <p style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin: 0;">___________________________________<br><b>ZMOCNĚNEC</b><br>[Jméno zmocněnce]</p>
+                </div>
+            </div>
+            <p><br></p>
+        `.replace(/ {2,}/g, '');
+
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, sigBlockHtml);
+        this.saveActiveDocumentState();
+    }
+
+    async insertMySignature() {
+        const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
+        const savedSignature = await this.core.storage.get('settings', 'lawyer-signature') || "[PODPIS]";
+        
+        const mySigHtml = `
+            <div style="margin-top: 30px; font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5;">
+                <p style="margin-bottom: 30px;">V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
+                <div style="font-family: 'Great Vibes', 'Brush Script MT', cursive; font-size: 26px; color: #2563eb; margin-bottom: 5px; transform: rotate(-3deg); padding-left: 20px;">
+                    ${savedSignature}
+                </div>
+                <div style="border-top: 1px solid #e2e8f0; width: 220px; padding-top: 5px;">
+                    <strong>${savedName}</strong><br>
+                    <span style="font-size: 11px; color: #64748b;">advokát</span>
+                </div>
+            </div>
+            <p><br></p>
+        `.replace(/ {2,}/g, '');
+
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, mySigHtml);
+        this.saveActiveDocumentState();
+    }
+
+    insertArticle() {
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        
+        const text = this.core.quill.getText();
+        const articleCount = (text.match(/Článek\s+[I|V|X]+/gi) || []).length;
+        
+        const romanNumerals = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+        const nextNum = romanNumerals[articleCount + 1] || "XI";
+
+        const articleHtml = `
+            <h2 style="text-align: center; font-size: 16px; font-weight: bold; color: #1e293b; margin-top: 25px; margin-bottom: 12px; text-transform: uppercase;">Článek ${nextNum}</h2>
+            <p style="text-align: center; font-size: 12px; color: #64748b; font-style: italic; margin-top: -8px; margin-bottom: 15px;">[Název a účel článku]</p>
+        `.replace(/ {2,}/g, '');
+
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, articleHtml);
+        this.saveActiveDocumentState();
+        this.updateDocumentOutline();
+    }
+
+    insertParagraph() {
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        
+        const text = this.core.quill.getText();
+        const paragraphCount = (text.match(/§\s+\d+/g) || []).length;
+        const nextNum = paragraphCount + 1;
+
+        const paraHtml = `
+            <p style="margin-top: 15px; margin-bottom: 8px; color: #1e293b;"><b>§ ${nextNum} [Název ustanovení]</b></p>
+            <p style="margin-left: 20px; color: #475569;">(1) </p>
+        `.replace(/ {2,}/g, '');
+
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, paraHtml);
+        this.saveActiveDocumentState();
+        this.updateDocumentOutline();
+    }
+
+    insertCitation() {
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        
+        const citationHtml = `
+            <blockquote style="border-left: 4px solid #cbd5e1; padding-left: 15px; margin: 15px 30px; font-style: italic; color: #475569; font-size: 12px; line-height: 1.6;">
+                „Zde zadejte citaci z judikatury Nejvyššího soudu nebo nálezu Ústavního soudu sp. zn. [SPISOVÁ ZNAČKA], ze dne [DATUM].“
+            </blockquote>
+            <p><br></p>
+        `.replace(/ {2,}/g, '');
+
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, citationHtml);
+        this.saveActiveDocumentState();
+    }
+
+    insertSectionSign() {
+        const range = this.core.quill.getSelection(true);
+        if (range) {
+            this.core.quill.insertText(range.index, "§ ");
+            this.core.quill.setSelection(range.index + 2);
+        } else {
+            this.core.quill.insertText(this.core.quill.getLength(), "§ ");
+        }
+    }
+
+    lookupCaseLaw() {
+        this.switchSidebarTab('chat');
+        const input = document.getElementById('ai-prompt');
+        if (input) {
+            input.value = "Najdi judikaturu Nejvyššího soudu ohledně náhrady škody způsobené vadou výrobku podle nového občanského zákoníku.";
+            this.customAlert("🏛️ <b>Judikatura spuštěna!</b><br><br>V pravém AI panelu byl přednastaven dotaz na judikaturu.");
+        }
+    }
+
+    async logTime() {
+        this.checkEnterpriseFeature("Evidence práce", () => {
+            this.customPrompt("Zadejte popis úkonu (např. Studium spisu):", "Studium spisu", (desc) => {
+                if (!desc) return;
+                this.customPrompt("Zadejte čas strávený na úkonu (v hodinách):", "1.5", async (hours) => {
+                    if (!hours) return;
+                    const val = parseFloat(hours);
+                    if (isNaN(val)) return this.customAlert("Zadán neplatný čas.");
+                    
+                    const log = {
+                        desc,
+                        hours: val,
+                        date: new Date().toLocaleDateString('cs-CZ'),
+                        timestamp: Date.now()
+                    };
+
+                    const savedLogs = await this.core.storage.get('settings', 'timesheet-logs') || [];
+                    savedLogs.push(log);
+                    await this.core.storage.set('settings', 'timesheet-logs', savedLogs);
+
+                    this.customAlert(`✅ <b>Úkon zapsán!</b><br><br>Úkon <b>${desc}</b> (${val} hod.) byl úspěšně zapsán do výkazu práce.`);
+                });
+            });
+        });
+    }
+
+    async exportTimesheet() {
+        this.checkEnterpriseFeature("Export výkazu", async () => {
+            const savedLogs = await this.core.storage.get('settings', 'timesheet-logs') || [];
+            if (savedLogs.length === 0) {
+                return this.customAlert("Žádné zapsané úkony k exportu nebyly nalezeny.");
+            }
+
+            let text = "VÝKAZ PRÁCE - LEXISEDITOR\n==========================\n\n";
+            let total = 0;
+            savedLogs.forEach(log => {
+                text += `📅 ${log.date} | ⏱️ ${log.hours} hod. | 📝 ${log.desc}\n`;
+                total += log.hours;
+            });
+            text += `\n==========================\nCELKEM: ${total} hod.`;
+
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `vykaz_prace_${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            this.customAlert("✅ <b>Výkaz exportován!</b><br><br>Soubor s přehledem zapsaných úkonů byl úspěšně stažen do vašeho počítače.");
+        });
+    }
+
+    setMargins(m) {
+        const editor = document.querySelector('.ql-editor');
+        if (!editor) return;
+        if (m === 'narrow') {
+            editor.style.setProperty('padding', '15mm', 'important');
+        } else if (m === 'wide') {
+            editor.style.setProperty('padding', '35mm', 'important');
+        } else {
+            editor.style.setProperty('padding', '25mm', 'important');
+        }
+    }
+
+    setOrientation(o) {
+        const wrapper = document.getElementById('editor-wrapper');
+        if (!wrapper) return;
+        if (o === 'landscape') {
+            wrapper.style.width = '297mm';
+            wrapper.style.minHeight = '210mm';
+        } else {
+            wrapper.style.width = '210mm';
+            wrapper.style.minHeight = '297mm';
+        }
+    }
+
+    setColumns(c) {
+        const editor = document.querySelector('.ql-editor');
+        if (!editor) return;
+        editor.style.columnCount = c;
+        editor.style.columnGap = '10mm';
+    }
+
+    insertSubjectHeader(type) {
+        let html = "";
+        const baseStyle = "padding: 20px 25px; margin: 30px 0; background: #ffffff; border-radius: 12px; font-family: 'Inter', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; overflow: hidden;";
+        
+        if (type === 'person') {
+            html = `
+                <div style="${baseStyle}">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #3b82f6, #2563eb);"></div>
+                    <p style="margin-bottom: 8px; color: #3b82f6; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Fyzická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                        <div><strong>Narozen(a):</strong> [DATUM]</div>
+                        <div><strong>ID DS:</strong> [ID DATOVÉ SCHRÁNKY]</div>
+                        <div style="grid-column: span 2;"><strong>Bytem:</strong> [ADRESA TRVALÉHO POBYTU]</div>
+                    </div>
+                </div>
+                <p><br></p>
+            `;
+        } else if (type === 'entrepreneur') {
+            html = `
+                <div style="${baseStyle}">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #f59e0b, #d97706);"></div>
+                    <p style="margin-bottom: 8px; color: #d97706; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Podnikající fyzická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                        <div><strong>IČO:</strong> [IČO]</div>
+                        <div><strong>DIČ:</strong> [DIČ]</div>
+                        <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA MÍSTA PODNIKÁNÍ]</div>
+                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8;">Zapsán v živnostenském rejstříku vedeném [ÚŘAD]</div>
+                    </div>
+                </div>
+                <p><br></p>
+            `;
+        } else if (type === 'company') {
+            html = `
+                <div style="${baseStyle}">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #10b981, #059669);"></div>
+                    <p style="margin-bottom: 8px; color: #10b981; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Právnická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[OBCHODNÍ FIRMA / NÁZEV]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                        <div><strong>IČO:</strong> [IČO]</div>
+                        <div><strong>DIČ:</strong> [DIČ]</div>
+                        <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA SÍDLA]</div>
+                        <div style="grid-column: span 2;"><strong>Zastoupená:</strong> [JMÉNO], [FUNKCE]</div>
+                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Zapsaná v obchodním rejstříku vedeném [SOUD] v [MĚSTO], oddíl [ODDÍL], vložka [VLOŽKA]</div>
+                    </div>
+                </div>
+                <p><br></p>
+            `;
+        }
+        
+        const range = this.core.quill.getSelection(true);
+        const index = range ? range.index : this.core.quill.getLength();
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, html);
+        this.saveActiveDocumentState();
+        this.updateDocumentOutline();
     }
 }
 
