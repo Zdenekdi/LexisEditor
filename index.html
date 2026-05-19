@@ -788,10 +788,10 @@
     <div id="reference-tab" class="reference-side-tab" onclick="toggleSidebar('right-sidebar')">
         <span>📖 REFERENCE</span>
     </div>
-    <div class="ai-side-tab" id="ai-tab" onclick="toggleAIDrawer(true)">
+    <div class="ai-side-tab" id="ai-tab" onclick="toggleAIDrawer()">
         <span>✨ LEXIS AI</span>
     </div>
-    <div class="comment-side-tab" id="comment-tab" onclick="toggleCommentDrawer(true)">
+    <div class="comment-side-tab" id="comment-tab" onclick="toggleCommentDrawer()">
         <span>💬 REVIZE</span>
     </div>
 
@@ -1201,7 +1201,8 @@
             const drawer = document.getElementById('comment-sidebar');
             const overlay = document.getElementById('ai-overlay');
             if (!drawer || !overlay) return;
-            if (open) {
+            const shouldOpen = open !== undefined ? open : !drawer.classList.contains('open');
+            if (shouldOpen) {
                 drawer.classList.add('open');
                 overlay.classList.add('active');
             } else {

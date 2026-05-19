@@ -271,7 +271,6 @@ body.split-view #reference-panel { width: 500px; display: block; padding: 20px; 
     cursor: pointer; z-index: 1000; box-shadow: 0 0 15px rgba(0,0,0,0.15);
     font-size: 10px; font-weight: 800; letter-spacing: 1.5px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3);
-    display: none;
 }
 .ai-side-tab, .comment-side-tab, .reference-side-tab { right: 0; border-radius: 12px 0 0 12px; border-right: none; }
 .sidebar-side-tab { left: 0; border-radius: 0 12px 12px 0; border-left: none; }
@@ -280,6 +279,12 @@ body.split-view #reference-panel { width: 500px; display: block; padding: 20px; 
 .ai-side-tab { transform: translateY(-160%); background: linear-gradient(to bottom, var(--ai-color), #7c3aed); }
 .reference-side-tab { transform: translateY(-40%); background: linear-gradient(to bottom, #10b981, #047857); }
 .comment-side-tab { transform: translateY(80%); background: linear-gradient(to bottom, #f59e0b, #d97706); }
+
+/* Dynamic shift when panels/drawers are open */
+body:has(#sidebar:not(.collapsed)) .sidebar-side-tab { left: 280px; }
+body:has(#right-sidebar:not(.collapsed)) .reference-side-tab { right: 320px; }
+body:has(#ai-drawer.open) .ai-side-tab { right: 400px; }
+body:has(#comment-sidebar.open) .comment-side-tab { right: 400px; }
 
 .thinking { display: flex; gap: 4px; padding: 10px; }
 .dot { width: 6px; height: 6px; background: #cbd5e1; border-radius: 50%; animation: pulse 1.5s infinite; }
