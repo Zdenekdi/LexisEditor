@@ -1,7 +1,7 @@
 {
   "name": "lexiseditor",
   "productName": "LexisEditor",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/Zdenekdi/LexisEditor.git"
@@ -24,6 +24,23 @@
       "target": [
         "zip",
         "dmg"
+      ]
+    },
+    "dmg": {
+      "background": "build/background.png",
+      "iconSize": 128,
+      "contents": [
+        {
+          "x": 180,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 420,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "win": {

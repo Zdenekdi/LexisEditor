@@ -2,10 +2,11 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
-## [3.3.3] - 2026-05-19
+## [3.3.4] - 2026-05-19
 ### Přidáno
 - **Vždy na domovské stránce**: Aplikace se nyní při startu vždy otevře na úvodním rozcestníku (domovské stránce) se seznamem nedávných dokumentů a šablonami namísto automatického vstupu do editoru.
 - **Oficiální logo v aplikaci**: Převedeno a integrováno oficiální skleněné logo (modrý štít) na startovní obrazovku aplikace a do README dokumentace.
+- **Vlastní vzhled DMG instalátoru**: Vytvořeno a nasazeno grafické pozadí pro macOS instalátor (.dmg) s přehledným návodem na obejití chybějícího podpisu bez příkazové řádky (přes pravé tlačítko).
 
 ## [3.3.0] - 2026-05-18
 ### Přidáno
