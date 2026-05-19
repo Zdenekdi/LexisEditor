@@ -213,7 +213,7 @@ class LexisUI {
             const el = document.getElementById('dynamic-ver');
             if (el) el.innerText = ver;
             const elStart = document.getElementById('app-version-start');
-            if (elStart) elStart.innerText = ver;
+            if (elStart) elStart.innerText = 'v' + ver;
         }
     }
 
