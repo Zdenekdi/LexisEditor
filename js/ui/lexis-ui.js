@@ -22,6 +22,8 @@ class LexisUI {
         this.currentDocumentTitle = '';
         this.currentDocumentDeadline = null;
         this.currentDocumentCj = '';
+        this.pinnedQATItems = [];
+        this.tempQATPinData = null;
 
         window.saveDetectedDeadline = (days, encContext) => {
             const context = decodeURIComponent(encContext);
@@ -42,6 +44,7 @@ class LexisUI {
         this.bindEvents();
         this.initContextMenu();
         this.loadQATSettings();
+        this.loadCustomQATItems();
         this.loadLockSettings();
         this.loadLicense();
         this.loadAISettings();
@@ -68,9 +71,81 @@ class LexisUI {
             if (contextMenu) contextMenu.style.display = 'none';
             const qatMenu = document.getElementById('qat-custom-menu');
             if (qatMenu) qatMenu.style.display = 'none';
+            const pinMenu = document.getElementById('qat-pin-menu');
+            if (pinMenu) pinMenu.style.display = 'none';
             const statusDropdown = document.getElementById('status-dropdown');
             if (statusDropdown) statusDropdown.style.display = 'none';
         });
+
+        // Right click on ribbon buttons (.btn-icon or other ribbon action buttons)
+        const ribbon = document.querySelector('.ribbon');
+        if (ribbon) {
+            ribbon.addEventListener('contextmenu', (e) => {
+                const btn = e.target.closest('.btn-icon');
+                if (!btn) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                const action = btn.getAttribute('onclick');
+                if (!action) return;
+
+                // Get icon emoji/char
+                const iconSq = btn.querySelector('.icon-sq');
+                const icon = iconSq ? iconSq.innerText : '⭐';
+                const title = btn.innerText.replace(icon, '').trim();
+
+                const menu = document.getElementById('qat-pin-menu');
+                if (!menu) return;
+
+                // Position and show menu
+                menu.style.display = 'block';
+                menu.style.left = `${e.clientX}px`;
+                menu.style.top = `${e.clientY}px`;
+
+                // Check if already pinned
+                const isPinned = this.pinnedQATItems.some(item => item.action === action);
+                const actionBtn = document.getElementById('qat-pin-action-btn');
+                if (actionBtn) {
+                    actionBtn.innerHTML = isPinned 
+                        ? `<span class="icon">❌</span> Odebrat z panelu Rychlý přístup` 
+                        : `<span class="icon">📌</span> Přidat na panel Rychlý přístup`;
+                    
+                    this.tempQATPinData = { action, icon, title, isPinned };
+                }
+            });
+        }
+
+        // Right click on quick access toolbar to unpin custom or hardcoded items
+        const quickAccess = document.querySelector('.quick-access');
+        if (quickAccess) {
+            quickAccess.addEventListener('contextmenu', (e) => {
+                const btn = e.target.closest('.qa-btn');
+                if (!btn || btn.innerText.includes('▾')) return; // ignore dropdown button
+                e.preventDefault();
+                e.stopPropagation();
+
+                const menu = document.getElementById('qat-pin-menu');
+                if (!menu) return;
+
+                menu.style.display = 'block';
+                menu.style.left = `${e.clientX}px`;
+                menu.style.top = `${e.clientY}px`;
+
+                const actionBtn = document.getElementById('qat-pin-action-btn');
+                if (actionBtn) {
+                    if (btn.id) {
+                        // Hardcoded item (qat-save, qat-undo, qat-redo, qat-print, qat-new)
+                        actionBtn.innerHTML = `<span class="icon">❌</span> Skrýt z panelu Rychlý přístup`;
+                        this.tempQATPinData = { id: btn.id, isHardcoded: true };
+                    } else {
+                        // Custom item
+                        const action = btn.getAttribute('onclick');
+                        actionBtn.innerHTML = `<span class="icon">❌</span> Odebrat z panelu Rychlý přístup`;
+                        this.tempQATPinData = { action, isPinned: true };
+                    }
+                }
+            });
+        }
 
         // Idle activity listeners
         document.addEventListener('mousemove', () => this.resetIdleTimer());
@@ -276,32 +351,134 @@ class LexisUI {
     importDocument() {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.docx,.txt,.html';
+        input.accept = '.docx,.txt,.html,.zfo';
         input.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
             
-            // Update document title in the top bar
-            const titleEl = document.getElementById('window-doc-title');
-            if (titleEl) {
-                const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
-                titleEl.innerText = cleanTitle;
+            if (file.name.endsWith('.zfo')) {
+                this.importZfo(file.path);
+                return;
+            }
+            
+            const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+            this.currentDocumentTitle = cleanTitle;
+            this.updateDocTitleDOM();
+            
+            // Hide start screen and show app container
+            const startScreen = document.getElementById('start-screen');
+            const appContainer = document.getElementById('app-container');
+            if (startScreen && appContainer) {
+                startScreen.style.display = 'none';
+                appContainer.style.display = 'flex';
             }
             
             const reader = new FileReader();
             if (file.name.endsWith('.docx')) {
                 reader.onload = (re) => {
                     mammoth.convertToHtml({ arrayBuffer: re.target.result })
-                        .then(result => this.core.setContent(result.value))
+                        .then(result => {
+                            this.core.setContent(result.value);
+                            this.setDocumentStatus('draft', true);
+                            this.saveActiveDocumentState();
+                        })
                         .catch(err => console.error(err));
                 };
                 reader.readAsArrayBuffer(file);
             } else {
-                reader.onload = (re) => this.core.setContent(re.target.result);
+                reader.onload = (re) => {
+                    this.core.setContent(re.target.result);
+                    this.setDocumentStatus('draft', true);
+                    this.saveActiveDocumentState();
+                };
                 reader.readAsText(file);
             }
         };
         input.click();
+    }
+
+    async importZfo(filePath) {
+        if (!window.electronAPI || !window.electronAPI.importZfo) {
+            this.customAlert("ℹ️ <b>Dostupné pouze v desktopové verzi</b><br><br>Import ZFO souborů vyžaduje běžící aplikaci LexisEditor.");
+            return;
+        }
+
+        try {
+            const res = await window.electronAPI.importZfo(filePath);
+            if (!res || !res.success) {
+                if (res && res.error) {
+                    this.customAlert(`❌ <b>Chyba importu</b><br><br>${res.error}`);
+                }
+                return;
+            }
+
+            // Hide start screen and show app container
+            const startScreen = document.getElementById('start-screen');
+            const appContainer = document.getElementById('app-container');
+            if (startScreen && appContainer) {
+                startScreen.style.display = 'none';
+                appContainer.style.display = 'flex';
+            }
+
+            // Set document title to the Subject of the datová zpráva
+            const cleanTitle = res.subject || "Datová zpráva";
+            this.currentDocumentTitle = cleanTitle;
+            this.updateDocTitleDOM();
+
+            // Set document ID
+            this.currentDocumentId = 'doc_' + Date.now();
+
+            // Build content HTML
+            let html = `
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 25px; font-family: 'Inter', sans-serif;">
+                    <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                        📮 DATOVÁ ZPRÁVA (ISDS IMPORT)
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <tr>
+                            <td style="padding: 6px 0; font-weight: 600; color: #475569; width: 120px;">Odesílatel:</td>
+                            <td style="padding: 6px 0; color: #1e293b;"><b>${res.sender}</b></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 0; font-weight: 600; color: #475569;">ID schránky:</td>
+                            <td style="padding: 6px 0; color: #1e293b; font-family: monospace;">${res.senderId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px 0; font-weight: 600; color: #475569;">Předmět:</td>
+                            <td style="padding: 6px 0; color: #1e293b;">${res.subject}</td>
+                        </tr>
+                    </table>
+                </div>
+                <h1 style="font-family: 'Times New Roman', serif; font-size: 18pt; text-align: center; margin-top: 20px; font-weight: bold;">${res.subject}</h1>
+                <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
+            `;
+
+            if (res.attachments && res.attachments.length > 0) {
+                html += `
+                    <div style="margin-top: 30px; border-top: 1px dashed #cbd5e1; padding-top: 20px; font-family: 'Inter', sans-serif;">
+                        <h4 style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 10px;">📎 Extrahované přílohy ze zprávy:</h4>
+                        <ul style="padding-left: 20px; font-size: 12px; color: #2563eb;">
+                `;
+                res.attachments.forEach(att => {
+                    html += `<li style="margin-bottom: 5px;"><b>${att.name}</b></li>`;
+                });
+                html += `
+                        </ul>
+                        <p style="font-size: 11px; color: #64748b; margin-top: 10px; font-style: italic;">💡 Textový obsah a přílohy PDF byly úspěšně naimportovány do paměti aplikace.</p>
+                    </div>
+                `;
+            }
+
+            this.core.setContent(html);
+            this.setDocumentStatus('draft', true);
+            this.saveActiveDocumentState();
+
+            this.customAlert("<b>Import úspěšný</b><br><br>Datová zpráva .zfo byla úspěšně načtena a její název byl nastaven jako název dokumentu.");
+
+        } catch (err) {
+            console.error("ZFO Import error in frontend:", err);
+            this.customAlert(`❌ <b>Chyba importu</b><br><br>${err.message}`);
+        }
     }
 
     insertFootnote() {
@@ -403,17 +580,27 @@ class LexisUI {
         if (type === 'blank') {
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
+            this.currentDocumentTitle = 'Nepojmenovaný dokument';
+            this.updateDocTitleDOM();
             this.core.setContent('<p><br></p>');
             this.setDocumentStatus('draft', true);
             this.saveActiveDocumentState();
         } else if (type === 'file') {
             this.importDocument();
-            this.setDocumentStatus('draft', true);
-            this.saveActiveDocumentState();
+            // Title and status will be updated inside importDocument after file is selected
         } else {
             this.showLoader("Načítání šablony...", async () => {
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('app-container').style.display = 'flex';
+                
+                let title = "Šablona";
+                if (type === 'zaloba') title = "Žaloba";
+                else if (type === 'smlouva') title = "Smlouva";
+                else if (type === 'odvolani') title = "Odvolání";
+                else if (type === 'posudek') title = "Právní posudek";
+                
+                this.currentDocumentTitle = title;
+                this.updateDocTitleDOM();
                 
                 if (window.electronAPI && window.electronAPI.getTemplateContent) {
                     const content = await window.electronAPI.getTemplateContent(type);
@@ -790,6 +977,69 @@ class LexisUI {
             const check = document.getElementById(`check-${id}`);
             if (btn) btn.style.display = visible ? 'flex' : 'none';
             if (check) check.innerText = visible ? '✓' : '';
+        }
+    }
+
+    async loadCustomQATItems() {
+        this.pinnedQATItems = await this.core.storage.get('settings', 'qat-custom-pinned') || [];
+        this.renderCustomQATItems();
+    }
+
+    renderCustomQATItems() {
+        const qatContainer = document.querySelector('.quick-access');
+        if (!qatContainer) return;
+
+        // Remove any previously rendered custom buttons
+        const customBtns = qatContainer.querySelectorAll('.qa-btn-custom');
+        customBtns.forEach(btn => btn.remove());
+
+        // Find the 'Customize' dropdown button
+        const customizeBtn = Array.from(qatContainer.querySelectorAll('.qa-btn')).find(btn => btn.innerText.includes('▾'));
+
+        // Insert pinned items before the customize button
+        this.pinnedQATItems.forEach(item => {
+            const btn = document.createElement('div');
+            btn.className = 'qa-btn qa-btn-custom';
+            btn.setAttribute('onclick', item.action);
+            btn.setAttribute('title', item.title);
+            btn.innerText = item.icon;
+            
+            if (customizeBtn) {
+                qatContainer.insertBefore(btn, customizeBtn);
+            } else {
+                qatContainer.appendChild(btn);
+            }
+        });
+    }
+
+    async executeQATPinAction() {
+        if (!this.tempQATPinData) return;
+        
+        if (this.tempQATPinData.isHardcoded) {
+            // It's a default/hardcoded button, toggle it
+            await this.toggleQATItem(this.tempQATPinData.id);
+        } else {
+            // It's a custom button, add/remove it from pinned items
+            const { action, icon, title, isPinned } = this.tempQATPinData;
+            if (isPinned) {
+                this.pinnedQATItems = this.pinnedQATItems.filter(item => item.action !== action);
+            } else {
+                this.pinnedQATItems.push({ action, icon, title });
+            }
+            await this.core.storage.set('settings', { key: 'qat-custom-pinned', value: this.pinnedQATItems });
+            this.renderCustomQATItems();
+        }
+
+        // Hide pin menu
+        const menu = document.getElementById('qat-pin-menu');
+        if (menu) menu.style.display = 'none';
+        this.tempQATPinData = null;
+    }
+
+    updateDocTitleDOM() {
+        const titleEl = document.getElementById('window-doc-title');
+        if (titleEl) {
+            titleEl.innerText = this.currentDocumentTitle || "Nepojmenovaný dokument";
         }
     }
 
@@ -1974,6 +2224,12 @@ Tímto způsobem funguje bezproblémové propojení s vaším stávajícím clou
 2. Nastavte kurzor na místo, kde má být obsah.<br>
 3. Na kartě <i>Vložit</i> klikněte na <b>Obsah</b>.<br>
 4. LexisEditor dynamicky projde strukturu a vygeneruje čistý, formátovaný přehled kapitol.`;
+        } else if (topic === 'qat-guide') {
+            title = "📌 Panel Rychlý přístup (QAT)";
+            text = `<b>Přizpůsobení panelu Rychlý přístup:</b><br><br>
+1. <b>Připnutí nových funkcí:</b> Klikněte pravým tlačítkem myši na jakoukoli ikonu/funkci v horním Ribbon menu a zvolte <i>„Přidat na panel Rychlý přístup“</i>.<br>
+2. <b>Odebrání:</b> Klikněte pravým tlačítkem myši na ikonu přímo v horním panelu rychlého přístupu (zcela nahoře vedle názvu souboru) a zvolte <i>„Odebrat/Skrýt z panelu Rychlý přístup“</i>.<br>
+3. <b>Rychlé nastavení:</b> Můžete také kliknout na šipku <b>▾</b> na konci panelu Rychlého přístupu pro rychlé zapnutí/vypnutí výchozích systémových tlačítek (Uložit, Zpět, Tisk...).`;
         } else if (topic === 'user-guide') {
             title = "📖 Návod na zprovoznění lokální AI (Apple Intelligence & Ollama)";
             text = `<div style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; font-family: inherit; line-height: 1.6; font-size: 13px;">
@@ -2312,6 +2568,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     }
                     
                     this.currentDocumentTitle = saved.title || '';
+                    this.updateDocTitleDOM();
                     this.currentDocumentDeadline = saved.deadline || null;
                     this.currentDocumentCj = saved.cj || '';
                     this.updateDeadlineBadge();
@@ -2695,6 +2952,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 this.setDocumentStatus('draft', true);
                 
                 // 4. Update UI elements and save to DB
+                this.updateDocTitleDOM();
                 this.updateDeadlineBadge();
                 await this.saveActiveDocumentState();
                 
@@ -2827,6 +3085,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     }
                     
                     this.currentDocumentTitle = saved.title || '';
+                    this.updateDocTitleDOM();
                     this.currentDocumentDeadline = saved.deadline || null;
                     this.currentDocumentCj = saved.cj || '';
                     this.updateDeadlineBadge();
@@ -3657,6 +3916,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                             this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
                             this.renderDeadlines();
                             this.updateDeadlineBadge();
+                            this.updateDocTitleDOM();
+                            this.saveActiveDocumentState();
                             this.updateDocumentOutline();
                             
                             // Transition view from start screen to editor

@@ -447,17 +447,21 @@ ipcMain.handle('import-pdf', async () => {
 });
 
 // --- ZFO IMPORT (Datové zprávy) ---
-ipcMain.handle('import-zfo', async () => {
+ipcMain.handle('import-zfo', async (event, filePath) => {
     try {
-        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-            title: 'Otevřít datovou zprávu (.zfo)',
-            filters: [{ name: 'Datové zprávy', extensions: ['zfo'] }],
-            properties: ['openFile']
-        });
+        let selectedPath = filePath;
+        if (!selectedPath) {
+            const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+                title: 'Otevřít datovou zprávu (.zfo)',
+                filters: [{ name: 'Datové zprávy', extensions: ['zfo'] }],
+                properties: ['openFile']
+            });
 
-        if (canceled || filePaths.length === 0) return { success: false, canceled: true };
+            if (canceled || filePaths.length === 0) return { success: false, canceled: true };
+            selectedPath = filePaths[0];
+        }
 
-        const zfoBuffer = fs.readFileSync(filePaths[0]);
+        const zfoBuffer = fs.readFileSync(selectedPath);
         const zfoContent = zfoBuffer.toString('binary');
         
         // ZFO je PKCS#7 (CMS) kontejner. Pro jednoduchou extrakci obsahu (XML)

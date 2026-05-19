@@ -619,6 +619,7 @@
                     <div class="btn-icon" onclick="showHelpTip('scan')"><div class="icon-sq">📸</div>Jak skenovat?</div>
                     <div class="btn-icon" onclick="showHelpTip('clauses')"><div class="icon-sq">📚</div>Knihovna</div>
                     <div class="btn-icon" onclick="showHelpTip('toc')"><div class="icon-sq">📜</div>Generování obsahu</div>
+                    <div class="btn-icon" onclick="showHelpTip('qat-guide')"><div class="icon-sq">📌</div>Rychlý přístup</div>
                     <div class="btn-icon" onclick="runSelfDiagnostic()" style="background:rgba(239,68,68,0.1);"><div class="icon-sq">🛡️</div>Self-Test</div>
                     <div class="btn-icon" onclick="startOnboarding()" style="background:rgba(37,99,235,0.1);"><div class="icon-sq">🎓</div>Průvodce</div>
                 </div>
@@ -830,6 +831,11 @@
         <div class="context-menu-item" onclick="toggleQATItem('qat-print')"><span class="qat-item-check" id="check-qat-print"></span> Tisk</div>
         <div class="context-menu-item" onclick="toggleQATItem('qat-new')"><span class="qat-item-check" id="check-qat-new"></span> Nový dokument</div>
     </div>
+
+    <!-- QAT Pinning Menu -->
+    <div id="qat-pin-menu" class="qat-custom-menu">
+        <div class="context-menu-item" id="qat-pin-action-btn" onclick="lexisUI.executeQATPinAction()"><span class="icon">📌</span> Přidat na panel Rychlý přístup</div>
+    </div>
     
     <div id="sidebar-tab" class="sidebar-side-tab" onclick="toggleSidebar('sidebar')">
         <span>📚 KNIHOVNA</span>
@@ -989,8 +995,8 @@
     <!-- Comment Drawer -->
     <div id="comment-sidebar" class="ai-drawer">
         <div class="ai-header" style="background: linear-gradient(to right, #f59e0b, #d97706);">
-            <span class="ai-header-close" onclick="toggleCommentDrawer(false)">✕</span>
             <span style="font-weight: 700; letter-spacing: 0.5px;">💬 KOMENTÁŘE A REVIZE</span>
+            <span class="ai-header-close" onclick="toggleCommentDrawer(false)">✕</span>
         </div>
         <div id="comments-list" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-grow: 1;">
             <div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Žádné komentáře</div>
@@ -1001,8 +1007,8 @@
     <div class="ai-overlay" id="ai-overlay" onclick="toggleAIDrawer(false)"></div>
     <div class="ai-drawer" id="ai-drawer">
         <div class="ai-header">
-            <span class="ai-header-close" onclick="toggleAIDrawer(false)">✕</span>
             <span id="ai-header-text" style="font-weight: 700; letter-spacing: 0.5px;">⚖️ LEGAL TOOLBOX</span>
+            <span class="ai-header-close" onclick="toggleAIDrawer(false)">✕</span>
         </div>
         
         <!-- Main Sidebar Tabs (Fáze 10) -->
@@ -1317,6 +1323,7 @@
         window.saveDocument = () => lexisUI.saveDocument();
         window.printDocument = () => lexisUI.printDocument();
         window.importDocument = () => lexisUI.importDocument();
+        window.importZfo = (filePath) => lexisUI.importZfo(filePath);
         window.toggleQATItem = (id) => lexisUI.toggleQATItem(id);
         window.saveSelectedAsClause = () => lexisUI.saveSelectedAsClause();
         window.sendAIQuery = () => lexisUI.sendAIQuery();

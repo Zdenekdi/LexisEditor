@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testPostConnection: (creds) => ipcRenderer.invoke('test-post-connection', creds),
     authenticateBiometric: (reason) => ipcRenderer.invoke('authenticate-biometric', reason),
     importPdf: () => ipcRenderer.invoke('import-pdf'),
-    importZfo: () => ipcRenderer.invoke('import-zfo'),
+    importZfo: (filePath) => ipcRenderer.invoke('import-zfo', filePath),
     importPdfBase64: (base64) => ipcRenderer.invoke('import-pdf-base64', base64),
     saveAIConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
     getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
