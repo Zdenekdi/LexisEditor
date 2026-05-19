@@ -105,3 +105,28 @@ ollama run llama3
 
 ### Uvidí někdo texty mých smluv?
 **Absolutně ne.** Na rozdíl od ChatGPT, MS Copilotu nebo Google Gemini, které posílají texty přes internet do obřích serverových datacenter, Apple Intelligence (přes `apfel`) a Ollama zpracovávají každé jedno slovo lokálně v operační paměti vašeho počítače. Žádná data neopouštějí váš stroj.
+
+---
+
+## 🤖 Pomocníci pro vašeho AI asistenta (Prompty)
+
+Pokud si při instalaci nevíte rady a používáte běžného chatbota (např. ChatGPT, Claude nebo Copilot), můžete mu zkopírovat a poslat následující prompty pro okamžitou pomoc na míru vašemu systému:
+
+### 1. Prompt pro pomoc s instalací Apple Intelligence (macOS)
+> **Zkopírujte a vložte svému AI asistentovi:**
+> ```markdown
+> Ahoj, používám Mac s procesorem Apple Silicon a nainstaloval jsem si LexisEditor. Chci v něm zprovoznit lokální Apple Intelligence pomocí nástroje `apfel --serve` přes Homebrew. Můžeš mě krok za krokem provést instalací v Terminálu, vysvětlit jak spustit server, a co dělat, když se v Terminálu objeví nějaká chyba? Piš prosím jednoduše a srozumitelně pro běžného uživatele.
+> ```
+
+### 2. Prompt pro pomoc s výběrem a instalací modelů v Ollamě (Windows / macOS / Linux)
+> **Zkopírujte a vložte svému AI asistentovi:**
+> ```markdown
+> Ahoj, chci v LexisEditoru nastavit lokální offline AI přes nástroj Ollama. Můžeš mi poradit, jaké modely (např. Llama 3, Qwen, Mistral) jsou nejvhodnější pro češtinu a práci s právními texty? Zároveň mi napiš přesné příkazy do příkazové řádky/terminálu, kterými ty modely stáhnu a spustím, a jak je následně vybrat v nastavení LexisEditoru.
+> ```
+
+### 3. Prompt pro řešení problémů s nefunkčním připojením (Troubleshooting)
+> **Zkopírujte a vložte svému AI asistentovi:**
+> ```markdown
+> Ahoj, v LexisEditoru se pokouším připojit k lokálnímu AI serveru (Ollama / apfel), ale hlásí mi to chybu "Externí API selhalo". Mám počítač s [doplňte váš operační systém, např. macOS Sequoia / Windows 11]. Můžeš mi napsat jednoduchý postup, jak ověřit, zda server na pozadí skutečně běží, na jakém portu naslouchá a jak tuto chybu spolehlivě opravit?
+> ```
+
