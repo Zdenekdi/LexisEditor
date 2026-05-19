@@ -42,11 +42,31 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
 
         console.log(`[LexisAIProvider] Volám model ${model} přes poskytovatele ${provider} na endpoint ${endpoint}...`);
 
+        // Dynamicky nastavit System Prompt na základě zvoleného Agenta
+        const agentSelect = document.getElementById('lexislocal-agent');
+        const agentId = agentSelect ? agentSelect.value : 'resersnik';
+        
+        let systemPromptToUse = systemPrompt;
+        if (agentId === 'resersnik') {
+            systemPromptToUse = `Jsi špičkový český právní rešeršník (Lexis Research Agent). Tvým úkolem je poskytovat přesné, objektivní a strukturované analýzy českého právního řádu (zejména občanského zákoníku, obchodního zákoníku, trestního zákoníku a správního řádu) a judikatury (Nejvyšší soud, Nejvyšší správní soud, Ústavní soud ČR).
+1. Vždy uváděj přesná zákonná ustanovení (paragrafy a čísla zákonů, např. zákon č. 89/2012 Sb., občanský zákoník).
+2. Pokud odkazuješ na judikaturu, uváděj spisové značky (např. 26 Cdo 1230/2021) a popiš stručně právní větu.
+3. Pokud si nejsi jistý, nikdy si právní předpisy ani judikáty nevymýšlej.`;
+        } else if (agentId === 'stylista') {
+            systemPromptToUse = `Jsi zkušený český advokát a mistr právní stylizace (Lexis Drafting Agent). Tvým úkolem je upravovat texty, navrhovat smluvní doložky a sepisovat právní podání.
+1. Používej striktně přesnou českou právní terminologii (např. "vyloučení postoupení pohledávky", "smluvní pokuta", "jistota" namísto kauce, apod.).
+2. Texty stylizuj tak, aby chránily zájmy klienta a byly jednoznačné.
+3. Piš aktivním rodoslovem, pokud je to možné, a vyhýbej se zbytečně archaickým nebo nesrozumitelným souvětím.`;
+        } else if (agentId === 'kontrolor') {
+            systemPromptToUse = `Jsi neúprosný právní auditor a specialista na řízení rizik (Lexis Audit Agent). Tvým úkolem je analýza rizik ve smlouvách a právních dokumentech.
+1. Hledej nevýhodná ujednání, skryté automatické prolongace a nejasné platební podmínky.
+2. Upozorni na ustanovení, která by mohla být neplatná pro rozpor se zákonem nebo dobrými mravy.
+3. Vytvoř seznam chybějících klíčových ustanovení.`;
+        }
+
         // 0. LexisLocal Swarm Swarm Orchestrator
         if (provider === 'lexislocal') {
-            const agentSelect = document.getElementById('lexislocal-agent');
             const modelSelect = document.getElementById('lexislocal-model');
-            const agentId = agentSelect ? agentSelect.value : 'resersnik';
             const selectedModel = modelSelect ? modelSelect.value : 'llama3';
             
             let contextText = "";
@@ -89,8 +109,8 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
             throw new Error(`LexisLocal Swarm vrátila status ${response.status}`);
         }
 
-        // 1. Apple Intelligence (apfel) / OpenAI / DeepSeek / LM Studio (OpenAI-kompatibilní API)
-        if (provider === 'apfel' || provider === 'openai' || provider === 'deepseek' || provider === 'lmstudio') {
+        // 1. Apple Intelligence (apfel) / OpenAI / DeepSeek / LM Studio / Anthropic
+        if (provider === 'apfel' || provider === 'openai' || provider === 'deepseek' || provider === 'lmstudio' || provider === 'anthropic') {
             const headers = { "Content-Type": "application/json" };
             if (apiKey) {
                 headers["Authorization"] = `Bearer ${apiKey}`;
@@ -102,7 +122,7 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                 body: JSON.stringify({
                     model: model,
                     messages: [
-                        { role: "system", content: systemPrompt },
+                        { role: "system", content: systemPromptToUse },
                         { role: "user", content: prompt }
                     ],
                     temperature: 0.3
@@ -126,7 +146,7 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                 body: JSON.stringify({
                     model: model,
                     prompt: prompt,
-                    system: systemPrompt,
+                    system: systemPromptToUse,
                     stream: false,
                     options: {
                         temperature: 0.3
@@ -151,7 +171,7 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
                     contents: [
                         {
                             parts: [
-                                { text: `${systemPrompt}\n\nUživatel: ${prompt}` }
+                                { text: `${systemPromptToUse}\n\nUživatel: ${prompt}` }
                             ]
                         }
                     ]

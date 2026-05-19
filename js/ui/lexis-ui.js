@@ -2451,13 +2451,16 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     toggleLexisLocalSelectors() {
         const provEl = document.getElementById('ai-provider');
         const container = document.getElementById('lexislocal-selectors-container');
+        const modelBox = document.getElementById('lexislocal-model-box');
         if (!provEl || !container) return;
         
+        container.style.display = 'flex';
+        
         if (provEl.value === 'lexislocal') {
-            container.style.display = 'flex';
+            if (modelBox) modelBox.style.display = 'flex';
             this.fetchLexisLocalModels();
         } else {
-            container.style.display = 'none';
+            if (modelBox) modelBox.style.display = 'none';
         }
     }
 
