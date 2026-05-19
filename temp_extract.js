@@ -27,7 +27,7 @@ function extractTextFromDocx(filePath) {
     }
 }
 
-const target = '/Users/zdenekdias/Projects/LexisLocal/LexisLocal_Sitova_Politika.docx';
+const target = '/Users/zdenekdias/Projects/LexisEditor/LexisLocal_Sitova_Politika.docx';
 if (fs.existsSync(target)) {
     console.log("--- START OF TEXT ---");
     console.log(extractTextFromDocx(target));

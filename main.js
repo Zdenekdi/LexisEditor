@@ -590,7 +590,7 @@ function getLocalIp() {
 }
 
 ipcMain.handle('start-lexis-link', async () => {
-    if (lexisLinkServer) return { success: true, url: `http://${getLocalIp()}:${LEXIS_LINK_PORT}/remote` };
+    if (lexisLinkServer) return { success: true, url: 'http://' + getLocalIp() + ':' + LEXIS_LINK_PORT + '/remote' };
 
     lexisLinkServer = http.createServer((req, res) => {
         if (req.url === '/remote') {
@@ -714,5 +714,5 @@ ipcMain.handle('start-lexis-link', async () => {
     });
 
     lexisLinkServer.listen(LEXIS_LINK_PORT);
-    return { success: true, url: \`http://\${getLocalIp()}:\${LEXIS_LINK_PORT}/remote\` };
+    return { success: true, url: 'http://' + getLocalIp() + ':' + LEXIS_LINK_PORT + '/remote' };
 });
