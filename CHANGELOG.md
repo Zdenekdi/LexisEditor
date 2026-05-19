@@ -2,6 +2,11 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.3.3] - 2026-05-19
+### Přidáno
+- **Vždy na domovské stránce**: Aplikace se nyní při startu vždy otevře na úvodním rozcestníku (domovské stránce) se seznamem nedávných dokumentů a šablonami namísto automatického vstupu do editoru.
+- **Oficiální logo v aplikaci**: Převedeno a integrováno oficiální skleněné logo (modrý štít) na startovní obrazovku aplikace a do README dokumentace.
+
 ## [3.3.0] - 2026-05-18
 ### Přidáno
 - **Aktivní Heartbeat logování**: Automatické hlášení aktivity na pozadí do LexisLocal (odesílá se každých 30 sekund při úpravách dokumentu).

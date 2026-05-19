@@ -2577,10 +2577,11 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     const startScreen = document.getElementById('start-screen');
                     const appContainer = document.getElementById('app-container');
                     if (startScreen && appContainer) {
-                        startScreen.style.display = 'none';
-                        appContainer.style.display = 'flex';
+                        startScreen.style.display = 'flex';
+                        appContainer.style.display = 'none';
                     }
-                    console.log(`Dokument ${lastId} byl úspěšně načten ze zálohy.`);
+                    this.renderRecentDocuments();
+                    console.log(`Dokument ${lastId} byl úspěšně načten ze zálohy v pozadí.`);
                     return;
                 }
             }
