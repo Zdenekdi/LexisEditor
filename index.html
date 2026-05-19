@@ -1104,20 +1104,27 @@
     </div>
 
     <div class="status-bar">
-        <span id="page-count">Strana 1 z 1</span> | 
-        <span id="word-count-panel">
-            <span data-i18n="status_words">Slova:</span> <span id="word-cnt">0</span> | 
-            <span data-i18n="status_chars">Znaky:</span> <span id="char-cnt">0</span> | 
-            <span data-i18n="status_ns">Normostrany:</span> <span id="ns-cnt">0.00</span>
-        </span>
+        <div class="status-group">
+            <span id="page-count">Strana 1 z 1</span>
+        </div>
+        <div class="status-divider">|</div>
+        <div class="status-group" id="status-words-group">
+            <span data-i18n="status_words">Slova:</span> <span id="word-cnt">0</span>
+            <span class="status-subdivider">|</span>
+            <span data-i18n="status_chars">Znaky:</span> <span id="char-cnt">0</span>
+            <span class="status-subdivider">|</span>
+            <span class="status-ns-label"><span data-i18n="status_ns">Normostrany:</span> <span id="ns-cnt">0.00</span></span>
+        </div>
         <div style="flex-grow: 1"></div>
         <div id="update-status" style="margin-right:15px; font-weight:bold; color:#3b82f6; display:none; cursor:pointer; padding:2px 8px; border-radius:4px;"></div>
         <div id="app-version-status" style="margin-right:15px; font-size:11px; color:#64748b;">LexisEditor <span id="dynamic-ver">...</span></div>
-        <span>✨ AI: Aktivní</span>
-        <span id="save-status">✓ Uloženo</span>
-        <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()">
-            <span id="sync-icon">☁️</span> <span id="sync-text">Synchronizováno</span>
-        </span>
+        <div class="status-group" id="status-ai-group"><span>✨ AI: Aktivní</span></div>
+        <div class="status-group" id="status-save-group"><span id="save-status">✓ Uloženo</span></div>
+        <div class="status-group" id="status-sync-group">
+            <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()">
+                <span id="sync-icon">☁️</span> <span id="sync-text">Synchronizováno</span>
+            </span>
+        </div>
     </div>
 
     </div> <!-- Konec app-container -->
