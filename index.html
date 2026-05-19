@@ -1312,7 +1312,7 @@
         window.autoLinkLaws = () => lexisUI.convertCitationsToLinks();
         
         window.addEventListener('DOMContentLoaded', () => {
-            // Start screen handled by openStartDocument
+            initApp().catch(err => console.error("Chyba při startu:", err));
         });
     </script>
 </body>
