@@ -8,9 +8,22 @@
     <!-- Libraries -->
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script>
+        // Dočasný hack pro starší CDN knihovny v prostředí Electronu
+        window.temp_module = window.module;
+        window.module = undefined;
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff-match-patch/1.0.5/index.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script>
+        if (window.temp_module !== undefined) {
+            window.module = window.temp_module;
+            delete window.temp_module;
+        } else {
+            delete window.module;
+        }
+    </script>
     
     <link rel="stylesheet" href="css/lexis-style.css">
     <style>
@@ -1165,6 +1178,26 @@
         };
         window.toggleAIDrawer = (open) => {
             if (lexisUI) lexisUI.toggleAIDrawer(open);
+            if (!open) {
+                const commentDrawer = document.getElementById('comment-sidebar');
+                if (commentDrawer) commentDrawer.classList.remove('open');
+            }
+        };
+        window.toggleSidebar = (id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('collapsed');
+        };
+        window.toggleCommentDrawer = (open) => {
+            const drawer = document.getElementById('comment-sidebar');
+            const overlay = document.getElementById('ai-overlay');
+            if (!drawer || !overlay) return;
+            if (open) {
+                drawer.classList.add('open');
+                overlay.classList.add('active');
+            } else {
+                drawer.classList.remove('open');
+                overlay.classList.remove('active');
+            }
         };
         window.requestStartupUnlock = async () => {
             if (window.electronAPI && window.electronAPI.requestTouchID) {

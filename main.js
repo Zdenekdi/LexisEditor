@@ -46,6 +46,7 @@ function createWindow() {
     });
 
     mainWindow.loadFile('index.html');
+    mainWindow.webContents.openDevTools();
 }
 
 app.setName('LexisEditor');

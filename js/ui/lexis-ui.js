@@ -175,13 +175,19 @@ class LexisUI {
     }
 
     switchTab(tabName) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        if (!tabName) return;
+        document.querySelectorAll('.tab').forEach(t => {
+            t.classList.remove('active');
+            if (t.getAttribute('data-tab') === tabName || 
+                (t.getAttribute('onclick') && t.getAttribute('onclick').includes(tabName)) ||
+                t.id === `${tabName}-btn` ||
+                t.id === tabName) {
+                t.classList.add('active');
+            }
+        });
         document.querySelectorAll('.tool-groups-container').forEach(c => c.classList.remove('active'));
 
-        const targetTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
-        const targetGroup = document.getElementById(`${tabName}-tools`);
-        
-        if (targetTab) targetTab.classList.add('active');
+        const targetGroup = document.getElementById(tabName) || document.getElementById(`${tabName}-tools`);
         if (targetGroup) targetGroup.classList.add('active');
         
         this.currentTab = tabName;
@@ -189,12 +195,15 @@ class LexisUI {
 
     toggleAIDrawer(forceOpen = null) {
         const drawer = document.getElementById('ai-drawer');
+        const overlay = document.getElementById('ai-overlay');
         if (!drawer) return;
         this.isDrawerOpen = forceOpen !== null ? forceOpen : !this.isDrawerOpen;
         if (this.isDrawerOpen) {
             drawer.classList.add('open');
+            if (overlay) overlay.classList.add('active');
         } else {
             drawer.classList.remove('open');
+            if (overlay) overlay.classList.remove('active');
         }
     }
 
@@ -1087,6 +1096,7 @@ class LexisUI {
                 this.customAlert('☁️ <b>Změny odeslány</b><br><br>Vaše lokální změny byly potvrzeny a zapsány do cloudového úložiště.');
             }
         };
+    }
     async checkEnterpriseFeature(featureName, callback) {
         const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
         if (status === 'Enterprise') {
@@ -1500,7 +1510,7 @@ class LexisUI {
         form.innerHTML = '';
         const text = this.core.getText();
         
-        const regex = /\\[([A-ZÁ-Ž0-9_]{3,30})\\]|\\{\\{([a-zA-Z0-9_á-žÁ-Ž]{2,30})\\}\\}/g;
+        const regex = /\[([A-ZÁ-Ž0-9_]{3,30})\]|\{\{([a-zA-Z0-9_á-žÁ-Ž]{2,30})\}\}/g;
         const variables = new Set();
         let match;
         
