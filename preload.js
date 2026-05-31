@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Zpřístupnění specifických systémových funkcí pro frontend (index.html)
 contextBridge.exposeInMainWorld('electronAPI', {
-    exportDocx: (htmlContent) => ipcRenderer.invoke('export-docx', htmlContent),
+    exportDocx: (htmlContent, headerHtml, footerHtml) => ipcRenderer.invoke('export-docx', htmlContent, headerHtml, footerHtml),
     searchAres: (ico) => ipcRenderer.invoke('search-ares', ico),
     getTemplates: () => ipcRenderer.invoke('get-templates'),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppVersion: () => ipcRenderer.invoke('get-version'),
     onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_event, value) => callback(value)),
     installUpdate: () => ipcRenderer.send('install-update'),
-    exportBundle: (html, css) => ipcRenderer.invoke('export-bundle', html, css),
+    exportBundle: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('export-bundle', html, css, headerHtml, footerHtml),
     saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
     getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
     savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
@@ -24,7 +24,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveAIConfig: (config) => ipcRenderer.invoke('save-ai-config', config),
     getAIConfig: () => ipcRenderer.invoke('get-ai-config'),
     startLexisLink: () => ipcRenderer.invoke('start-lexis-link'),
+    queryInfoJednani: (params) => ipcRenderer.invoke('query-infojednani', params),
     onLexisLinkCommand: (callback) => ipcRenderer.on('lexis-link-command', (event, cmd) => callback(cmd)),
     onLexisConnectImport: (callback) => ipcRenderer.on('lexis-connect-import', (event, data) => callback(data)),
-    onLexisLinkScan: (callback) => ipcRenderer.on('lexis-link-scan', (event, base64) => callback(base64))
+    onLexisLinkScan: (callback) => ipcRenderer.on('lexis-link-scan', (event, base64) => callback(base64)),
+    // --- SECURITY LOCK ---
+    lockSaveConfig: (config) => ipcRenderer.invoke('lock-save-config', config),
+    lockGetConfig: () => ipcRenderer.invoke('lock-get-config'),
+    lockDeleteConfig: () => ipcRenderer.invoke('lock-delete-config'),
+    lockVerifyPassword: (password) => ipcRenderer.invoke('lock-verify-password', password),
+    lockTouchIdAvailable: () => ipcRenderer.invoke('lock-touchid-available'),
 });

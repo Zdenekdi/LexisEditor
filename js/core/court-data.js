@@ -1,0 +1,488 @@
+const COURT_PATTERNS = [
+  {
+    "nazev": "Krajský soud Brno",
+    "kod": "KSJIMBM",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brno[a-za-ž]*"
+  },
+  {
+    "nazev": "Krajský soud České Budějovice",
+    "kod": "KSJICCB",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?cesk[e|y]*\\s+budejovic"
+  },
+  {
+    "nazev": "Krajský soud Hradec Králové",
+    "kod": "KSVYCHK",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?hrad[e|c][c|e]\\s+kralov"
+  },
+  {
+    "nazev": "Krajský soud Ostrava",
+    "kod": "KSSEMOS",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?ostra[a-za-ž]*"
+  },
+  {
+    "nazev": "Krajský soud Plzeň",
+    "kod": "KSZPCPM",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?plzen[a-za-ž]*"
+  },
+  {
+    "nazev": "Krajský soud Praha",
+    "kod": "KSSTCAB",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?praha[a-za-ž]*"
+  },
+  {
+    "nazev": "Krajský soud Ústí nad Labem",
+    "kod": "KSSCEUL",
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:ust[i]*\\s+(?:nad\\s+)?lab)"
+  },
+  {
+    "nazev": "Městský soud Praha",
+    "kod": "MSPHAAB",
+    "pattern": "mestsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prah[a|e|u]"
+  },
+  {
+    "nazev": "Vrchní soud Olomouc",
+    "kod": "VSSEMOL",
+    "pattern": "vrchn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?olomo[a-za-ž]*"
+  },
+  {
+    "nazev": "Vrchní soud Praha",
+    "kod": "VSPHAAB",
+    "pattern": "vrchn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?praha[a-za-ž]*"
+  },
+  {
+    "nazev": "Městský soud Brno",
+    "kod": "OSJIMBM",
+    "pattern": "mestsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brn[o|e]"
+  },
+  {
+    "nazev": "Obvodní soud Praha 1",
+    "kod": "OSPHA01",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+1\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 10",
+    "kod": "OSPHA10",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+10\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 2",
+    "kod": "OSPHA02",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+2\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 3",
+    "kod": "OSPHA03",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+3\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 4",
+    "kod": "OSPHA04",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+4\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 5",
+    "kod": "OSPHA05",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+5\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 6",
+    "kod": "OSPHA06",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+6\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 7",
+    "kod": "OSPHA07",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+7\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 8",
+    "kod": "OSPHA08",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+8\\b"
+  },
+  {
+    "nazev": "Obvodní soud Praha 9",
+    "kod": "OSPHA09",
+    "pattern": "obvodn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:pro\\s+)?prah[a|e|u]\\s+9\\b"
+  },
+  {
+    "nazev": "Okresní soud Benešov",
+    "kod": "OSSTCBN",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?benes[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Beroun",
+    "kod": "OSSTCBE",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?berou[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Blansko",
+    "kod": "OSJIMBK",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?blans[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Brno-venkov",
+    "kod": "OSJIMBO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brn[o|e]\\s*-\\s*venkov"
+  },
+  {
+    "nazev": "Okresní soud Bruntál",
+    "kod": "OSSEMBR",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brunt[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Břeclav",
+    "kod": "OSJIMBV",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brecl[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Cheb",
+    "kod": "OSZPCCH",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?cheb[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Chomutov",
+    "kod": "OSSCECV",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?chomu[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Chrudim",
+    "kod": "OSVYCCR",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?chrud[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Česká Lípa",
+    "kod": "OSSCECL",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?ceska[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud České Budějovice",
+    "kod": "OSJICCB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?ceske[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Český Krumlov",
+    "kod": "OSJICCK",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?cesky[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Děčín",
+    "kod": "OSSCEDC",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?decin[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Domažlice",
+    "kod": "OSZPCDO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?domaz[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Frýdek-Místek",
+    "kod": "OSSEMFM",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?fryde[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Havlíčkův Brod",
+    "kod": "OSVYCHB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?havli[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Hodonín",
+    "kod": "OSJIMHO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?hodon[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Hradec Králové",
+    "kod": "OSVYCHK",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?hrade[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Jablonec nad Nisou",
+    "kod": "OSSCEJN",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?jablo[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Jeseník",
+    "kod": "OSSEMJE",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?jesen[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Jičín",
+    "kod": "OSVYCJC",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?jicin[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Jihlava",
+    "kod": "OSJIMJI",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?jihla[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Jindřichův Hradec",
+    "kod": "OSJICJH",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?jindr[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Karlovy Vary",
+    "kod": "OSZPCKV",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?karlo[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Karviná",
+    "kod": "OSSEMKA",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?karvi[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Kladno",
+    "kod": "OSSTCKL",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?kladn[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Klatovy",
+    "kod": "OSZPCKT",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?klato[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Kolín",
+    "kod": "OSSTCKO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?kolin[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Kroměříž",
+    "kod": "OSJIMKM",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?krome[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Kutná Hora",
+    "kod": "OSSTCKH",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?kutna[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Liberec",
+    "kod": "OSSCELB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?liber[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Litoměřice",
+    "kod": "OSSCELT",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?litom[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Louny",
+    "kod": "OSSCELN",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?louny[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Mělník",
+    "kod": "OSSTCME",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?melni[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Mladá Boleslav",
+    "kod": "OSSTCMB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?mlada[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Most",
+    "kod": "OSSCEMO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?most[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Náchod",
+    "kod": "OSVYCNA",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?nacho[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Nový Jičín",
+    "kod": "OSSEMNJ",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?novy [a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Nymburk",
+    "kod": "OSSTCNB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?nymbu[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Olomouc",
+    "kod": "OSSEMOC",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?olomo[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Opava",
+    "kod": "OSSEMOP",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?opava[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Ostrava",
+    "kod": "OSSEMOS",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?ostra[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Pardubice",
+    "kod": "OSVYCPA",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?pardu[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Pelhřimov",
+    "kod": "OSJICPE",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?pelhr[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Písek",
+    "kod": "OSJICPI",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?pisek[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Plzeň-jih",
+    "kod": "OSZPCPJ",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?plz[e|n][n|i]\\s*-\\s*jih"
+  },
+  {
+    "nazev": "Okresní soud Plzeň-Město",
+    "kod": "OSZPCPM",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?plz[e|n][n|i]\\s*-\\s*(?:m[e|e]st|mesta)"
+  },
+  {
+    "nazev": "Okresní soud Plzeň-sever",
+    "kod": "OSZPCPS",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?plz[e|n][n|i]\\s*-\\s*sever"
+  },
+  {
+    "nazev": "Okresní soud Prachatice",
+    "kod": "OSJICPT",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prach[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Praha-Východ",
+    "kod": "OSSTCPY",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prah[a|e|u]\\s*-\\s*vychod"
+  },
+  {
+    "nazev": "Okresní soud Praha-Západ",
+    "kod": "OSSTCPZ",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prah[a|e|u]\\s*-\\s*zapad"
+  },
+  {
+    "nazev": "Okresní soud Prostějov",
+    "kod": "OSJIMPV",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prost[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Přerov",
+    "kod": "OSSEMPR",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?prero[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Příbram",
+    "kod": "OSSTCPB",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?pribr[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Rakovník",
+    "kod": "OSSTCRA",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?rakov[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Rokycany",
+    "kod": "OSZPCRO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?rokyc[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Rychnov nad Kněžnou",
+    "kod": "OSVYCRK",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?rychn[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Semily",
+    "kod": "OSVYCSM",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?semil[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Sokolov",
+    "kod": "OSZPCSO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?sokol[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Strakonice",
+    "kod": "OSJICST",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?strak[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Svitavy",
+    "kod": "OSVYCSY",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?svita[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Šumperk",
+    "kod": "OSSEMSU",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?sumpe[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Tábor",
+    "kod": "OSJICTA",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?tabor[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Tachov",
+    "kod": "OSZPCTC",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?tacho[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Teplice",
+    "kod": "OSSCETP",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?tepli[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Trutnov",
+    "kod": "OSVYCTU",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?trutn[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Třebíč",
+    "kod": "OSJIMTR",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?trebi[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Uherské Hradiště",
+    "kod": "OSJIMUH",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?uhers[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Ústí nad Labem",
+    "kod": "OSSCEUL",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti [a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Ústí nad Orlicí",
+    "kod": "OSVYCUO",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti [a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Vsetín",
+    "kod": "OSSEMVS",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?vseti[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Vyškov",
+    "kod": "OSJIMVY",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?vysko[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Zlín",
+    "kod": "OSJIMZL",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?zlin[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Znojmo",
+    "kod": "OSJIMZN",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?znojm[a-za-ž]*"
+  },
+  {
+    "nazev": "Okresní soud Žďár nad Sázavou",
+    "kod": "OSJIMZR",
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?zdar [a-za-ž]*"
+  }
+];
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { COURT_PATTERNS };
+} else {
+    window.COURT_PATTERNS = COURT_PATTERNS;
+}

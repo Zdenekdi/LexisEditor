@@ -32,6 +32,10 @@ class LexisUI {
         window.removeActiveDeadline = (id) => {
             this.removeActiveDeadline(id);
         };
+        window.saveHearingToCalendar = (jsonStr) => {
+            const data = JSON.parse(decodeURIComponent(jsonStr));
+            this.promptAddHearingToCalendar(data);
+        };
         
         // Modular helper for dialogs, calculators, and generators
         this.dialogs = new LexisDialogs(this);
@@ -55,7 +59,9 @@ class LexisUI {
         this.initLexisLinkListeners();
         this.initDeadlines();
         this.initActiveDocumentState();
+        this.initRibbonTooltips();
     }
+
 
 
     bindEvents() {
@@ -147,10 +153,27 @@ class LexisUI {
             });
         }
 
+        // Auto-save changes in header and footer area
+        const headerArea = document.getElementById('header-area');
+        const footerArea = document.getElementById('footer-area');
+        const throttleSave = () => {
+            clearTimeout(this.headerFooterSaveTimer);
+            this.headerFooterSaveTimer = setTimeout(() => {
+                this.saveActiveDocumentState();
+            }, 1000);
+        };
+        if (headerArea) {
+            headerArea.addEventListener('input', throttleSave);
+        }
+        if (footerArea) {
+            footerArea.addEventListener('input', throttleSave);
+        }
+
         // Idle activity listeners
         document.addEventListener('mousemove', () => this.resetIdleTimer());
         document.addEventListener('keydown', () => this.resetIdleTimer());
     }
+
 
     initIdleTimer() {
         this.lastHeartbeatTime = Date.now();
@@ -364,6 +387,7 @@ class LexisUI {
             const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
             this.currentDocumentTitle = cleanTitle;
             this.updateDocTitleDOM();
+            this.resetHeaderFooterDOM();
             
             // Hide start screen and show app container
             const startScreen = document.getElementById('start-screen');
@@ -424,6 +448,7 @@ class LexisUI {
             const cleanTitle = res.subject || "Datová zpráva";
             this.currentDocumentTitle = cleanTitle;
             this.updateDocTitleDOM();
+            this.resetHeaderFooterDOM();
 
             // Set document ID
             this.currentDocumentId = 'doc_' + Date.now();
@@ -570,12 +595,24 @@ class LexisUI {
     }
 
 
+    resetHeaderFooterDOM() {
+        const headerArea = document.getElementById('header-area');
+        const footerArea = document.getElementById('footer-area');
+        if (headerArea) {
+            headerArea.innerHTML = `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
+        }
+        if (footerArea) {
+            footerArea.innerHTML = `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
+        }
+    }
+
     openStartDocument(type) {
         this.currentDocumentId = 'doc_' + Date.now();
         this.currentDocumentTitle = '';
         this.currentDocumentDeadline = null;
         this.currentDocumentCj = '';
         this.updateDeadlineBadge();
+        this.resetHeaderFooterDOM();
         
         if (type === 'blank') {
             document.getElementById('start-screen').style.display = 'none';
@@ -870,10 +907,15 @@ class LexisUI {
     }
 
     startMailMerge() {
-        this.customPrompt("Import dat (CSV obsah):", "Jméno,IČO,Sídlo\nJan Novák,123456,Praha", (csvData) => {
-            if (!csvData) return;
-            this.customAlert("Hromadné generování spuštěno. Dokumenty budou uloženy do složky Export.");
-        });
+        this._campaignStep = 1;
+        this._campaignRecords = [];
+        this._campaignPreviewIdx = 0;
+        this._campaignAction = 'pdf';
+        const overlay = document.getElementById('campaign-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            this.renderCampaignStep(1);
+        }
     }
 
     linkCaseLaw() {
@@ -1640,6 +1682,7 @@ class LexisUI {
                     
                     // 5. Update editor text and set state
                     this.core.setContent(replyHtml);
+                    this.resetHeaderFooterDOM();
                     this.setDocumentStatus('draft', true);
                     
                     // 6. Automatically register in Deadline Guard & active document memory!
@@ -1907,8 +1950,12 @@ class LexisUI {
     async exportToDocx() {
         if (window.electronAPI && window.electronAPI.exportDocx) {
             const html = this.core.getContent();
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+            const headerHtml = headerArea ? headerArea.innerHTML : '';
+            const footerHtml = footerArea ? footerArea.innerHTML : '';
             try {
-                const result = await window.electronAPI.exportDocx(html);
+                const result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);
                 if (result && result.success) {
                     this.customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}`);
                 } else if (result && !result.canceled) {
@@ -2577,6 +2624,16 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     this.updateDeadlineBadge();
                     this.updateDocumentOutline();
                     
+                    // Obnovení záhlaví a zápatí
+                    const headerArea = document.getElementById('header-area');
+                    const footerArea = document.getElementById('footer-area');
+                    if (headerArea) {
+                        headerArea.innerHTML = saved.headerHtml !== undefined ? saved.headerHtml : `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
+                    }
+                    if (footerArea) {
+                        footerArea.innerHTML = saved.footerHtml !== undefined ? saved.footerHtml : `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
+                    }
+                    
                     const startScreen = document.getElementById('start-screen');
                     const appContainer = document.getElementById('app-container');
                     if (startScreen && appContainer) {
@@ -2613,6 +2670,11 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             const text = this.core.getText();
             const title = this.currentDocumentTitle || text.substring(0, 30).trim() || "Nový dokument";
             
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+            const headerHtml = headerArea ? headerArea.innerHTML : '';
+            const footerHtml = footerArea ? footerArea.innerHTML : '';
+            
             const state = {
                 id: this.currentDocumentId,
                 html: html,
@@ -2621,6 +2683,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 status: this.documentStatus || 'draft',
                 deadline: this.currentDocumentDeadline || null,
                 cj: this.currentDocumentCj || '',
+                headerHtml: headerHtml,
+                footerHtml: footerHtml,
                 updatedAt: new Date().toISOString()
             };
             
@@ -2923,6 +2987,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 this.currentDocumentCj = doc.caseNumber;
                 this.currentDocumentDeadline = doc.deadlineDate;
                 this.currentDocumentTitle = `Vyjádření k žalobě - sp. zn. ${doc.caseNumber}`;
+                this.resetHeaderFooterDOM();
                 
                 // Set the title input field
                 const titleInput = document.getElementById('doc-title');
@@ -3094,6 +3159,16 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     this.currentDocumentCj = saved.cj || '';
                     this.updateDeadlineBadge();
                     this.updateDocumentOutline();
+                    
+                    // Obnovení záhlaví a zápatí
+                    const headerArea = document.getElementById('header-area');
+                    const footerArea = document.getElementById('footer-area');
+                    if (headerArea) {
+                        headerArea.innerHTML = saved.headerHtml !== undefined ? saved.headerHtml : `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
+                    }
+                    if (footerArea) {
+                        footerArea.innerHTML = saved.footerHtml !== undefined ? saved.footerHtml : `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
+                    }
                     
                     // Save active-document-id to settings
                     await this.core.storage.set('settings', { key: 'active-document-id', value: id });
@@ -3470,6 +3545,9 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         } else {
             detectedSection.style.display = 'none';
         }
+        
+        // Automaticky spustit vyhledávání soudních jednání
+        this.scanTextForCourtHearings(text);
     }
 
     promptAddDeadline(defaultDays, context) {
@@ -4225,37 +4303,34 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         });
     }
 
-    async editHeader() {
-        const savedFirm = await this.core.storage.get('settings', 'lawyer-firm') || "Advokátní kancelář";
-        this.customPrompt("Zadejte text záhlaví stránky:", savedFirm, (text) => {
-            if (text === null) return;
-            const editorScroll = document.querySelector('.editor-scroll');
-            let headerDiv = document.getElementById('document-custom-header');
-            if (!headerDiv) {
-                headerDiv = document.createElement('div');
-                headerDiv.id = 'document-custom-header';
-                headerDiv.style = "text-align: center; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; font-family:'Inter',sans-serif;";
-                editorScroll.prepend(headerDiv);
-            }
-            headerDiv.innerText = text;
-            this.customAlert("✅ <b>Záhlaví nastaveno!</b>");
-        });
+    editHeader() {
+        const header = document.getElementById('header-area');
+        if (header) {
+            header.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            header.focus();
+            
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(header);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
     }
 
     editFooter() {
-        this.customPrompt("Zadejte text zápatí stránky:", "Strana {page} | Důvěrné", (text) => {
-            if (text === null) return;
-            const editorScroll = document.querySelector('.editor-scroll');
-            let footerDiv = document.getElementById('document-custom-footer');
-            if (!footerDiv) {
-                footerDiv = document.createElement('div');
-                footerDiv.id = 'document-custom-footer';
-                footerDiv.style = "text-align: center; font-size: 10px; color: #94a3b8; padding: 10px 0; border-top: 1px solid #e2e8f0; margin-top: 40px; font-family:'Inter',sans-serif;";
-                editorScroll.appendChild(footerDiv);
-            }
-            footerDiv.innerText = text.replace('{page}', '1');
-            this.customAlert("✅ <b>Zápatí nastaveno!</b>");
-        });
+        const footer = document.getElementById('footer-area');
+        if (footer) {
+            footer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            footer.focus();
+            
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(footer);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
     }
 
     insertPageNumber() {
@@ -4534,6 +4609,1717 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         this.saveActiveDocumentState();
         this.updateDocumentOutline();
     }
+
+    initRibbonTooltips() {
+        let tooltipEl = document.getElementById('lexis-tooltip');
+        if (!tooltipEl) {
+            tooltipEl = document.createElement('div');
+            tooltipEl.id = 'lexis-tooltip';
+            tooltipEl.className = 'lexis-tooltip';
+            document.body.appendChild(tooltipEl);
+        }
+
+        const targets = document.querySelectorAll('.btn-icon, .qa-btn, .ribbon [title]');
+        console.log("[Tooltip Debug] initRibbonTooltips found targets count:", targets.length);
+        const actionMap = {
+            'goToStartScreen': 'Přejít na rozcestník s historií dokumentů a šablonami.',
+            'window.print': 'Uložit dokument jako soubor PDF nebo jej vytisknout.',
+            'sendViaEmail': 'Odeslat dokument jako přílohu e-mailu.',
+            'saveAsTemplateDialog': 'Uložit aktuální dokument jako uživatelskou šablonu.',
+            'exportWebPreview': 'Zobrazit dokument v rozvržení pro webový prohlížeč.',
+            'indexCurrentDocument': 'Indexovat dokument do vaší místní znalostní báze pro AI.',
+            'showHelpTip(\'connect\')': 'Zkontrolovat stav připojení k místnímu serveru LexisLocal.',
+            'syncCloud(\'Dropbox\')': 'Synchronizovat soubory s cloudovým úložištěm Dropbox.',
+            'syncCloud(\'Google Drive\')': 'Synchronizovat soubory s Google Drive.',
+            'syncCloud(\'OneDrive\')': 'Synchronizovat soubory s Microsoft OneDrive.',
+            'exportToDocx': 'Exportovat dokument do formátu Microsoft Word (.docx).',
+            'exportToBundle': 'Exportovat kompletní sadu dokumentů ve formátu .lexis.',
+            'startMailMerge': 'Spustit hromadné obesílání (Mail Merge) na více příjemců přes datové schránky.',
+            'document.execCommand(\'copy\')': 'Zkopírovat označený text do schránky (Ctrl+C).',
+            'showFindReplace': 'Vyhledat a nahradit text v dokumentu (Ctrl+F).',
+            'toggleDictation': 'Spustit hlasové diktování textu.',
+            'exec(\'bold\')': 'Tučné písmo (Ctrl+B).',
+            'exec(\'italic\')': 'Kurzíva (Ctrl+I).',
+            'exec(\'underline\')': 'Podtržené písmo (Ctrl+U).',
+            'applyHighlight': 'Zvýraznit text žlutou barvou.',
+            'setLineHeight(\'1.0\')': 'Nastavit řádkování na 1.0 (jednoduché).',
+            'setLineHeight(\'1.5\')': 'Nastavit řádkování na 1.5 (jeden a půl).',
+            'indent(1)': 'Zvětšit odsazení odstavce.',
+            'indent(-1)': 'Zmenšit odsazení odstavce.',
+            'exec(\'align\', \'left\')': 'Zarovnat text doleva.',
+            'exec(\'align\', \'center\')': 'Zarovnat text na střed.',
+            'exec(\'align\', \'right\')': 'Zarovnat text doprava.',
+            'exec(\'align\', \'justify\')': 'Zarovnat text do bloku.',
+            'openPdfViewer': 'Otevřít integrovaný prohlížeč PDF pro srovnání textu.',
+            'importZfo': 'Importovat obsah doručené zprávy z datové schránky (.zfo).',
+            'insertTOC': 'Vložit automaticky generovaný obsah na pozici kurzoru.',
+            'insertCurrentDate': 'Vložit aktuální datum do dokumentu.',
+            'insertTitlePage': 'Vložit formální titulní stranu pro právní podání.',
+            'insertFootnote': 'Vložit poznámku pod čarou na pozici kurzoru.',
+            'lexisUI.convertCitationsToLinks()': 'Automaticky převést spisové značky a odkazy na zákony na klikatelné odkazy.',
+            'insertClause': 'Vložit vybranou právní doložku z knihovny vzorů.',
+            'insertSubjectHeader(\'person\')': 'Vložit vzorovou hlavičku pro fyzickou osobu.',
+            'insertSubjectHeader(\'entrepreneur\')': 'Vložit vzorovou hlavičku pro podnikající fyzickou osobu (OSVČ).',
+            'insertSubjectHeader(\'company\')': 'Vložit vzorovou hlavičku pro právnickou osobu (s.r.o., a.s.).',
+            'insertTable': 'Vložit tabulku na pozici kurzoru.',
+            'generateToC': 'Vygenerovat obsah dokumentu.',
+            'searchAres': 'Vyhledat firmu v registru ARES podle IČO a vložit její sídlo a název.',
+            'insertIllustration': 'Vložit ilustrační obrázek.',
+            'insertImage': 'Vložit vlastní obrázek z počítače.',
+            'insertLink': 'Vložit hypertextový odkaz na webovou stránku.',
+            'insertBookmark': 'Vložit záložku pro rychlou navigaci v dokumentu.',
+            'editHeader': 'Upravit záhlaví stránky (hladký přesun a focus).',
+            'editFooter': 'Upravit zápatí stránky (hladký přesun a focus).',
+            'insertPageNumber': 'Vložit pole s dynamickým číslem stránky.',
+            'calculateFee': 'Spočítat soudní poplatek podle výše nároku.',
+            'openDeadlineCalc': 'Spočítat procesní lhůtu a zkontrolovat pracovní dny.',
+            'calculateInterests': 'Spočítat úrok z prodlení podle nařízení vlády.',
+            'insertSignatureBlock': 'Vložit formální podpisový blok na konec dokumentu.',
+            'insertMySignature': 'Vložit váš uložený digitální podpis.',
+            'anonymizeSelection': 'Spustit automatickou anonymizaci citlivých osobních údajů v dokumentu.',
+            'checkHierarchy': 'Zkontrolovat správnost hierarchie a číslování článků.',
+            'checkTerminology': 'Zkontrolovat jednotnost definovaných pojmů ve smlouvě.',
+            'insertArticle': 'Vložit článek se stabilním právnickým číslováním.',
+            'insertParagraph': 'Vložit paragraf se stabilním právnickým číslováním.',
+            'insertCitation': 'Vložit citaci z judikatury.',
+            'insertSectionSign': 'Vložit speciální znak paragrafu (§).',
+            'lookupCaseLaw': 'Vyhledat judikáty k vybranému tématu.',
+            'autoLinkLaws': 'Automaticky převést odkazy na zákony na hypertextové odkazy.',
+            'openISDS': 'Odeslat dokument přímo přes integrovanou datovou schránku.',
+            'openPostDialog': 'Odeslat dokument jako fyzický dopis přes službu České pošty (Dopis Online).',
+            'signDigital': 'Digitálně podepsat dokument zaručeným podpisem.',
+            'logTime': 'Zapsat čas strávený na tomto dokumentu do výkazu.',
+            'exportTimesheet': 'Exportovat časový výkaz prací (timesheet).',
+            'setMargins(\'normal\')': 'Nastavit standardní okraje stránky.',
+            'setMargins(\'narrow\')': 'Nastavit úzké okraje stránky (více textu).',
+            'setMargins(\'wide\')': 'Nastavit široké okraje stránky.',
+            'setOrientation(\'portrait\')': 'Nastavit orientaci papíru na výšku.',
+            'setOrientation(\'landscape\')': 'Nastavit orientaci papíru na šířku.',
+            'setColumns(1)': 'Zobrazit text v jednom sloupci.',
+            'setColumns(2)': 'Rozdělit text do dvou sloupců.',
+            'generateTableOfAuthorities': 'Vytvořit rejstřík citované judikatury a zákonů.',
+            'toggleTrackChanges': 'Zapnout režim sledování změn (Redlining).',
+            'acceptAll': 'Přijmout všechny navržené změny v dokumentu.',
+            'rejectAll': 'Odmítnout všechny navržené změny v dokumentu.',
+            'compareVersions': 'Porovnat dvě verze dokumentu (Blackline).',
+            'showHistory': 'Zobrazit historii automatických záloh a verzí dokumentu.',
+            'toggleCommentDrawer(true)': 'Otevřít postranní panel s komentáři a revizemi.',
+            'runFinalAudit': 'Spustit hloubkovou AI analýzu chyb, rizik a rozporů.',
+            'scrubMetadata': 'Odstranit skryté revize a metadata před odesláním.',
+            'clearHighlights': 'Vymazat veškeré barevné zvýraznění textu.',
+            'toggleRuler': 'Zobrazit horizontální pravítko nad stránkou.',
+            'toggleGrid': 'Zobrazit mřížku pro přesné zarovnání objektů.',
+            'toggleSidebar(\'sidebar\')': 'Zobrazit/skrýt levý postranní panel s osnovou.',
+            'toggleSidebar(\'right-sidebar\')': 'Zobrazit/skrýt pravý postranní panel s referencemi.',
+            'toggleDarkMode': 'Přepnout rozhraní do tmavého vzhledu.',
+            'showHelpTip(\'redlining\')': 'Zobrazit nápovědu ke sledování změn.',
+            'showHelpTip(\'blackline\')': 'Zobrazit nápovědu k porovnávání verzí.',
+            'showHelpTip(\'scan\')': 'Zobrazit návod pro mobilní skenování.',
+            'showHelpTip(\'clauses\')': 'Jak používat knihovnu vzorových doložek.',
+            'showHelpTip(\'toc\')': 'Návod na generování obsahu a rejstříků.',
+            'showHelpTip(\'qat-guide\')': 'Jak si přizpůsobit panel Rychlý přístup.',
+            'runSelfDiagnostic': 'Spustit diagnostiku aplikace a připojení.',
+            'startOnboarding': 'Spustit interaktivního průvodce aplikací.',
+            'showHelpTip(\'user-guide\')': 'Otevřít kompletní manuál LexisEditoru.',
+            'showHelpTip(\'updates\')': 'Zkontrolovat dostupnost nových verzí aplikace.',
+            'showHelpTip(\'about\')': 'Zobrazit informace o verzi a licenci.'
+        };
+
+        let activeTimeout = null;
+
+        const showTooltip = (e) => {
+            const btn = e.currentTarget;
+            const text = btn.getAttribute('data-tooltip');
+            if (!text) return;
+
+            if (activeTimeout) clearTimeout(activeTimeout);
+
+            activeTimeout = setTimeout(() => {
+                tooltipEl.textContent = text;
+                const rect = btn.getBoundingClientRect();
+                
+                const tooltipWidth = tooltipEl.offsetWidth || 180;
+                
+                // Position below the element
+                const top = rect.bottom + window.scrollY + 6;
+                let left = rect.left + window.scrollX + rect.width / 2;
+                
+                // Prevent going off screen horizontally
+                const minLeft = tooltipWidth / 2 + 10;
+                const maxLeft = window.innerWidth - (tooltipWidth / 2) - 10;
+                left = Math.max(minLeft, Math.min(left, maxLeft));
+                
+                tooltipEl.style.top = `${top}px`;
+                tooltipEl.style.left = `${left}px`;
+                
+                tooltipEl.classList.add('show');
+            }, 150);
+        };
+
+        const hideTooltip = () => {
+            if (activeTimeout) clearTimeout(activeTimeout);
+            tooltipEl.classList.remove('show');
+        };
+
+        targets.forEach(btn => {
+            let matchedTooltip = '';
+
+            if (btn.hasAttribute('title')) {
+                matchedTooltip = btn.getAttribute('title');
+                btn.removeAttribute('title');
+            }
+
+            if (!matchedTooltip) {
+                const onclickAttr = btn.getAttribute('onclick') || '';
+                for (const [key, value] of Object.entries(actionMap)) {
+                    if (onclickAttr.includes(key)) {
+                        matchedTooltip = value;
+                        break;
+                    }
+                }
+            }
+
+            if (!matchedTooltip) {
+                const btnText = btn.innerText.trim();
+                const textMap = {
+                    'Pravopis': 'Spustit kontrolu pravopisu a překlepů.',
+                    'Tezaurus': 'Vyhledat synonyma pro označené slovo.',
+                    'Otevřít AI Bridge': 'Otevřít postranní panel s AI chatem a rešeršemi.',
+                    'LexisLink Remote': 'Připojit mobilní telefon jako dálkový skener a diktafon.',
+                    'Čtení': 'Přepnout do režimu čtení (skryje lišty).',
+                    'Tisk': 'Zobrazit dokument v rozvržení před tiskem.',
+                    'Web': 'Přepnout do webového zobrazení dokumentu.'
+                };
+                for (const [key, value] of Object.entries(textMap)) {
+                    if (btnText.includes(key)) {
+                        matchedTooltip = value;
+                        break;
+                    }
+                }
+            }
+
+            if (matchedTooltip) {
+                btn.setAttribute('data-tooltip', matchedTooltip);
+                btn.addEventListener('mouseenter', showTooltip);
+                btn.addEventListener('mouseleave', hideTooltip);
+                btn.addEventListener('click', hideTooltip);
+            }
+        });
+    }
+
+    scanTextForCourtHearings(text) {
+        if (!text) return;
+        
+        let detectedCourt = null;
+        const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        
+        if (window.COURT_PATTERNS) {
+            for (const court of window.COURT_PATTERNS) {
+                const regex = new RegExp(court.pattern, 'i');
+                if (regex.test(normalizedText)) {
+                    detectedCourt = court;
+                    break;
+                }
+            }
+        }
+        
+        // Match spisová značka (case file number)
+        const spznRegex = /\b(\d+)\s*([A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ]{1,5})\s*(\d+)\s*\/\s*(\d{2,4})\b/g;
+        let match;
+        let detectedSpzn = null;
+        while ((match = spznRegex.exec(text)) !== null) {
+            let rocnik = parseInt(match[4]);
+            if (match[4].length === 2) {
+                const currentYearLastTwo = new Date().getFullYear() % 100;
+                if (rocnik <= currentYearLastTwo) {
+                    rocnik = 2000 + rocnik;
+                } else {
+                    rocnik = 1900 + rocnik;
+                }
+            }
+            detectedSpzn = {
+                cisloSenatu: parseInt(match[1]),
+                druhVeci: match[2].toUpperCase(),
+                bcVec: parseInt(match[3]),
+                rocnik: rocnik,
+                fullText: `${match[1]} ${match[2]} ${match[3]}/${rocnik}`
+            };
+            break; // We take the first one found
+        }
+        
+        const hearingsSection = document.getElementById('court-hearings-section');
+        const hearingsList = document.getElementById('hearings-list');
+        
+        if (!hearingsSection || !hearingsList) return;
+        
+        if (detectedCourt && detectedSpzn) {
+            hearingsSection.style.display = 'block';
+            hearingsList.innerHTML = `
+                <div style="font-size: 11px; color: #64748b; text-align: center; padding: 10px; font-style: italic;">
+                    🔍 Vyhledávám nařízená jednání u ${detectedCourt.nazev}...
+                </div>
+            `;
+            
+            const queryParams = {
+                druhOrganizace: null,
+                okresniSoud: null,
+                cisloSenatu: detectedSpzn.cisloSenatu,
+                druhVeci: detectedSpzn.druhVeci,
+                bcVec: detectedSpzn.bcVec,
+                rocnik: detectedSpzn.rocnik,
+                agenda: null,
+                typHledani: "SPZN"
+            };
+            
+            if (detectedCourt.kod.startsWith('OS')) {
+                queryParams.okresniSoud = detectedCourt.kod;
+            } else {
+                queryParams.druhOrganizace = detectedCourt.kod;
+            }
+            
+            window.electronAPI.queryInfoJednani(queryParams).then((res) => {
+                if (res && res.success && res.data) {
+                    const data = res.data;
+                    const udalosti = data.udalosti || [];
+                    if (udalosti.length > 0) {
+                        hearingsList.innerHTML = udalosti.map((u, idx) => {
+                            const dateStr = u.datum || '';
+                            const timeStr = u.cas || '';
+                            const room = u.jednaciSin || 'Neznámá síň';
+                            const type = u.druhJednani || 'Soudní jednání';
+                            const judge = u.resitel || 'Neuveden';
+                            const isCancelled = u.jednaciZruseno === 'Ano' || u.jednaciZruseno === true;
+                            
+                            const statusPill = isCancelled 
+                                ? `<span style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">❌ ZRUŠENO</span>`
+                                : `<span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">📅 NAŘÍZENO</span>`;
+
+                            const hearingData = {
+                                id: 'hearing_' + Date.now() + '_' + idx,
+                                title: type,
+                                spzn: detectedSpzn.fullText,
+                                courtName: data.organizace || detectedCourt.nazev,
+                                courtCode: detectedCourt.kod,
+                                spisovaZnacka: {
+                                    cisloSenatu: detectedSpzn.cisloSenatu,
+                                    druhVeci: detectedSpzn.druhVeci,
+                                    bcVec: detectedSpzn.bcVec,
+                                    rocnik: detectedSpzn.rocnik
+                                },
+                                date: dateStr,
+                                time: timeStr,
+                                location: (data.organizace || detectedCourt.nazev) + ', síň ' + room
+                            };
+
+                            return `
+                                <div style="background: white; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #14532d;">
+                                    <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <span>⚖️ ${type}</span>
+                                        ${statusPill}
+                                    </div>
+                                    <div style="margin-bottom: 3px;"><b>Sp. zn.:</b> ${detectedSpzn.fullText}</div>
+                                    <div style="margin-bottom: 3px;"><b>Termín:</b> ${dateStr} v ${timeStr}</div>
+                                    <div style="margin-bottom: 3px;"><b>Místo:</b> ${data.organizace || detectedCourt.nazev}, síň ${room}</div>
+                                    <div style="margin-bottom: 5px;"><b>Soudce:</b> ${judge}</div>
+                                    ${!isCancelled ? `
+                                        <button onclick="window.saveHearingToCalendar('${encodeURIComponent(JSON.stringify(hearingData))}')" style="background: #16a34a; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center;">📅 Zapsat do kalendáře</button>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        hearingsList.innerHTML = `
+                            <div style="font-size: 11px; color: #64748b; text-align: center; padding: 10px; font-style: italic;">
+                                Pro sp. zn. <b>${detectedSpzn.fullText}</b> není u ${detectedCourt.nazev} v následujících 30 dnech nařízeno žádné jednání.
+                            </div>
+                        `;
+                    }
+                } else {
+                    hearingsList.innerHTML = `
+                        <div style="font-size: 11px; color: #ef4444; text-align: center; padding: 10px; font-style: italic;">
+                            ⚠️ Nepodařilo se načíst jednání z InfoJednání.
+                        </div>
+                    `;
+                }
+            }).catch((err) => {
+                console.error("Chyba InfoJednání API:", err);
+                hearingsList.innerHTML = `
+                    <div style="font-size: 11px; color: #ef4444; text-align: center; padding: 10px; font-style: italic;">
+                        ⚠️ Chyba spojení s portálem InfoJednání.
+                    </div>
+                `;
+            });
+        } else {
+            hearingsSection.style.display = 'none';
+        }
+    }
+
+    promptAddHearingToCalendar(data) {
+        const title = `Jednání sp. zn. ${data.spzn} - ${data.title}`;
+        this.customPrompt(`💡 <b>Zapsat jednání do kalendáře</b><br><br>Upravte název události (např. <i>Hlavní líčení sp. zn. ${data.spzn}</i>):`, title, async (userTitle) => {
+            if (!userTitle) return;
+            
+            // Format DD.MM.YYYY to YYYY-MM-DD
+            let isoDate = data.date;
+            const parts = data.date.replace(/\s+/g, '').split('.');
+            if (parts.length === 3) {
+                const day = parts[0].padStart(2, '0');
+                const month = parts[1].padStart(2, '0');
+                const year = parts[2];
+                isoDate = `${year}-${month}-${day}`;
+            }
+            
+            const body = {
+                id: data.id,
+                title: userTitle,
+                dueDate: isoDate,
+                time: data.time,
+                location: data.location,
+                context: `Soudní jednání u ${data.courtName}.\nSpisová značka: ${data.spzn}\nDetekováno z portálu InfoJednání.`,
+                isHearing: true,
+                courtCode: data.courtCode,
+                spisovaZnacka: data.spisovaZnacka
+            };
+            
+            try {
+                const conn = this.getLexisLocalConnection();
+                const res = await fetch(`${conn.baseUrl}/api/calendar/add`, {
+                    method: 'POST',
+                    headers: conn.headers,
+                    body: JSON.stringify(body)
+                });
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const resData = await res.json();
+                this.customAlert(`📅 <b>Jednání zapsáno do kalendáře!</b><br><br>Událost byla úspěšně uložena a byl vygenerován kalendářový soubor:<br><span style="font-size: 11px; color:#16a34a; font-family:monospace; word-break: break-all;">${resData.filePath}</span>`);
+            } catch (e) {
+                console.error(e);
+                this.customAlert("❌ <b>Chyba zapsání do kalendáře</b><br><br>LexisLocal backend je offline, nebo se nepodařilo uložit událost.");
+            }
+        });
+    }
+
+    // ==========================================
+    // ZÁHLAVÍ / ZÁPATÍ — Header Footer Editor
+    // ==========================================
+
+    _currentHFTarget = 'header'; // 'header' | 'footer'
+    _hfImages = { left: null, center: null, right: null };
+
+    editHeader() {
+        this._currentHFTarget = 'header';
+        this._openHFModal();
+    }
+
+    editFooter() {
+        this._currentHFTarget = 'footer';
+        this._openHFModal();
+    }
+
+    _openHFModal() {
+        const overlay = document.getElementById('hf-modal-overlay');
+        const title = document.getElementById('hf-modal-title');
+        if (!overlay) return;
+
+        if (title) title.textContent = this._currentHFTarget === 'header' ? 'Editor záhlaví' : 'Editor zápatí';
+
+        // Load current content from the actual header/footer area
+        const areaId = this._currentHFTarget === 'header' ? 'header-area' : 'footer-area';
+        const area = document.getElementById(areaId);
+
+        // Try to restore structured data if available
+        const savedKey = `hf-data-${this._currentHFTarget}`;
+        const saved = this._hfData?.[this._currentHFTarget];
+        if (saved) {
+            const l = document.getElementById('hf-left');
+            const c = document.getElementById('hf-center');
+            const r = document.getElementById('hf-right');
+            if (l) l.value = saved.left || '';
+            if (c) c.value = saved.center || '';
+            if (r) r.value = saved.right || '';
+        } else {
+            // Default content from textarea
+            ['left','center','right'].forEach(pos => {
+                const el = document.getElementById(`hf-${pos}`);
+                if (el) el.value = '';
+            });
+        }
+
+        // Reset images
+        ['left','center','right'].forEach(pos => {
+            const img = document.getElementById(`hf-img-${pos}`);
+            if (img) {
+                const savedImg = this._hfImages[pos];
+                img.src = savedImg || '';
+                img.style.display = savedImg ? 'block' : 'none';
+            }
+        });
+
+        this.switchHFTab('layout');
+        this.updateHFPreview();
+        overlay.style.display = 'flex';
+    }
+
+    closeHFModal() {
+        const overlay = document.getElementById('hf-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    switchHFTab(tab) {
+        ['layout','style','templates'].forEach(t => {
+            const btn = document.getElementById(`hf-tab-${t}`);
+            const panel = document.getElementById(`hf-panel-${t}`);
+            if (btn) btn.classList.toggle('active', t === tab);
+            if (panel) panel.style.display = t === tab ? 'block' : 'none';
+        });
+    }
+
+    updateHFPreview() {
+        const left = document.getElementById('hf-left')?.value || '';
+        const center = document.getElementById('hf-center')?.value || '';
+        const right = document.getElementById('hf-right')?.value || '';
+        const fontSize = document.getElementById('hf-fontsize')?.value || '11px';
+
+        const today = new Date().toLocaleDateString('cs-CZ');
+        const docTitle = document.getElementById('window-doc-title')?.innerText || 'Dokument';
+
+        const resolve = (text) => text
+            .replace(/{DATUM}/g, today)
+            .replace(/{STRANA}/g, '1')
+            .replace(/{TITULEK}/g, docTitle)
+            .replace(/\n/g, '<br>');
+
+        const pl = document.getElementById('hf-preview-left');
+        const pc = document.getElementById('hf-preview-center');
+        const pr = document.getElementById('hf-preview-right');
+        const previewEl = document.getElementById('hf-preview-content');
+
+        // Show image if set
+        const imgLeft = this._hfImages['left'];
+        const imgCenter = this._hfImages['center'];
+        const imgRight = this._hfImages['right'];
+
+        if (pl) pl.innerHTML = imgLeft
+            ? `<img src="${imgLeft}" style="max-height:36px; object-fit:contain;"><br>${resolve(left)}`
+            : resolve(left) || '<span style="color:#cbd5e1">—</span>';
+        if (pc) pc.innerHTML = imgCenter
+            ? `<img src="${imgCenter}" style="max-height:36px; object-fit:contain;"><br>${resolve(center)}`
+            : resolve(center) || '<span style="color:#cbd5e1">—</span>';
+        if (pr) pr.innerHTML = imgRight
+            ? `<img src="${imgRight}" style="max-height:36px; object-fit:contain;"><br>${resolve(right)}`
+            : resolve(right) || '<span style="color:#cbd5e1">—</span>';
+
+        if (previewEl) previewEl.style.fontSize = fontSize;
+    }
+
+    pickHFImage(position) {
+        const input = document.getElementById(`hf-img-input-${position}`);
+        if (input) input.click();
+    }
+
+    onHFImagePicked(position, input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            this._hfImages[position] = dataUrl;
+            const imgEl = document.getElementById(`hf-img-${position}`);
+            if (imgEl) { imgEl.src = dataUrl; imgEl.style.display = 'block'; }
+            this.updateHFPreview();
+        };
+        reader.readAsDataURL(file);
+        input.value = ''; // reset so same file can be picked again
+    }
+
+    applyHFChanges() {
+        const left = document.getElementById('hf-left')?.value || '';
+        const center = document.getElementById('hf-center')?.value || '';
+        const right = document.getElementById('hf-right')?.value || '';
+        const showLine = document.getElementById('hf-show-line')?.checked ?? true;
+        const height = document.getElementById('hf-height')?.value || 'normal';
+        const fontSize = document.getElementById('hf-fontsize')?.value || '11px';
+        const bgColor = document.getElementById('hf-bg-color')?.value || '#ffffff';
+        const textColor = document.getElementById('hf-text-color')?.value || '#334155';
+        const lineColor = document.getElementById('hf-line-color')?.value || '#cbd5e1';
+        const fontFamily = document.getElementById('hf-font-family')?.value || "'Segoe UI', sans-serif";
+
+        const today = new Date().toLocaleDateString('cs-CZ');
+        const docTitle = document.getElementById('window-doc-title')?.innerText || 'Dokument';
+
+        const resolve = (text) => text
+            .replace(/{DATUM}/g, today)
+            .replace(/{STRANA}/g, '1')
+            .replace(/{TITULEK}/g, docTitle);
+
+        // Build HTML for header/footer area
+        const paddingMap = { compact: '5mm 40mm', normal: '10mm 40mm', tall: '15mm 40mm' };
+        const padding = paddingMap[height] || '10mm 40mm';
+
+        const buildCellHtml = (text, imgSrc, align) => {
+            let html = `<div style="flex:1; text-align:${align}; font-family:${fontFamily}; font-size:${fontSize}; color:${textColor}; white-space:pre-line;">`;
+            if (imgSrc) html += `<img src="${imgSrc}" style="max-height:40px; max-width:120px; object-fit:contain; display:block; margin-bottom:3px; ${align === 'right' ? 'margin-left:auto;' : align === 'center' ? 'margin:0 auto 3px auto;' : ''}"><br>`;
+            html += resolve(text) + '</div>';
+            return html;
+        };
+
+        const borderStyle = showLine ? `border-bottom: 1px solid ${lineColor};` : '';
+        const areaHtml = `<div style="display:flex; align-items:center; gap:10px; padding:${padding}; background:${bgColor}; ${borderStyle}">
+            ${buildCellHtml(left, this._hfImages['left'], 'left')}
+            ${buildCellHtml(center, this._hfImages['center'], 'center')}
+            ${buildCellHtml(right, this._hfImages['right'], 'right')}
+        </div>`;
+
+        const areaId = this._currentHFTarget === 'header' ? 'header-area' : 'footer-area';
+        const area = document.getElementById(areaId);
+        if (area) {
+            area.innerHTML = areaHtml;
+            area.contentEditable = 'false'; // Lock from direct editing now
+        }
+
+        // Save structured data for re-editing
+        if (!this._hfData) this._hfData = {};
+        this._hfData[this._currentHFTarget] = { left, center, right, showLine, height, fontSize, bgColor, textColor, lineColor, fontFamily };
+
+        this.closeHFModal();
+        this.saveActiveDocumentState();
+        this.customAlert(`✅ <b>Záhlaví použito!</b><br><br>Záhlaví dokumentu bylo aktualizováno. Změny jsou uloženy se stavem dokumentu.`);
+    }
+
+    applyHFTemplate(type) {
+        const templates = {
+            advokatura: {
+                left: 'Advokátní kancelář\nJUDr. Jan Novák\nwww.ak-novak.cz',
+                center: '',
+                right: 'Č.j.: {TITULEK}\nDatum: {DATUM}\nStrana: {STRANA}'
+            },
+            urad: {
+                left: 'Logo úřadu', // user can replace with image
+                center: '{TITULEK}\nRef. č.: 2025/001',
+                right: 'V Praze dne {DATUM}'
+            },
+            soud: {
+                left: 'Sp. zn.: \nK rukám soudu',
+                center: 'Krajský soud v Praze\nNáměstí Kinských 34\n150 00 Praha 5',
+                right: '{DATUM}\nStrana {STRANA}'
+            },
+            smlouva: {
+                left: '',
+                center: '',
+                right: 'Strana {STRANA}'
+            }
+        };
+
+        const tpl = templates[type];
+        if (!tpl) return;
+
+        ['left','center','right'].forEach(pos => {
+            const el = document.getElementById(`hf-${pos}`);
+            if (el) el.value = tpl[pos] || '';
+        });
+
+        this.switchHFTab('layout');
+        this.updateHFPreview();
+    }
+
+    async saveHFAsTemplate() {
+        this.customPrompt('Zadejte název šablony záhlaví:', 'Moje záhlaví', async (name) => {
+            if (!name) return;
+            const left = document.getElementById('hf-left')?.value || '';
+            const center = document.getElementById('hf-center')?.value || '';
+            const right = document.getElementById('hf-right')?.value || '';
+
+            const templates = await this.core.storage.get('settings', 'hf-templates') || {};
+            templates[`hf_${Date.now()}`] = { name, left, center, right };
+            await this.core.storage.set('settings', 'hf-templates', templates);
+            this.customAlert(`✅ <b>Šablona uložena!</b><br><br>Šablona záhlaví <b>${name}</b> je uložena pro budoucí použití.`);
+        });
+    }
+
+    // ==========================================
+    // REŽIMY ZOBRAZENÍ — View Modes
+    // ==========================================
+
+    _currentViewMode = 'normal';
+
+    setViewMode(mode) {
+        // Remove all view mode classes
+        document.body.classList.remove('reading-mode', 'print-layout', 'web-layout');
+
+        // Update button active states
+        ['reading','print','web'].forEach(m => {
+            const btn = document.getElementById(`view-btn-${m}`);
+            if (btn) btn.classList.remove('view-mode-active');
+        });
+
+        if (mode === 'normal' || mode === this._currentViewMode) {
+            // Toggle off — return to normal
+            this._currentViewMode = 'normal';
+            return;
+        }
+
+        this._currentViewMode = mode;
+
+        if (mode === 'reading') {
+            document.body.classList.add('reading-mode');
+            const btn = document.getElementById('view-btn-reading');
+            if (btn) btn.classList.add('view-mode-active');
+        } else if (mode === 'print') {
+            document.body.classList.add('print-layout');
+            const btn = document.getElementById('view-btn-print');
+            if (btn) btn.classList.add('view-mode-active');
+        } else if (mode === 'web') {
+            document.body.classList.add('web-layout');
+            const btn = document.getElementById('view-btn-web');
+            if (btn) btn.classList.add('view-mode-active');
+        }
+    }
+
+    // ==========================================
+    // HROMADNÉ KAMPANĚ — Campaign Wizard
+    // ==========================================
+
+    _campaignStep = 1;
+    _campaignRecords = [];
+    _campaignPreviewIdx = 0;
+    _campaignAction = 'pdf';
+
+    closeCampaign() {
+        const overlay = document.getElementById('campaign-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    parseCsvToRecords(csvText) {
+        const lines = csvText.trim().split('\n').filter(l => l.trim());
+        if (lines.length < 2) return [];
+        const headers = lines[0].split(',').map(h => h.trim());
+        return lines.slice(1).map(line => {
+            const vals = line.split(',').map(v => v.trim());
+            const record = {};
+            headers.forEach((h, i) => { record[h] = vals[i] || ''; });
+            return record;
+        });
+    }
+
+    renderCampaignStep(step) {
+        this._campaignStep = step;
+        const body = document.getElementById('campaign-body');
+        const footerInfo = document.getElementById('campaign-footer-info');
+        const btnBack = document.getElementById('campaign-btn-back');
+        const btnNext = document.getElementById('campaign-btn-next');
+        if (!body) return;
+
+        // Update stepper UI
+        for (let i = 1; i <= 4; i++) {
+            const stepEl = document.getElementById(`cstep-${i}`);
+            const lineEl = document.getElementById(`cline-${i}`);
+            if (stepEl) {
+                stepEl.classList.toggle('active', i === step);
+                stepEl.classList.toggle('done', i < step);
+                const numEl = stepEl.querySelector('.campaign-step-num');
+                if (numEl && i < step) numEl.textContent = '✓';
+                else if (numEl) numEl.textContent = String(i);
+            }
+            if (lineEl) lineEl.classList.toggle('done', i < step);
+        }
+
+        if (footerInfo) footerInfo.textContent = `Krok ${step} ze 4`;
+        if (btnBack) btnBack.style.display = step > 1 ? 'inline-flex' : 'none';
+        if (btnNext) {
+            if (step < 4) {
+                btnNext.textContent = 'Další →';
+                btnNext.className = 'campaign-btn campaign-btn-next';
+                btnNext.onclick = () => this.campaignNext();
+            } else {
+                btnNext.textContent = '🚀 Spustit kampaň';
+                btnNext.className = 'campaign-btn campaign-btn-run';
+                btnNext.onclick = () => this.runCampaignBatch();
+            }
+        }
+
+        // Render step content
+        if (step === 1) {
+            const text = this.core.getText();
+            const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
+            const hasVars = varMatches.length > 0;
+
+            body.innerHTML = `
+                <div class="${hasVars ? 'campaign-info-box' : 'campaign-warn-box'}">
+                    ${hasVars
+                        ? `✅ <b>Nalezeno ${varMatches.length} proměnných</b> v dokumentu. V dalším kroku importujete adresáty a hodnoty pro tyto proměnné.`
+                        : `⚠️ <b>Žádné proměnné nenalezeny.</b> Přidejte do dokumentu proměnné ve formátu <code>{{JménoProměnné}}</code>, nebo kampaň pošle stejný dokument všem adresátům.`
+                    }
+                </div>
+                <p style="font-size:13px; color:#334155; margin-bottom:12px;">Proměnné jsou označeny dvojitými složenými závorkami, např. <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">{{Jméno}}</code>, <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">{{IČO}}</code>.</p>
+                <div class="campaign-vars-grid">
+                    ${varMatches.map(v => `<div class="campaign-var-chip">{{${v}}}</div>`).join('')}
+                    ${varMatches.length === 0 ? '<div style="font-size:12px;color:#94a3b8;">Žádné proměnné.</div>' : ''}
+                </div>
+            `;
+        } else if (step === 2) {
+            const text = this.core.getText();
+            const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
+            const exampleHeaders = varMatches.length > 0 ? varMatches.join(',') : 'Jméno,IČO,Adresa';
+            const exampleRow = varMatches.length > 0
+                ? varMatches.map((v, i) => ['Jan Novák', '12345678', 'Praha 1'][i] || 'Hodnota').join(',')
+                : 'Jan Novák,12345678,Praha 1';
+
+            const csvVal = this._campaignCsvText || `${exampleHeaders}\n${exampleRow}\nMarie Svobodová,87654321,Brno`;
+
+            body.innerHTML = `
+                <p style="font-size:13px; color:#334155; margin-bottom:12px;">Vložte CSV data s adresáty. První řádek = záhlaví sloupců (musí odpovídat proměnným v dokumentu).</p>
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button onclick="document.getElementById('campaign-csv-input').click()" style="padding:7px 14px; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:12px; font-weight:600; cursor:pointer;">📂 Načíst ze souboru (.csv)</button>
+                    <span style="font-size:11px; color:#94a3b8; align-self:center;">nebo napište/vložte ručně:</span>
+                </div>
+                <textarea class="campaign-csv-area" id="campaign-csv-ta" oninput="lexisUI._updateCampaignRecordsPreview()">${csvVal}</textarea>
+                <div id="campaign-table-preview" style="margin-top:8px;"></div>
+            `;
+            // Render existing records
+            this._updateCampaignRecordsPreview();
+        } else if (step === 3) {
+            const records = this._campaignRecords;
+            if (records.length === 0) {
+                body.innerHTML = '<div class="campaign-warn-box">⚠️ Žádní adresáti. Vraťte se zpět a importujte data.</div>';
+                return;
+            }
+            const idx = Math.min(this._campaignPreviewIdx, records.length - 1);
+            const docHtml = this.core.getContent();
+            const filled = this.exportCampaignRecord(records[idx], docHtml);
+
+            body.innerHTML = `
+                <div class="campaign-preview-nav">
+                    <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(-1)">←</button>
+                    <div class="campaign-preview-counter">Adresát ${idx + 1} z ${records.length}: <b>${records[idx][Object.keys(records[idx])[0]] || ''}</b></div>
+                    <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(1)">→</button>
+                </div>
+                <div class="campaign-preview-doc">${filled}</div>
+            `;
+        } else if (step === 4) {
+            const count = this._campaignRecords.length;
+            body.innerHTML = `
+                <p style="font-size:13px; color:#334155; margin-bottom:16px;">Vyberte akci pro <b>${count} adresátů</b>:</p>
+                <div class="campaign-action-grid">
+                    <div class="campaign-action-card ${this._campaignAction === 'pdf' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('pdf')">
+                        <div class="campaign-action-icon">📄</div>
+                        <div class="campaign-action-title">Export PDF</div>
+                        <div class="campaign-action-desc">Uložit každý dokument jako samostatný HTML soubor ke stažení (${count} souborů)</div>
+                    </div>
+                    <div class="campaign-action-card ${this._campaignAction === 'download' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('download')">
+                        <div class="campaign-action-icon">📦</div>
+                        <div class="campaign-action-title">Stáhnout vše</div>
+                        <div class="campaign-action-desc">Stáhnout všechny dokumenty najednou jako HTML soubory</div>
+                    </div>
+                </div>
+                <div class="campaign-progress-bar" id="campaign-prog-bar" style="display:none;">
+                    <div class="campaign-progress-fill" id="campaign-prog-fill" style="width:0%"></div>
+                </div>
+                <div id="campaign-run-status" style="font-size:12px; color:#64748b; margin-top:8px;"></div>
+            `;
+        }
+    }
+
+    _setCampaignAction(action) {
+        this._campaignAction = action;
+        document.querySelectorAll('.campaign-action-card').forEach(card => card.classList.remove('selected'));
+        // Re-render step 4
+        this.renderCampaignStep(4);
+    }
+
+    _campaignPreviewNav(dir) {
+        const count = this._campaignRecords.length;
+        this._campaignPreviewIdx = (this._campaignPreviewIdx + dir + count) % count;
+        this.renderCampaignStep(3);
+    }
+
+    _updateCampaignRecordsPreview() {
+        const ta = document.getElementById('campaign-csv-ta');
+        const preview = document.getElementById('campaign-table-preview');
+        if (!ta || !preview) return;
+        const csvText = ta.value;
+        this._campaignCsvText = csvText;
+        const records = this.parseCsvToRecords(csvText);
+        this._campaignRecords = records;
+
+        if (records.length === 0) {
+            preview.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:8px;">Žádné záznamy.</div>';
+            return;
+        }
+        const headers = Object.keys(records[0]);
+        preview.innerHTML = `
+            <table class="campaign-recipients-table">
+                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}<th>Adresát č.</th></tr></thead>
+                <tbody>${records.map((r, i) => `<tr><td>${headers.map(h => r[h]).join('</td><td>')}</td><td>#${i+1}</td></tr>`).join('')}</tbody>
+            </table>
+        `;
+    }
+
+    exportCampaignRecord(record, templateHtml) {
+        let html = templateHtml;
+        for (const [key, val] of Object.entries(record)) {
+            const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+            html = html.replace(regex, `<span class="filled-var">${val}</span>`);
+        }
+        return html;
+    }
+
+    onCampaignCsvPicked(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this._campaignCsvText = e.target.result;
+            const ta = document.getElementById('campaign-csv-ta');
+            if (ta) {
+                ta.value = this._campaignCsvText;
+                this._updateCampaignRecordsPreview();
+            }
+        };
+        reader.readAsText(file, 'utf-8');
+        input.value = '';
+    }
+
+    campaignNext() {
+        const step = this._campaignStep;
+
+        if (step === 2) {
+            // Parse records before moving
+            const ta = document.getElementById('campaign-csv-ta');
+            if (ta) {
+                this._campaignCsvText = ta.value;
+                this._campaignRecords = this.parseCsvToRecords(ta.value);
+            }
+            if (this._campaignRecords.length === 0) {
+                this.customAlert('⚠️ Zadejte alespoň jednoho adresáta.');
+                return;
+            }
+        }
+
+        if (step < 4) this.renderCampaignStep(step + 1);
+    }
+
+    campaignBack() {
+        if (this._campaignStep > 1) this.renderCampaignStep(this._campaignStep - 1);
+    }
+
+    async runCampaignBatch() {
+        const records = this._campaignRecords;
+        if (records.length === 0) {
+            this.customAlert('Nejsou žádní adresáti.');
+            return;
+        }
+
+        const progBar = document.getElementById('campaign-prog-bar');
+        const progFill = document.getElementById('campaign-prog-fill');
+        const status = document.getElementById('campaign-run-status');
+        const btnNext = document.getElementById('campaign-btn-next');
+        if (progBar) progBar.style.display = 'block';
+        if (btnNext) btnNext.disabled = true;
+
+        const templateHtml = this.core.getContent();
+
+        for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            const firstName = record[Object.keys(record)[0]] || `Adresát_${i + 1}`;
+            const filled = this.exportCampaignRecord(record, templateHtml)
+                .replace(/<span class="filled-var">/g, '').replace(/<\/span>/g, '');
+
+            // Create downloadable HTML
+            const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${firstName}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dokument_${firstName.replace(/[^a-z0-9_]/gi, '_')}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Update progress
+            const pct = Math.round(((i + 1) / records.length) * 100);
+            if (progFill) progFill.style.width = `${pct}%`;
+            if (status) status.textContent = `Generuji ${i + 1} / ${records.length} — ${firstName}...`;
+
+            // Small delay to avoid browser blocking multiple downloads
+            await new Promise(r => setTimeout(r, 300));
+        }
+
+        if (status) status.innerHTML = `✅ <b>Hotovo!</b> Vygenerováno ${records.length} dokumentů.`;
+        if (btnNext) btnNext.disabled = false;
+    }
+
+    // ==========================================
+    // ADRESÁŘ KONTAKTŮ — Contacts Manager
+    // ==========================================
+
+    _contacts = null; // LexisContacts instance
+
+    _getContacts() {
+        if (!this._contacts) {
+            this._contacts = new LexisContacts(this.core.storage);
+        }
+        return this._contacts;
+    }
+
+    async openContacts() {
+        const overlay = document.getElementById('contacts-modal-overlay');
+        if (!overlay) return;
+        overlay.style.display = 'flex';
+        await this.renderContactsList();
+        await this._renderContactGroupFilter();
+    }
+
+    closeContacts() {
+        const overlay = document.getElementById('contacts-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    async renderContactsList() {
+        const tbody = document.getElementById('contacts-table-body');
+        const countEl = document.getElementById('contacts-count');
+        if (!tbody) return;
+
+        const search = (document.getElementById('contacts-search')?.value || '').toLowerCase();
+        const typeFilter = document.getElementById('contacts-type-filter')?.value || '';
+        const activeGroup = this._contactsActiveGroup || '';
+
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:30px;text-align:center;color:#94a3b8;">⏳ Načítám...</td></tr>`;
+
+        const all = await this._getContacts().getAll();
+        let filtered = all.filter(c => {
+            const matchSearch = !search ||
+                (c.jmeno || '').toLowerCase().includes(search) ||
+                (c.adresa || '').toLowerCase().includes(search) ||
+                (c.mesto || '').toLowerCase().includes(search) ||
+                (c.isds || '').toLowerCase().includes(search) ||
+                (c.email || '').toLowerCase().includes(search);
+            const matchType = !typeFilter || c.typ === typeFilter;
+            const matchGroup = !activeGroup || (c.skupiny || []).includes(activeGroup);
+            return matchSearch && matchType && matchGroup;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">
+                📭 Žádné kontakty. Přidejte první kontakt tlačítkem "+ Nový kontakt" nebo importujte CSV.
+            </td></tr>`;
+            if (countEl) countEl.textContent = `Celkem: 0 kontaktů`;
+            return;
+        }
+
+        const typLabels = { fyzicka: '👤 FO', pravnicka: '🏢 PO', organ: '🏛️ Úřad', soud: '⚖️ Soud' };
+
+        tbody.innerHTML = filtered.map(c => `
+            <tr>
+                <td style="padding:10px 16px;">
+                    <div style="font-weight:700;color:#0f172a;font-size:13px;">${this._esc(c.jmeno || '')}</div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${typLabels[c.typ] || ''}${c.ic ? ` · IČO: ${c.ic}` : ''}</div>
+                </td>
+                <td style="padding:10px 16px;font-size:12px;color:#475569;">
+                    ${c.adresa ? `${this._esc(c.adresa)}<br>` : ''}
+                    ${c.psc || c.mesto ? `${c.psc || ''} ${c.mesto || ''}`.trim() : '<span style="color:#cbd5e1">—</span>'}
+                </td>
+                <td style="padding:10px 16px;">
+                    ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:#cbd5e1">—</span>'}
+                </td>
+                <td style="padding:10px 16px;font-size:12px;color:#475569;">
+                    ${c.email ? `📧 ${this._esc(c.email)}<br>` : ''}
+                    ${c.tel ? `📞 ${this._esc(c.tel)}` : ''}
+                    ${!c.email && !c.tel ? '<span style="color:#cbd5e1">—</span>' : ''}
+                </td>
+                <td style="padding:10px 16px;">
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        ${(c.skupiny || []).map(g => `<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;">${this._esc(g)}</span>`).join('')}
+                    </div>
+                </td>
+                <td style="padding:10px 16px;text-align:center;">
+                    <div style="display:flex;gap:6px;justify-content:center;">
+                        <button onclick="lexisUI.insertContactToDoc('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#10b981;color:white;border:none;font-size:11px;font-weight:700;cursor:pointer;">✅ Vložit</button>
+                        <button onclick="lexisUI.openContactForm('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:11px;font-weight:700;cursor:pointer;color:#334155;">✏️ Upravit</button>
+                        <button onclick="lexisUI.deleteContact('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;font-size:11px;font-weight:700;cursor:pointer;color:#991b1b;">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        if (countEl) countEl.textContent = `Zobrazeno: ${filtered.length} / ${all.length} kontaktů`;
+    }
+
+    async _renderContactGroupFilter() {
+        const container = document.getElementById('contacts-group-filter');
+        if (!container) return;
+        const groups = await this._getContacts().getGroups();
+        container.innerHTML = groups.map(g => `
+            <div class="court-type-chip ${this._contactsActiveGroup === g ? 'active' : ''}"
+                onclick="lexisUI._toggleContactGroup('${g}')">
+                ${this._esc(g)}
+            </div>
+        `).join('');
+    }
+
+    _toggleContactGroup(group) {
+        this._contactsActiveGroup = this._contactsActiveGroup === group ? '' : group;
+        this._renderContactGroupFilter();
+        this.renderContactsList();
+    }
+
+    async openContactForm(id) {
+        const overlay = document.getElementById('contact-form-overlay');
+        const titleEl = document.getElementById('contact-form-title');
+        if (!overlay) return;
+
+        // Reset form
+        ['cf-id','cf-jmeno','cf-typ','cf-ic','cf-adresa','cf-mesto','cf-psc','cf-isds','cf-email','cf-tel','cf-skupiny','cf-poznamka'].forEach(fid => {
+            const el = document.getElementById(fid);
+            if (el) el.value = '';
+        });
+        const typEl = document.getElementById('cf-typ');
+        if (typEl) typEl.value = 'fyzicka';
+
+        if (id) {
+            const all = await this._getContacts().getAll();
+            const contact = all.find(c => c.id === id);
+            if (contact) {
+                if (titleEl) titleEl.textContent = 'Upravit kontakt';
+                document.getElementById('cf-id').value = contact.id;
+                document.getElementById('cf-jmeno').value = contact.jmeno || '';
+                document.getElementById('cf-typ').value = contact.typ || 'fyzicka';
+                document.getElementById('cf-ic').value = contact.ic || '';
+                document.getElementById('cf-adresa').value = contact.adresa || '';
+                document.getElementById('cf-mesto').value = contact.mesto || '';
+                document.getElementById('cf-psc').value = contact.psc || '';
+                document.getElementById('cf-isds').value = contact.isds || '';
+                document.getElementById('cf-email').value = contact.email || '';
+                document.getElementById('cf-tel').value = contact.tel || '';
+                document.getElementById('cf-skupiny').value = (contact.skupiny || []).join(', ');
+                document.getElementById('cf-poznamka').value = contact.poznamka || '';
+            }
+        } else {
+            if (titleEl) titleEl.textContent = 'Nový kontakt';
+        }
+
+        overlay.style.display = 'flex';
+    }
+
+    closeContactForm() {
+        const overlay = document.getElementById('contact-form-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    async saveContactForm() {
+        const jmeno = document.getElementById('cf-jmeno')?.value?.trim();
+        if (!jmeno) {
+            this.customAlert('⚠️ Vyplňte prosím alespoň jméno/název kontaktu.');
+            return;
+        }
+
+        const skupinyRaw = document.getElementById('cf-skupiny')?.value || '';
+        const skupiny = skupinyRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+        const contact = {
+            id: document.getElementById('cf-id')?.value || undefined,
+            jmeno,
+            typ: document.getElementById('cf-typ')?.value || 'fyzicka',
+            ic: document.getElementById('cf-ic')?.value?.trim() || '',
+            adresa: document.getElementById('cf-adresa')?.value?.trim() || '',
+            mesto: document.getElementById('cf-mesto')?.value?.trim() || '',
+            psc: document.getElementById('cf-psc')?.value?.trim() || '',
+            isds: document.getElementById('cf-isds')?.value?.trim() || '',
+            email: document.getElementById('cf-email')?.value?.trim() || '',
+            tel: document.getElementById('cf-tel')?.value?.trim() || '',
+            skupiny,
+            poznamka: document.getElementById('cf-poznamka')?.value?.trim() || ''
+        };
+
+        await this._getContacts().save(contact);
+        this.closeContactForm();
+        await this.renderContactsList();
+        await this._renderContactGroupFilter();
+        this.customAlert(`✅ <b>Kontakt uložen!</b><br><br><b>${this._esc(jmeno)}</b> byl úspěšně uložen do adresáře.`);
+    }
+
+    async deleteContact(id) {
+        const all = await this._getContacts().getAll();
+        const contact = all.find(c => c.id === id);
+        if (!contact) return;
+
+        if (!confirm(`Opravdu smazat kontakt "${contact.jmeno}"?`)) return;
+        await this._getContacts().delete(id);
+        await this.renderContactsList();
+        await this._renderContactGroupFilter();
+    }
+
+    async insertContactToDoc(id) {
+        const all = await this._getContacts().getAll();
+        const contact = all.find(c => c.id === id);
+        if (!contact) return;
+        
+        let html = `<b>${this._esc(contact.jmeno || '')}</b>`;
+        if (contact.adresa) html += `<br>${this._esc(contact.adresa)}`;
+        if (contact.mesto || contact.psc) html += `<br>${this._esc(contact.psc || '')} ${this._esc(contact.mesto || '')}`.trim();
+        if (contact.ic) html += `<br>IČO: ${this._esc(contact.ic)}`;
+        
+        // Zkusíme vložit do Quill editoru na pozici kurzoru
+        let range = this.core.quill.getSelection();
+        let index = range ? range.index : this.core.quill.getLength();
+        
+        // Zabalíme do odstavce
+        this.core.quill.clipboard.dangerouslyPasteHTML(index, `<p>${html}</p><p><br></p>`);
+        this.core.quill.setSelection(index + 2); // orientační posun kurzoru
+        
+        this.closeContacts();
+        this.customAlert(`✅ <b>Údaje vloženy!</b><br><br>Údaje kontaktu <b>${this._esc(contact.jmeno)}</b> byly vloženy do dokumentu.`);
+    }
+
+    async onContactsCsvPicked(input) {
+        const file = input.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const result = await this._getContacts().importFromCsv(e.target.result);
+            this._getContacts().invalidateCache();
+            await this.renderContactsList();
+            await this._renderContactGroupFilter();
+            const errHtml = result.errors.length > 0
+                ? `<br><br>⚠️ Přeskočeno ${result.errors.length} řádků: ${result.errors.slice(0,3).join(', ')}${result.errors.length > 3 ? '...' : ''}`
+                : '';
+            this.customAlert(`✅ <b>Import dokončen!</b><br><br>Přidáno <b>${result.added}</b> kontaktů.${errHtml}`);
+        };
+        reader.readAsText(file, 'utf-8');
+        input.value = '';
+    }
+
+    _esc(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ==========================================
+    // PŘEPRACOVANÁ KAMPAŇ — 3 módy příjemců
+    // ==========================================
+
+    _campaignRecipientMode = 'courts'; // 'courts' | 'contacts' | 'csv'
+    _selectedCourts = new Set();
+    _selectedContacts = new Set();
+    _courtTypeFilter = '';
+    _courtSearchQuery = '';
+
+    startMailMerge() {
+        this._campaignStep = 1;
+        this._campaignRecords = [];
+        this._campaignPreviewIdx = 0;
+        this._campaignAction = 'download';
+        this._campaignRecipientMode = 'courts';
+        this._selectedCourts = new Set();
+        this._selectedContacts = new Set();
+        const overlay = document.getElementById('campaign-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            this.renderCampaignStep(1);
+        }
+    }
+
+    renderCampaignStep(step) {
+        this._campaignStep = step;
+        const body = document.getElementById('campaign-body');
+        const footerInfo = document.getElementById('campaign-footer-info');
+        const btnBack = document.getElementById('campaign-btn-back');
+        const btnNext = document.getElementById('campaign-btn-next');
+        if (!body) return;
+
+        for (let i = 1; i <= 4; i++) {
+            const stepEl = document.getElementById(`cstep-${i}`);
+            const lineEl = document.getElementById(`cline-${i}`);
+            if (stepEl) {
+                stepEl.classList.toggle('active', i === step);
+                stepEl.classList.toggle('done', i < step);
+                const numEl = stepEl.querySelector('.campaign-step-num');
+                if (numEl && i < step) numEl.textContent = '✓';
+                else if (numEl) numEl.textContent = String(i);
+            }
+            if (lineEl) lineEl.classList.toggle('done', i < step);
+        }
+
+        if (footerInfo) footerInfo.textContent = `Krok ${step} ze 4`;
+        if (btnBack) btnBack.style.display = step > 1 ? 'inline-flex' : 'none';
+        if (btnNext) {
+            if (step < 4) {
+                btnNext.textContent = 'Další →';
+                btnNext.className = 'campaign-btn campaign-btn-next';
+                btnNext.onclick = () => this.campaignNext();
+                btnNext.disabled = false;
+            } else {
+                btnNext.textContent = '🚀 Spustit kampaň';
+                btnNext.className = 'campaign-btn campaign-btn-run';
+                btnNext.onclick = () => this.runCampaignBatch();
+                btnNext.disabled = false;
+            }
+        }
+
+        if (step === 1) this._renderCampaignStep1(body);
+        else if (step === 2) this._renderCampaignStep2(body);
+        else if (step === 3) this._renderCampaignStep3(body);
+        else if (step === 4) this._renderCampaignStep4(body);
+    }
+
+    _renderCampaignStep1(body) {
+        const text = this.core.getText();
+        const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
+        const hasVars = varMatches.length > 0;
+        body.innerHTML = `
+            <div class="${hasVars ? 'campaign-info-box' : 'campaign-warn-box'}">
+                ${hasVars
+                    ? `✅ <b>Nalezeno ${varMatches.length} proměnných</b> v dokumentu.`
+                    : `⚠️ <b>Žádné proměnné nenalezeny.</b> Přidejte <code>{{JménoProměnné}}</code>, nebo kampaň pošle stejný dokument všem.`
+                }
+            </div>
+            <p style="font-size:13px;color:#334155;margin-bottom:14px;">
+                Proměnné se zapisují jako <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{NazevPromenné}}</code>.<br>
+                Pro soudy jsou automaticky dostupné: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{NazevSoudu}}</code>, 
+                <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{AdresaSoudu}}</code>, 
+                <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{MestoPSC}}</code>.
+            </p>
+            <div class="campaign-vars-grid">
+                ${varMatches.map(v => `<div class="campaign-var-chip">{{${this._esc(v)}}}</div>`).join('')}
+                ${varMatches.length === 0 ? '<div style="font-size:12px;color:#94a3b8;">Žádné proměnné.</div>' : ''}
+            </div>
+        `;
+    }
+
+    async _renderCampaignStep2(body) {
+        const mode = this._campaignRecipientMode;
+
+        body.innerHTML = `
+            <div class="campaign-mode-switcher">
+                <button class="campaign-mode-btn ${mode === 'courts' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('courts')">🏛️ Soudy</button>
+                <button class="campaign-mode-btn ${mode === 'contacts' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('contacts')">👥 Adresář</button>
+                <button class="campaign-mode-btn ${mode === 'csv' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('csv')">📋 CSV / Ručně</button>
+            </div>
+            <div id="campaign-recipient-body"></div>
+        `;
+
+        if (mode === 'courts') await this._renderCourtsSelector();
+        else if (mode === 'contacts') await this._renderContactsSelector();
+        else this._renderCsvSelector();
+    }
+
+    _setCampaignMode(mode) {
+        this._campaignRecipientMode = mode;
+        const body = document.getElementById('campaign-body');
+        if (body) this._renderCampaignStep2(body);
+    }
+
+    async _renderCourtsSelector() {
+        const container = document.getElementById('campaign-recipient-body');
+        if (!container) return;
+
+        const courts = (window.COURT_REGISTRY || []);
+        const types = window.COURT_TYPES || {};
+        const search = this._courtSearchQuery || '';
+        const typeFilter = this._courtTypeFilter || '';
+
+        const filtered = courts.filter(c => {
+            const matchSearch = !search ||
+                c.nazev.toLowerCase().includes(search.toLowerCase()) ||
+                c.mesto.toLowerCase().includes(search.toLowerCase());
+            const matchType = !typeFilter || c.typ === typeFilter;
+            return matchSearch && matchType;
+        });
+
+        const grouped = {};
+        filtered.forEach(c => {
+            const label = types[c.typ] || c.typ;
+            if (!grouped[label]) grouped[label] = [];
+            grouped[label].push(c);
+        });
+
+        const selCount = this._selectedCourts.size;
+
+        container.innerHTML = `
+            <div class="sp-zn-hint">
+                💡 Vyberte soudy, na které chcete podat. Dokument bude pro každý soud vygenerován zvlášť s vyplněnými proměnnými soudu.
+            </div>
+            <div class="court-search-box">
+                <input type="text" class="court-search-input" id="court-search" placeholder="🔍 Hledat soud..." value="${this._esc(search)}" oninput="lexisUI._onCourtSearch(this.value)">
+                <span class="court-search-icon">⌕</span>
+            </div>
+            <div class="court-type-filter">
+                <div class="court-type-chip ${!typeFilter ? 'active' : ''}" onclick="lexisUI._filterCourtType('')">Všechny</div>
+                ${Object.entries(types).map(([k,v]) => `
+                    <div class="court-type-chip ${typeFilter === k ? 'active' : ''}" onclick="lexisUI._filterCourtType('${k}')">${v}</div>
+                `).join('')}
+            </div>
+            <div class="court-list-scroll">
+                <div class="court-select-all-row">
+                    <input type="checkbox" id="court-select-all" ${selCount === filtered.length && filtered.length > 0 ? 'checked' : ''} onchange="lexisUI._toggleAllCourts(this.checked, ${JSON.stringify(filtered.map(c => c.nazev))})">
+                    <label for="court-select-all" class="court-select-all-label">Vybrat vše (${filtered.length})</label>
+                    ${selCount > 0 ? `<div class="court-count-badge">${selCount} vybráno</div>` : ''}
+                </div>
+                ${Object.entries(grouped).map(([group, courts_in_group]) => `
+                    <div class="court-list-group-header">${group}</div>
+                    ${courts_in_group.map(c => `
+                        <div class="court-list-item ${this._selectedCourts.has(c.nazev) ? 'selected' : ''}" onclick="lexisUI._toggleCourt('${this._esc(c.nazev)}')">
+                            <input type="checkbox" ${this._selectedCourts.has(c.nazev) ? 'checked' : ''} onclick="event.stopPropagation();lexisUI._toggleCourt('${this._esc(c.nazev)}')">
+                            <span class="court-list-item-name">${this._esc(c.nazev)}</span>
+                            <span class="court-list-item-meta">${this._esc(c.mesto)}</span>
+                            <span class="court-isds-badge">${this._esc(c.isds)}</span>
+                        </div>
+                    `).join('')}
+                `).join('')}
+                ${filtered.length === 0 ? '<div style="padding:24px;text-align:center;color:#94a3b8;">Žádné soudy nenalezeny.</div>' : ''}
+            </div>
+            <div class="court-selected-tags" id="court-selected-tags">
+                ${[...this._selectedCourts].map(name => `
+                    <div class="court-selected-tag">
+                        ${this._esc(name)}
+                        <span class="court-selected-tag-remove" onclick="lexisUI._toggleCourt('${this._esc(name)}')">✕</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    _onCourtSearch(val) {
+        this._courtSearchQuery = val;
+        this._renderCourtsSelector();
+    }
+
+    _filterCourtType(type) {
+        this._courtTypeFilter = type;
+        this._renderCourtsSelector();
+    }
+
+    _toggleCourt(name) {
+        if (this._selectedCourts.has(name)) this._selectedCourts.delete(name);
+        else this._selectedCourts.add(name);
+        this._renderCourtsSelector();
+    }
+
+    _toggleAllCourts(checked, names) {
+        if (checked) names.forEach(n => this._selectedCourts.add(n));
+        else names.forEach(n => this._selectedCourts.delete(n));
+        this._renderCourtsSelector();
+    }
+
+    async _renderContactsSelector() {
+        const container = document.getElementById('campaign-recipient-body');
+        if (!container) return;
+
+        const all = await this._getContacts().getAll();
+        const groups = await this._getContacts().getGroups();
+        const search = this._contactsCampaignSearch || '';
+        const typeFilter = this._contactsCampaignType || '';
+        const groupFilter = this._contactsCampaignGroup || '';
+
+        const filtered = all.filter(c => {
+            const matchSearch = !search ||
+                (c.jmeno || '').toLowerCase().includes(search.toLowerCase()) ||
+                (c.adresa || '').toLowerCase().includes(search.toLowerCase()) ||
+                (c.isds || '').toLowerCase().includes(search.toLowerCase());
+            const matchType = !typeFilter || c.typ === typeFilter;
+            const matchGroup = !groupFilter || (c.skupiny || []).includes(groupFilter);
+            return matchSearch && matchType && matchGroup;
+        });
+
+        const selCount = this._selectedContacts.size;
+
+        container.innerHTML = `
+            <div class="sp-zn-hint">
+                💡 Vyberte kontakty z adresáře. Proměnné <code>{{Jmeno}}</code>, <code>{{Adresa}}</code>, <code>{{ISDS}}</code>, <code>{{Email}}</code> budou automaticky doplněny.
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                <div class="court-search-box" style="flex:1;min-width:180px;margin-bottom:0;">
+                    <input type="text" class="court-search-input" placeholder="🔍 Hledat..." value="${this._esc(search)}" oninput="lexisUI._onContactsCampaignSearch(this.value)">
+                </div>
+                <select onchange="lexisUI._onContactsCampaignType(this.value)" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;">
+                    <option value="">Všechny typy</option>
+                    <option value="fyzicka">Fyzické osoby</option>
+                    <option value="pravnicka">Právnické osoby</option>
+                    <option value="organ">Orgány</option>
+                    <option value="soud">Soudy</option>
+                </select>
+                ${groups.length > 0 ? `
+                <select onchange="lexisUI._onContactsCampaignGroup(this.value)" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;">
+                    <option value="">Všechny skupiny</option>
+                    ${groups.map(g => `<option value="${this._esc(g)}" ${groupFilter === g ? 'selected' : ''}>${this._esc(g)}</option>`).join('')}
+                </select>` : ''}
+            </div>
+            <div class="court-list-scroll">
+                <div class="court-select-all-row">
+                    <input type="checkbox" id="contacts-select-all" ${selCount === filtered.length && filtered.length > 0 ? 'checked' : ''}
+                        onchange="lexisUI._toggleAllContacts(this.checked, ${JSON.stringify(filtered.map(c => c.id))})">
+                    <label for="contacts-select-all" class="court-select-all-label">Vybrat vše (${filtered.length})</label>
+                    ${selCount > 0 ? `<div class="court-count-badge">${selCount} vybráno</div>` : ''}
+                </div>
+                ${filtered.length === 0
+                    ? `<div style="padding:30px;text-align:center;color:#94a3b8;">
+                        📭 Žádné kontakty. <span onclick="lexisUI.openContacts()" style="color:#2563eb;cursor:pointer;font-weight:700;">Přidat kontakty do adresáře →</span>
+                       </div>`
+                    : filtered.map(c => `
+                        <div class="court-list-item ${this._selectedContacts.has(c.id) ? 'selected' : ''}" onclick="lexisUI._toggleContact('${c.id}')">
+                            <input type="checkbox" ${this._selectedContacts.has(c.id) ? 'checked' : ''} onclick="event.stopPropagation();lexisUI._toggleContact('${c.id}')">
+                            <span class="court-list-item-name">
+                                <b>${this._esc(c.jmeno)}</b>
+                                ${c.adresa ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px;">${this._esc(c.adresa)}, ${this._esc(c.mesto || '')}</span>` : ''}
+                            </span>
+                            ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:#cbd5e1;">bez DS</span>'}
+                        </div>
+                    `).join('')
+                }
+            </div>
+            ${selCount > 0 ? `
+            <div class="court-selected-tags">
+                ${[...this._selectedContacts].slice(0,8).map(id => {
+                    const c = all.find(x => x.id === id);
+                    return c ? `<div class="court-selected-tag">${this._esc(c.jmeno)}<span class="court-selected-tag-remove" onclick="lexisUI._toggleContact('${c.id}')">✕</span></div>` : '';
+                }).join('')}
+                ${selCount > 8 ? `<div class="court-selected-tag" style="background:#f1f5f9;color:#64748b;">+${selCount - 8} dalších</div>` : ''}
+            </div>` : ''}
+        `;
+    }
+
+    _onContactsCampaignSearch(val) { this._contactsCampaignSearch = val; this._renderContactsSelector(); }
+    _onContactsCampaignType(val) { this._contactsCampaignType = val; this._renderContactsSelector(); }
+    _onContactsCampaignGroup(val) { this._contactsCampaignGroup = val; this._renderContactsSelector(); }
+
+    _toggleContact(id) {
+        if (this._selectedContacts.has(id)) this._selectedContacts.delete(id);
+        else this._selectedContacts.add(id);
+        this._renderContactsSelector();
+    }
+
+    _toggleAllContacts(checked, ids) {
+        if (checked) ids.forEach(id => this._selectedContacts.add(id));
+        else ids.forEach(id => this._selectedContacts.delete(id));
+        this._renderContactsSelector();
+    }
+
+    _renderCsvSelector() {
+        const container = document.getElementById('campaign-recipient-body');
+        if (!container) return;
+        const text = this.core.getText();
+        const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
+        const exampleHeaders = varMatches.length > 0 ? varMatches.join(',') : 'Jmeno,Adresa,ISDS';
+        const csvVal = this._campaignCsvText || `${exampleHeaders}\nJan Novák,Václavské nám. 1 Praha 1,abc123x\nMarie Svobodová,náměstí Míru 7 Praha 2,xyz987k`;
+
+        container.innerHTML = `
+            <div class="sp-zn-hint">
+                💡 Vložte CSV nebo napište adresáty ručně. První řádek = záhlaví sloupců (odpovídá proměnným v dokumentu).
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:10px;">
+                <button onclick="document.getElementById('campaign-csv-input').click()" style="padding:7px 14px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:12px;font-weight:700;cursor:pointer;">📂 Načíst soubor (.csv)</button>
+                <span style="font-size:11px;color:#94a3b8;align-self:center;">nebo napiš ručně:</span>
+            </div>
+            <textarea class="campaign-csv-area" id="campaign-csv-ta" oninput="lexisUI._updateCampaignRecordsPreview()">${this._esc(csvVal)}</textarea>
+            <div id="campaign-table-preview" style="margin-top:8px;"></div>
+        `;
+        this._updateCampaignRecordsPreview();
+    }
+
+    async _buildRecordsFromMode() {
+        const mode = this._campaignRecipientMode;
+        if (mode === 'courts') {
+            const courts = window.COURT_REGISTRY || [];
+            return [...this._selectedCourts].map(name => {
+                const c = courts.find(x => x.nazev === name);
+                if (!c) return null;
+                return {
+                    NazevSoudu: c.nazev,
+                    AdresaSoudu: c.adresa,
+                    MestoPSC: `${c.psc} ${c.mesto}`,
+                    Mesto: c.mesto,
+                    PSC: c.psc,
+                    ISDS: c.isds,
+                    _isds: c.isds,
+                    _nazev: c.nazev
+                };
+            }).filter(Boolean);
+        } else if (mode === 'contacts') {
+            const all = await this._getContacts().getAll();
+            return [...this._selectedContacts].map(id => {
+                const c = all.find(x => x.id === id);
+                if (!c) return null;
+                return {
+                    Jmeno: c.jmeno,
+                    Adresa: c.adresa,
+                    Mesto: c.mesto,
+                    PSC: c.psc,
+                    MestoPSC: `${c.psc || ''} ${c.mesto || ''}`.trim(),
+                    ISDS: c.isds,
+                    Email: c.email,
+                    Tel: c.tel,
+                    IC: c.ic,
+                    _isds: c.isds,
+                    _nazev: c.jmeno
+                };
+            }).filter(Boolean);
+        } else {
+            const ta = document.getElementById('campaign-csv-ta');
+            if (ta) this._campaignCsvText = ta.value;
+            return this.parseCsvToRecords(this._campaignCsvText || '');
+        }
+    }
+
+    _renderCampaignStep3(body) {
+        const records = this._campaignRecords;
+        if (records.length === 0) {
+            body.innerHTML = '<div class="campaign-warn-box">⚠️ Žádní příjemci. Vraťte se zpět.</div>';
+            return;
+        }
+        const idx = Math.min(this._campaignPreviewIdx, records.length - 1);
+        const docHtml = this.core.getContent();
+        const filled = this.exportCampaignRecord(records[idx], docHtml);
+        const recipientName = records[idx]._nazev || records[idx][Object.keys(records[idx])[0]] || '';
+        body.innerHTML = `
+            <div class="campaign-preview-nav">
+                <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(-1)">←</button>
+                <div class="campaign-preview-counter">Příjemce ${idx + 1} z ${records.length}: <b>${this._esc(recipientName)}</b></div>
+                <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(1)">→</button>
+            </div>
+            <div class="campaign-preview-doc">${filled}</div>
+        `;
+    }
+
+    _renderCampaignStep4(body) {
+        const count = this._campaignRecords.length;
+        const hasISDS = this._campaignRecords.some(r => r._isds);
+        body.innerHTML = `
+            <p style="font-size:13px;color:#334155;margin-bottom:16px;">Připraveno <b>${count} dokumentů</b> k odeslání:</p>
+            <div class="campaign-action-grid">
+                <div class="campaign-action-card ${this._campaignAction === 'download' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('download')">
+                    <div class="campaign-action-icon">📦</div>
+                    <div class="campaign-action-title">Stáhnout dokumenty</div>
+                    <div class="campaign-action-desc">Stáhne ${count} HTML souborů do počítače</div>
+                </div>
+                <div class="campaign-action-card ${this._campaignAction === 'isds' ? 'selected' : ''} ${!hasISDS ? 'disabled' : ''}" 
+                     onclick="${hasISDS ? "lexisUI._setCampaignAction('isds')" : "lexisUI.customAlert('Žádní příjemci nemají datovou schránku.')"}">
+                    <div class="campaign-action-icon">📮</div>
+                    <div class="campaign-action-title">Odeslat přes ISDS</div>
+                    <div class="campaign-action-desc">${hasISDS ? `Odešle přes datové schránky (${this._campaignRecords.filter(r=>r._isds).length} příjemců má DS)` : '⚠️ Žádný příjemce nemá datovou schránku'}</div>
+                </div>
+            </div>
+            <div class="campaign-progress-bar" id="campaign-prog-bar" style="display:none;">
+                <div class="campaign-progress-fill" id="campaign-prog-fill" style="width:0%"></div>
+            </div>
+            <div id="campaign-run-status" style="font-size:12px;color:#64748b;margin-top:8px;"></div>
+            <div id="campaign-batch-results" style="margin-top:12px;max-height:200px;overflow-y:auto;"></div>
+        `;
+    }
+
+    async campaignNext() {
+        const step = this._campaignStep;
+
+        if (step === 2) {
+            // Build records from selected mode
+            const records = await this._buildRecordsFromMode();
+            if (records.length === 0) {
+                this.customAlert('⚠️ Nevybráni žádní příjemci. Prosím vyberte alespoň jednoho.');
+                return;
+            }
+            this._campaignRecords = records;
+            this._campaignPreviewIdx = 0;
+        }
+
+        if (step < 4) this.renderCampaignStep(step + 1);
+    }
+
+    campaignBack() {
+        if (this._campaignStep > 1) this.renderCampaignStep(this._campaignStep - 1);
+    }
+
+    async runCampaignBatch() {
+        const records = this._campaignRecords;
+        if (records.length === 0) { this.customAlert('Nejsou žádní příjemci.'); return; }
+
+        const progBar = document.getElementById('campaign-prog-bar');
+        const progFill = document.getElementById('campaign-prog-fill');
+        const statusEl = document.getElementById('campaign-run-status');
+        const resultsEl = document.getElementById('campaign-batch-results');
+        const btnNext = document.getElementById('campaign-btn-next');
+
+        if (progBar) progBar.style.display = 'block';
+        if (btnNext) btnNext.disabled = true;
+
+        const templateHtml = this.core.getContent();
+        const results = [];
+
+        // Table header
+        if (resultsEl) resultsEl.innerHTML = `
+            <table class="campaign-batch-table">
+                <thead><tr>
+                    <th>#</th><th>Příjemce</th><th>ISDS</th><th>Stav</th>
+                </tr></thead>
+                <tbody id="campaign-batch-tbody"></tbody>
+            </table>`;
+
+        for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            const name = record._nazev || record[Object.keys(record)[0]] || `Příjemce_${i+1}`;
+            const isds = record._isds || '';
+
+            // Update table row
+            const tbody = document.getElementById('campaign-batch-tbody');
+            if (tbody) {
+                const tr = document.createElement('tr');
+                tr.id = `batch-row-${i}`;
+                tr.innerHTML = `
+                    <td>${i+1}</td>
+                    <td><b>${this._esc(name)}</b></td>
+                    <td>${isds ? `<span class="court-isds-badge">${this._esc(isds)}</span>` : '<span style="color:#cbd5e1;font-size:11px;">—</span>'}</td>
+                    <td><span id="batch-status-${i}" class="batch-status-badge batch-status-sending">⏳ Generuji...</span></td>
+                `;
+                tbody.appendChild(tr);
+                tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            let status = 'ok';
+            try {
+                const filled = this.exportCampaignRecord(record, templateHtml)
+                    .replace(/<span class="filled-var">/g, '').replace(/<\/span>/g, '');
+
+                if (this._campaignAction === 'isds' && isds) {
+                    // Simulate ISDS send — in production would call electronAPI
+                    await new Promise(r => setTimeout(r, 400));
+                    // window.electronAPI?.sendIsdsMessage({ recipientId: isds, content: filled, subject: name })
+                    status = 'ok';
+                } else {
+                    // Download as HTML
+                    const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${this._esc(name)}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
+                    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = `dokument_${name.replace(/[^a-z0-9_]/gi,'_')}.html`;
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    await new Promise(r => setTimeout(r, 300));
+                    status = 'ok';
+                }
+            } catch (e) {
+                status = 'err';
+                console.error(`Chyba pro ${name}:`, e);
+            }
+
+            results.push({ name, status });
+
+            const statusBadge = document.getElementById(`batch-status-${i}`);
+            if (statusBadge) {
+                statusBadge.className = `batch-status-badge batch-status-${status}`;
+                statusBadge.textContent = status === 'ok' ? '✅ Hotovo' : '❌ Chyba';
+            }
+
+            const pct = Math.round(((i + 1) / records.length) * 100);
+            if (progFill) progFill.style.width = `${pct}%`;
+            if (statusEl) statusEl.textContent = `Zpracovávám ${i + 1} / ${records.length}...`;
+        }
+
+        const ok = results.filter(r => r.status === 'ok').length;
+        const err = results.filter(r => r.status === 'err').length;
+        if (statusEl) statusEl.innerHTML = `✅ <b>Kampaň dokončena!</b> ${ok} úspěšně${err > 0 ? `, ${err} chyb` : ''}.`;
+        if (btnNext) btnNext.disabled = false;
+    }
+
+    // window.openContacts shortcut
+    _openContactsShortcut() { this.openContacts(); }
 }
 
 

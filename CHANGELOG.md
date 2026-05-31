@@ -2,6 +2,11 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [3.4.0] - 2026-05-31
+### Přidáno
+- **Chytré záhlaví a zápatí**: AI generátor nyní respektuje layout a generuje obsah výhradně do těla dokumentu s chytrou extrakcí spisových značek.
+- **Rychlé vkládání kontaktů**: Přidána možnost vložit detaily kontaktů (jméno, IČO, adresa) přímo z Adresáře subjektů do aktuální pozice kurzoru pomocí nového tlačítka.
+
 ## [3.3.4] - 2026-05-19
 ### Přidáno
 - **Vždy na domovské stránce**: Aplikace se nyní při startu vždy otevře na úvodním rozcestníku (domovské stránce) se seznamem nedávných dokumentů a šablonami namísto automatického vstupu do editoru.

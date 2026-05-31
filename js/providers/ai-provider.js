@@ -64,6 +64,9 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
 3. Vytvoř seznam chybějících klíčových ustanovení.`;
         }
 
+        // --- PŘIDÁNO: Globální instrukce pro záhlaví a zápatí ---
+        systemPromptToUse += `\n\nDŮLEŽITÉ: Při generování smluv a podání generuj VŽDY pouze tělo dokumentu. Záhlaví a zápatí dokumentu nech na pokoji. Pokud z kontextu znáš "číslo jednací" nebo "číslo spisu", přidej kamkoliv do své odpovědi speciální skrytý HTML tag: <meta data-spis="ZDE_TVOJE_HODNOTA" /> (např. <meta data-spis="123/2024" />). Zbytek generuj jako čisté HTML (nadpisy, odstavce, bold).`;
+
         // 0. LexisLocal Swarm Swarm Orchestrator
         if (provider === 'lexislocal') {
             const modelSelect = document.getElementById('lexislocal-model');

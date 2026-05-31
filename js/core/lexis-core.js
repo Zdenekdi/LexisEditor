@@ -241,7 +241,28 @@ class LexisCore {
     }
 
     setContent(html) {
-        const cleanHtml = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html || '') : (html || '');
+        let processHtml = html || '';
+        
+        // Zpracování AI metadat pro spisovou značku
+        const spisMatch = processHtml.match(/<meta\s+data-spis=["']([^"']+)["']\s*\/?>/i);
+        if (spisMatch && spisMatch[1]) {
+            const spis = spisMatch[1];
+            processHtml = processHtml.replace(spisMatch[0], '');
+            
+            const updateSpis = (el) => {
+                if (!el) return;
+                const htmlContent = el.innerHTML;
+                const updated = htmlContent.replace(/(Spis:|Sp\. zn\.:|č\. j\.|K č\. j\. \/ sp\. zn\.:|K sp\. zn\.:)\s*([^<]+)/i, `$1 ${spis}`);
+                if (updated !== htmlContent) {
+                    el.innerHTML = updated;
+                }
+            };
+            
+            updateSpis(document.getElementById('header-area'));
+            updateSpis(document.getElementById('footer-area'));
+        }
+
+        const cleanHtml = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(processHtml) : processHtml;
         this.quill.root.innerHTML = cleanHtml || '<p><br></p>';
     }
 

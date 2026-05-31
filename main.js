@@ -95,7 +95,7 @@ app.on('window-all-closed', function () {
 });
 
 // Zpracování požadavku z UI na export do DOCX
-ipcMain.handle('export-docx', async (event, htmlContent) => {
+ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml) => {
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Uložit dokument',
@@ -107,11 +107,11 @@ ipcMain.handle('export-docx', async (event, htmlContent) => {
 
         if (filePath) {
             // Konverze HTML (z Quill editoru) do čistého DOCX bufferu
-            const fileBuffer = await HTMLToDOCX(htmlContent, null, {
+            const fileBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
                 table: { row: { cantSplit: true } },
                 footer: true,
                 pageNumber: true,
-            });
+            }, footerHtml || null);
             
             // Fyzický zápis souboru na lokální disk
             fs.writeFileSync(filePath, fileBuffer);
@@ -201,7 +201,7 @@ ipcMain.handle('reset-templates', () => {
     }
 });
 
-ipcMain.handle('export-bundle', async (event, htmlContent, cssContent) => {
+ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtml, footerHtml) => {
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Exportovat Bundle (DOCX + PDF)',
@@ -218,11 +218,11 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent) => {
             const pdfPath = basePath + '.pdf';
 
             // 1. Export DOCX
-            const docxBuffer = await HTMLToDOCX(htmlContent, null, {
+            const docxBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
                 table: { row: { cantSplit: true } },
                 footer: true,
                 pageNumber: true,
-            });
+            }, footerHtml || null);
             fs.writeFileSync(docxPath, docxBuffer);
 
             // 2. Export PDF přes skryté okno
@@ -241,15 +241,18 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent) => {
                     <style>
                         ${cssContent}
                         body { margin: 0; padding: 0; background: white; }
-                        .ql-editor { padding: 20mm 25mm !important; }
                         @media print {
                             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                         }
                     </style>
                 </head>
                 <body>
-                    <div class="ql-container ql-snow" style="border:none;">
-                        <div class="ql-editor">${htmlContent}</div>
+                    <div id="editor-wrapper" style="border:none; box-shadow:none; width:auto; min-height:auto; display:flex; flex-direction:column;">
+                        ${headerHtml ? `<div class="page-header" id="header-area" style="padding: 10mm 40mm 5mm 40mm !important; min-height: auto;">${headerHtml}</div>` : ''}
+                        <div class="ql-container ql-snow" style="border:none; flex-grow:1;">
+                            <div class="ql-editor">${htmlContent}</div>
+                        </div>
+                        ${footerHtml ? `<div class="page-footer" id="footer-area" style="padding: 5mm 40mm 10mm 40mm !important; margin-top: auto;">${footerHtml}</div>` : ''}
                     </div>
                 </body>
                 </html>
@@ -720,4 +723,111 @@ ipcMain.handle('start-lexis-link', async () => {
 
     lexisLinkServer.listen(LEXIS_LINK_PORT);
     return { success: true, url: 'http://' + getLocalIp() + ':' + LEXIS_LINK_PORT + '/remote' };
+});
+
+// IPC Handler pro vyhledávání soudních jednání (InfoJednání)
+ipcMain.handle('query-infojednani', async (event, queryParams) => {
+    try {
+        const response = await fetch('https://infojednani.gov.cz/api/v1/jednani/vyhledej', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(queryParams)
+        });
+        if (!response.ok) {
+            throw new Error(`Chyba InfoJednání API: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        return { success: true, data };
+    } catch (error) {
+        console.error('Chyba při volání InfoJednání:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// ============================================================
+//   SECURITY LOCK — Zabezpečení aplikace (Touch ID / heslo)
+// ============================================================
+
+const lockConfigPath = path.join(app.getPath('userData'), 'lexis_lock.json');
+
+// Uložení nastavení zámku (enable/disable + zašifrované heslo)
+ipcMain.handle('lock-save-config', async (event, config) => {
+    try {
+        const toSave = {
+            enabled: !!config.enabled,
+            method: config.method || 'password', // 'touchid' | 'password' | 'both'
+            touchIdEnabled: !!config.touchIdEnabled,
+        };
+        if (config.password) {
+            toSave.passwordHash = safeStorage.encryptString(config.password).toString('base64');
+        } else {
+            // Ponechat existující hash pokud existuje
+            if (fs.existsSync(lockConfigPath)) {
+                try {
+                    const existing = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8'));
+                    if (existing.passwordHash) toSave.passwordHash = existing.passwordHash;
+                } catch(e) {}
+            }
+        }
+        fs.writeFileSync(lockConfigPath, JSON.stringify(toSave, null, 2), 'utf-8');
+        return { success: true };
+    } catch (e) {
+        console.error('Chyba při ukládání lock konfigurace:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// Načtení nastavení zámku (bez hesla — pouze enabled + method)
+ipcMain.handle('lock-get-config', async () => {
+    try {
+        if (fs.existsSync(lockConfigPath)) {
+            const raw = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8'));
+            // Nikdy neposílat heslo zpět do rendereru
+            return {
+                enabled: !!raw.enabled,
+                method: raw.method || 'password',
+                touchIdEnabled: !!raw.touchIdEnabled,
+                hasPassword: !!raw.passwordHash
+            };
+        }
+    } catch (e) {
+        console.error('Chyba při čtení lock konfigurace:', e);
+    }
+    return { enabled: false, method: 'password', touchIdEnabled: false, hasPassword: false };
+});
+
+// Smazání lock konfigurace (vypnutí zámku)
+ipcMain.handle('lock-delete-config', async () => {
+    try {
+        if (fs.existsSync(lockConfigPath)) fs.unlinkSync(lockConfigPath);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Ověření hesla (porovnání s uloženým hashem)
+ipcMain.handle('lock-verify-password', async (event, inputPassword) => {
+    try {
+        if (!fs.existsSync(lockConfigPath)) return { success: false, error: 'Žádná konfigurace.' };
+        const raw = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8'));
+        if (!raw.passwordHash) return { success: false, error: 'Heslo není nastaveno.' };
+        const stored = safeStorage.decryptString(Buffer.from(raw.passwordHash, 'base64'));
+        return { success: stored === inputPassword };
+    } catch (e) {
+        console.error('Chyba při ověřování hesla:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// Touch ID dostupnost
+ipcMain.handle('lock-touchid-available', async () => {
+    if (process.platform !== 'darwin') return { available: false };
+    try {
+        return { available: systemPreferences.canPromptTouchID() };
+    } catch (e) {
+        return { available: false };
+    }
 });

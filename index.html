@@ -432,6 +432,8 @@
                     <div class="btn-icon" onclick="openISDS()"><div class="icon-sq">📮</div>Datová schránka</div>
                     <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Dopis Online</div>
                     <div class="btn-icon" onclick="signDigital()"><div class="icon-sq">🔑</div>E-podpis</div>
+                    <div class="btn-icon" onclick="startMailMerge()" style="background: rgba(37,99,235,0.08); border: 1px solid #bfdbfe;"><div class="icon-sq">📨</div>Kampaň</div>
+                    <div class="btn-icon" onclick="openContacts()" style="background: rgba(16,185,129,0.08); border: 1px solid #a7f3d0;"><div class="icon-sq">📒</div>Adresář</div>
                 </div>
                 <div class="group-label">Distribuce</div>
             </div>
@@ -441,6 +443,17 @@
                     <div class="btn-icon" onclick="exportTimesheet()"><div class="icon-sq">📤</div>Exportovat</div>
                 </div>
                 <div class="group-label">Evidence práce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="lockScreen.openSecuritySettings()" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);">
+                        <div class="icon-sq">🔐</div>Zabezpečení
+                    </div>
+                    <div class="btn-icon" onclick="lockScreen.lockNow()" style="background:rgba(15,23,42,0.06);border:1px solid rgba(15,23,42,0.15);">
+                        <div class="icon-sq">🔒</div>Zamknout
+                    </div>
+                </div>
+                <div class="group-label">Bezpečnost</div>
             </div>
         </div>
 
@@ -540,9 +553,9 @@
         <div id="tab-view" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="lexisUI.customAlert('📖 <b>Režim čtení</b><br><br>Režim čtení skryje horní Ribbon a postranní panely pro maximální soustředění na text dokumentu.')"><div class="icon-sq">📖</div>Čtení</div>
-                    <div class="btn-icon" onclick="lexisUI.customAlert('🖨️ <b>Rozložení při tisku</b><br><br>Aktivní rozložení přesně odpovídá finální podobě dokumentu na papíře A4 (WYSIWYG).')"><div class="icon-sq">🖨️</div>Tisk</div>
-                    <div class="btn-icon" onclick="lexisUI.customAlert('🌐 <b>Webové rozložení</b><br><br>Zobrazí dokument v plné šířce okna bez okrajů stránky, vhodné pro rychlé psaní dlouhých konceptů.')"><div class="icon-sq">🌐</div>Web</div>
+                    <div class="btn-icon" id="view-btn-reading" onclick="setViewMode('reading')"><div class="icon-sq">📖</div>Čtení</div>
+                    <div class="btn-icon" id="view-btn-print" onclick="setViewMode('print')"><div class="icon-sq">🖨️</div>Tisk</div>
+                    <div class="btn-icon" id="view-btn-web" onclick="setViewMode('web')"><div class="icon-sq">🌐</div>Web</div>
                 </div>
                 <div class="group-label">Zobrazení</div>
             </div>
@@ -895,6 +908,11 @@
                     <div id="detected-list" style="padding: 5px;"></div>
                 </div>
 
+                <div class="panel-section" id="court-hearings-section" style="display:none; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <div class="panel-title" style="color: #166534;">⚖️ Soudní jednání (InfoJednání)</div>
+                    <div id="hearings-list" style="padding: 5px;"></div>
+                </div>
+
                 <div class="panel-section">
                     <div class="panel-title">🏗️ Generátory</div>
                     <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
@@ -1147,6 +1165,9 @@
 
     <!-- SDK & UI Modules -->
     <script src="js/providers/ai-provider.js"></script>
+    <script src="js/core/court-data.js"></script>
+    <script src="js/core/court-registry.js"></script>
+    <script src="js/core/lexis-contacts.js"></script>
     <script src="js/core/lexis-storage.js"></script>
     <script src="js/core/lexis-core.js"></script>
     <script src="js/ui/lexis-ui.js"></script>
@@ -1408,6 +1429,8 @@
         window.editHeader = () => lexisUI.editHeader();
         window.editFooter = () => lexisUI.editFooter();
         window.insertPageNumber = () => lexisUI.insertPageNumber();
+        window.setViewMode = (mode) => lexisUI.setViewMode(mode);
+        window.startMailMerge = () => lexisUI.startMailMerge();
         window.calculateFee = () => lexisUI.showFeeCalc();
         window.calculateInterests = () => lexisUI.showInterestCalc();
         window.openDeadlineCalc = () => lexisUI.showDeadlineCalc();
@@ -1431,6 +1454,475 @@
         });
         window.addEventListener('load', () => { setTimeout(repositionTabs, 300); });
     </script>
+
+    <!-- Floating Exit Button for Reading Mode -->
+    <div id="reading-mode-exit-btn" onclick="setViewMode('normal')">
+        <span>✕</span> <span>Ukončit режim čtení</span>
+    </div>
+
+    <!-- Header / Footer Editor Modal -->
+    <div id="hf-modal-overlay" class="hf-modal-overlay" style="display:none;" onclick="if(event.target===this)lexisUI.closeHFModal()">
+        <div class="hf-modal">
+            <div class="hf-modal-header">
+                <span style="font-size:20px;">🔼</span>
+                <h3 id="hf-modal-title">Editor záhlaví</h3>
+                <div class="hf-modal-close" onclick="lexisUI.closeHFModal()">✕</div>
+            </div>
+            <div class="hf-modal-tabs">
+                <div class="hf-modal-tab active" id="hf-tab-layout" onclick="lexisUI.switchHFTab('layout')">📐 Rozložení</div>
+                <div class="hf-modal-tab" id="hf-tab-style" onclick="lexisUI.switchHFTab('style')">🎨 Styl</div>
+                <div class="hf-modal-tab" id="hf-tab-templates" onclick="lexisUI.switchHFTab('templates')">📋 Šablony</div>
+            </div>
+            <div class="hf-modal-body">
+                <!-- Tab: Rozložení -->
+                <div id="hf-panel-layout">
+                    <div class="hf-preview-label">Tři sloupce záhlaví</div>
+                    <div class="hf-columns">
+                        <div class="hf-col">
+                            <div class="hf-col-label">⬅ Vlevo</div>
+                            <textarea class="hf-col-textarea" id="hf-left" placeholder="Název firmy&#10;Adresa&#10;IČO: 123456" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('left')">
+                                🖼️ Vložit logo
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-left" />
+                        </div>
+                        <div class="hf-col">
+                            <div class="hf-col-label">⬌ Střed</div>
+                            <textarea class="hf-col-textarea" id="hf-center" placeholder="Nadpis dokumentu&#10;nebo prázdné" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('center')">
+                                🖼️ Vložit obrázek
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-center" />
+                        </div>
+                        <div class="hf-col">
+                            <div class="hf-col-label">➡ Vpravo</div>
+                            <textarea class="hf-col-textarea" id="hf-right" placeholder="Č.j.: 2025/001&#10;Datum: {DATUM}&#10;Strana: {STRANA}" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('right')">
+                                🖼️ Vložit obrázek
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-right" />
+                        </div>
+                    </div>
+
+                    <div class="hf-options-row">
+                        <label class="hf-option-label">
+                            <input type="checkbox" id="hf-show-line" checked onchange="lexisUI.updateHFPreview()"> Čára pod záhlavím
+                        </label>
+                        <label class="hf-option-label">
+                            Výška:
+                            <select class="hf-select" id="hf-height" onchange="lexisUI.updateHFPreview()">
+                                <option value="normal">Normální</option>
+                                <option value="compact">Kompaktní</option>
+                                <option value="tall">Vysoké</option>
+                            </select>
+                        </label>
+                        <label class="hf-option-label">
+                            Velikost písma:
+                            <select class="hf-select" id="hf-fontsize" onchange="lexisUI.updateHFPreview()">
+                                <option value="10px">Malé (10px)</option>
+                                <option value="11px" selected>Normální (11px)</option>
+                                <option value="13px">Větší (13px)</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="hf-live-preview">
+                        <div class="hf-live-preview-label">Živý náhled</div>
+                        <div class="hf-live-preview-content" id="hf-preview-content">
+                            <div id="hf-preview-left">—</div>
+                            <div id="hf-preview-center">—</div>
+                            <div id="hf-preview-right">—</div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:11px; color:#94a3b8; background:#f8fafc; border-radius:8px; padding:10px 14px;">
+                        💡 <b>Proměnné:</b> <code>{DATUM}</code> = dnešní datum, <code>{STRANA}</code> = číslo stránky, <code>{TITULEK}</code> = název dokumentu
+                    </div>
+                </div>
+
+                <!-- Tab: Styl -->
+                <div id="hf-panel-style" style="display:none;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px;">
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva pozadí záhlaví:
+                            <input type="color" id="hf-bg-color" value="#ffffff" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva textu:
+                            <input type="color" id="hf-text-color" value="#334155" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva čáry:
+                            <input type="color" id="hf-line-color" value="#cbd5e1" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Rodina písma:
+                            <select class="hf-select" id="hf-font-family" onchange="lexisUI.updateHFPreview()">
+                                <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Calibri', sans-serif">Calibri</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Tab: Šablony -->
+                <div id="hf-panel-templates" style="display:none;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px;" id="hf-templates-grid">
+                        <div onclick="lexisUI.applyHFTemplate('advokatura')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">⚖️</div>
+                            <div style="font-weight:700; font-size:13px;">Advokátní kancelář</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Název AK vlevo, č.j. a datum vpravo</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('urad')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">🏛️</div>
+                            <div style="font-weight:700; font-size:13px;">Úřední dokument</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Logo vlevo, název uprostřed, datum vpravo</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('soud')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">⚔️</div>
+                            <div style="font-weight:700; font-size:13px;">Soudní podání</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Sp. zn. vlevo, soud uprostřed</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('smlouva')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">📝</div>
+                            <div style="font-weight:700; font-size:13px;">Smlouva</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Čistý styl bez záhlaví, jen číslo strany</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="hf-modal-footer">
+                <button class="hf-btn hf-btn-secondary" onclick="lexisUI.closeHFModal()">Zrušit</button>
+                <button class="hf-btn hf-btn-save-tpl" onclick="lexisUI.saveHFAsTemplate()">💾 Uložit jako šablonu</button>
+                <button class="hf-btn hf-btn-primary" onclick="lexisUI.applyHFChanges()">✅ Použít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Wizard Modal -->
+    <div id="campaign-overlay" class="campaign-overlay" style="display:none;" onclick="if(event.target===this)lexisUI.closeCampaign()">
+        <div class="campaign-modal">
+            <div class="campaign-header">
+                <span style="font-size:24px;">📨</span>
+                <div>
+                    <h3>Hromadná kampaň (Mail Merge)</h3>
+                    <div style="font-size:12px; opacity:0.75; margin-top:2px;">Odeslání dokumentu na více adresátů najednou</div>
+                </div>
+                <div class="campaign-header-close" onclick="lexisUI.closeCampaign()">✕</div>
+            </div>
+
+            <!-- Stepper -->
+            <div class="campaign-stepper">
+                <div class="campaign-step active" id="cstep-1">
+                    <div class="campaign-step-num">1</div>
+                    <div class="campaign-step-label">Proměnné</div>
+                </div>
+                <div class="campaign-step-line" id="cline-1"></div>
+                <div class="campaign-step" id="cstep-2">
+                    <div class="campaign-step-num">2</div>
+                    <div class="campaign-step-label">Adresáti</div>
+                </div>
+                <div class="campaign-step-line" id="cline-2"></div>
+                <div class="campaign-step" id="cstep-3">
+                    <div class="campaign-step-num">3</div>
+                    <div class="campaign-step-label">Náhled</div>
+                </div>
+                <div class="campaign-step-line" id="cline-3"></div>
+                <div class="campaign-step" id="cstep-4">
+                    <div class="campaign-step-num">4</div>
+                    <div class="campaign-step-label">Odeslání</div>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="campaign-body" id="campaign-body"><!-- rendered by JS --></div>
+
+            <!-- Footer -->
+            <div class="campaign-footer">
+                <div style="font-size:12px; color:#64748b;" id="campaign-footer-info">Krok 1 ze 4</div>
+                <div class="campaign-footer-right">
+                    <button class="campaign-btn campaign-btn-back" id="campaign-btn-back" onclick="lexisUI.campaignBack()" style="display:none;">← Zpět</button>
+                    <button class="campaign-btn campaign-btn-next" id="campaign-btn-next" onclick="lexisUI.campaignNext()">Další →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden image pickers for HF editor -->
+    <input type="file" id="hf-img-input-left" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('left', this)">
+    <input type="file" id="hf-img-input-center" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('center', this)">
+    <input type="file" id="hf-img-input-right" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('right', this)">
+    <!-- Hidden CSV picker for campaign -->
+    <input type="file" id="campaign-csv-input" accept=".csv,.txt" style="display:none" onchange="lexisUI.onCampaignCsvPicked(this)">
+    <!-- Hidden CSV picker for contacts bulk import -->
+    <input type="file" id="contacts-csv-input" accept=".csv,.txt" style="display:none" onchange="lexisUI.onContactsCsvPicked(this)">
+
+    <!-- =============================================
+         ADRESÁŘ KONTAKTŮ
+         ============================================= -->
+    <div id="contacts-modal-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(8px);z-index:20000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lexisUI.closeContacts()">
+        <div style="background:white;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,0.25);width:1000px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#0f172a,#1e293b);color:white;padding:20px 28px;display:flex;align-items:center;gap:14px;">
+                <span style="font-size:26px;">📒</span>
+                <div style="flex-grow:1;">
+                    <div style="font-size:17px;font-weight:800;letter-spacing:-0.3px;">Adresář kontaktů</div>
+                    <div style="font-size:11px;opacity:0.6;margin-top:2px;">Správa příjemců, klientů a institucxí</div>
+                </div>
+                <button onclick="document.getElementById('contacts-csv-input').click()" style="padding:8px 16px;border-radius:8px;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">📅 Hromadný import CSV</button>
+                <button onclick="lexisUI.openContactForm()" style="padding:8px 16px;border-radius:8px;background:#10b981;color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">+ Nový kontakt</button>
+                <button onclick="lexisUI.closeContacts()" style="background:transparent;border:none;color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;line-height:1;">&#x2715;</button>
+            </div>
+
+            <!-- Toolbar -->
+            <div style="padding:14px 24px;border-bottom:1px solid #e2e8f0;display:flex;gap:10px;align-items:center;background:#f8fafc;flex-wrap:wrap;">
+                <div class="court-search-box" style="flex:1;min-width:200px;margin-bottom:0;">
+                    <input type="text" class="court-search-input" id="contacts-search" placeholder="🔍 Hledat kontakt..." oninput="lexisUI.renderContactsList()">
+                </div>
+                <div id="contacts-group-filter" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                <select id="contacts-type-filter" onchange="lexisUI.renderContactsList()" style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;cursor:pointer;">
+                    <option value="">Všechny typy</option>
+                    <option value="fyzicka">Fyzické osoby</option>
+                    <option value="pravnicka">Právnické osoby</option>
+                    <option value="organ">Orgány / Úřady</option>
+                    <option value="soud">Soudy</option>
+                </select>
+            </div>
+
+            <!-- Table -->
+            <div style="flex:1;overflow:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f1f5f9;position:sticky;top:0;z-index:1;">
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Jméno / Název</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Adresa</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Datová schránka</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">E-mail / Tel</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Skupiny</th>
+                            <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contacts-table-body">
+                        <tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">⏳ Načítám kontakty...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 24px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;">
+                <div id="contacts-count" style="font-size:12px;color:#64748b;"></div>
+                <button onclick="lexisUI.closeContacts()" style="padding:9px 22px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:13px;font-weight:600;cursor:pointer;color:#334155;">Zavřít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORMULÁŘ nového / editovaného kontaktu -->
+    <div id="contact-form-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(8px);z-index:21000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lexisUI.closeContactForm()">
+        <div style="background:white;border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,0.25);width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.25s ease;">
+            <div style="background:linear-gradient(135deg,#10b981,#059669);color:white;padding:18px 24px;display:flex;align-items:center;gap:12px;">
+                <span style="font-size:22px;">📝</span>
+                <h3 id="contact-form-title" style="font-size:16px;font-weight:800;flex-grow:1;margin:0;">Nový kontakt</h3>
+                <button onclick="lexisUI.closeContactForm()" style="background:transparent;border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;">&#x2715;</button>
+            </div>
+            <div style="padding:22px 24px;overflow-y:auto;flex-grow:1;">
+                <input type="hidden" id="cf-id">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">JMÉNO / NÁZEV *</label>
+                        <input type="text" id="cf-jmeno" placeholder="JUDr. Jan Novák / Advokátní kancelář ..." style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">TYP</label>
+                        <select id="cf-typ" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white;">
+                            <option value="fyzicka">Fyzická osoba</option>
+                            <option value="pravnicka">Právnická osoba</option>
+                            <option value="organ">Úřad / Orgán</option>
+                            <option value="soud">Soud</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">ÍČO</label>
+                        <input type="text" id="cf-ic" placeholder="12345678" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">ADRESA (ulice, č.p.)</label>
+                        <input type="text" id="cf-adresa" placeholder="Václavské náměstí 1" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">MĚSTO</label>
+                        <input type="text" id="cf-mesto" placeholder="Praha 1" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">PSČ</label>
+                        <input type="text" id="cf-psc" placeholder="110 00" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">DATOVÁ SCHRÁNKA (ID)</label>
+                        <input type="text" id="cf-isds" placeholder="abc123x" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:monospace;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">E-MAIL</label>
+                        <input type="email" id="cf-email" placeholder="novak@ak.cz" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">TELEFON</label>
+                        <input type="tel" id="cf-tel" placeholder="+420 777 123 456" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">SKUPINY (oddělené čárkou)</label>
+                        <input type="text" id="cf-skupiny" placeholder="klienti, soudy, protistrany" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">POZNÁMKA</label>
+                        <textarea id="cf-poznamka" rows="2" placeholder="Volné pole..." style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:16px 24px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="lexisUI.closeContactForm()" style="padding:9px 20px;border-radius:8px;background:white;border:1px solid #e2e8f0;font-size:13px;font-weight:600;cursor:pointer;color:#334155;">Zrušit</button>
+                <button onclick="lexisUI.saveContactForm()" style="padding:9px 22px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">✅ Uložit kontakt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================
+         LOCK SCREEN — Obrazovka zámku
+         ============================================= -->
+    <div id="lock-screen" style="position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 40%,#0f172a 100%);"></div>
+        <div style="position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%);top:-100px;left:-100px;animation:orbFloat1 8s ease-in-out infinite;"></div>
+        <div style="position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,0.1) 0%,transparent 70%);bottom:-80px;right:-80px;animation:orbFloat2 10s ease-in-out infinite;"></div>
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:24px;animation:slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1);">
+            <div style="text-align:center;">
+                <div style="width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 14px;box-shadow:0 12px 40px rgba(99,102,241,0.4);">⚖️</div>
+                <div style="font-size:24px;font-weight:900;color:white;letter-spacing:-0.5px;">LexisEditor</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.45);margin-top:4px;">Aplikace je uzamčena</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:32px 36px;width:340px;display:flex;flex-direction:column;gap:18px;box-shadow:0 24px 60px rgba(0,0,0,0.4);">
+                <div id="lock-touchid-section" style="display:none;text-align:center;">
+                    <button id="lock-touchid-btn" onclick="lockScreen.tryTouchId()"
+                        style="width:80px;height:80px;border-radius:50%;border:2px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 12px;transition:all 0.3s;">
+                        <span id="lock-touchid-icon">👆</span>
+                    </button>
+                    <div id="lock-touchid-label" style="font-size:13px;color:rgba(255,255,255,0.7);">Touch ID</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;">
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.3);">nebo</div>
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></div>
+                    </div>
+                </div>
+                <div id="lock-password-section">
+                    <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.5px;margin-bottom:8px;">HESLO / PIN</label>
+                    <div style="position:relative;">
+                        <input type="password" id="lock-password-input" placeholder="Zadejte heslo..." maxlength="64"
+                            style="width:100%;padding:12px 44px 12px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:white;font-size:15px;outline:none;transition:border-color 0.2s;box-sizing:border-box;letter-spacing:2px;"
+                            onkeydown="if(event.key==='Enter')lockScreen.tryPassword()"
+                            onfocus="this.style.borderColor='rgba(99,102,241,0.7)'"
+                            onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                        <button onclick="lockScreen.togglePasswordVisibility()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;padding:0;">👁</button>
+                    </div>
+                    <div id="lock-error-msg" style="font-size:12px;color:#f87171;margin-top:6px;display:none;text-align:center;">❌ Nesprávné heslo</div>
+                </div>
+                <button id="lock-unlock-btn" onclick="lockScreen.tryPassword()"
+                    style="padding:13px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all 0.2s;box-shadow:0 6px 20px rgba(99,102,241,0.35);"
+                    onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">
+                    🔓 Odemknout
+                </button>
+                <div id="lock-attempts" style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);display:none;"></div>
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.2);margin-top:4px;">LexisEditor · Bezpečný přístup</div>
+        </div>
+    </div>
+
+    <!-- NASTAVENÍ ZABEZPEČENÍ -->
+    <div id="security-settings-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(8px);z-index:20000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lockScreen.closeSecuritySettings()">
+        <div style="background:white;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,0.3);width:500px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+            <div style="background:linear-gradient(135deg,#0f172a,#1e1b4b);color:white;padding:20px 24px;display:flex;align-items:center;gap:14px;">
+                <span style="font-size:24px;">🔐</span>
+                <div style="flex-grow:1;">
+                    <div style="font-size:16px;font-weight:800;">Zabezpečení aplikace</div>
+                    <div style="font-size:11px;opacity:0.55;margin-top:2px;">Zámek, Touch ID a správa přístupu</div>
+                </div>
+                <button onclick="lockScreen.closeSecuritySettings()" style="background:transparent;border:none;color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;">&#x2715;</button>
+            </div>
+            <div style="padding:24px;overflow-y:auto;flex-grow:1;display:flex;flex-direction:column;gap:20px;">
+                <!-- Master toggle -->
+                <div style="display:flex;align-items:center;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;">
+                    <div style="flex-grow:1;">
+                        <div style="font-size:14px;font-weight:700;color:#0f172a;">Zámek aplikace</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">Vyžadovat ověření při spuštění aplikace</div>
+                    </div>
+                    <label class="security-toggle">
+                        <input type="checkbox" id="sec-lock-enabled" onchange="lockScreen.onLockToggle(this.checked)" style="opacity:0;width:0;height:0;">
+                        <span class="security-toggle-slider"></span>
+                    </label>
+                </div>
+                <!-- Settings body -->
+                <div id="sec-settings-body" style="display:none;flex-direction:column;gap:16px;">
+                    <!-- Touch ID row -->
+                    <div id="sec-touchid-row" style="display:none;padding:14px 16px;background:#f0fdf4;border-radius:12px;border:1.5px solid #86efac;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span style="font-size:24px;">👆</span>
+                            <div style="flex-grow:1;">
+                                <div style="font-size:13px;font-weight:700;color:#065f46;">Touch ID</div>
+                                <div id="sec-touchid-status" style="font-size:11px;color:#059669;margin-top:2px;">Detekuji dostupnost...</div>
+                            </div>
+                            <label class="security-toggle">
+                                <input type="checkbox" id="sec-touchid-enabled" onchange="lockScreen.onTouchIdToggle(this.checked)" style="opacity:0;width:0;height:0;">
+                                <span class="security-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Password section -->
+                    <div style="padding:16px;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;">
+                        <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:12px;">🔑 Heslo / PIN</div>
+                        <div id="sec-has-password" style="display:none;margin-bottom:10px;padding:8px 12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#2563eb;">✅ Heslo je nastaveno. Pro změnu zadejte nové.</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">NOVÉ HESLO</label>
+                                <input type="password" id="sec-new-password" placeholder="Minimálně 4 znaky..." maxlength="64"
+                                    style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">POTVRDIT HESLO</label>
+                                <input type="password" id="sec-confirm-password" placeholder="Opakujte heslo..." maxlength="64"
+                                    style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                            </div>
+                            <div id="sec-password-hint" style="font-size:11px;color:#94a3b8;"></div>
+                            <button onclick="lockScreen.savePassword()"
+                                style="padding:9px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">💾 Nastavit heslo</button>
+                        </div>
+                    </div>
+                    <!-- Lock now -->
+                    <button onclick="lockScreen.lockNow()" style="padding:11px;border-radius:10px;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">🔒 Zamknout nyní</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes orbFloat1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(40px,30px) scale(1.05);} }
+        @keyframes orbFloat2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-30px,-40px) scale(1.08);} }
+        .security-toggle { position:relative;display:inline-block;width:48px;height:26px;cursor:pointer; }
+        .security-toggle input { opacity:0;width:0;height:0; }
+        .security-toggle-slider { position:absolute;inset:0;background:#e2e8f0;border-radius:20px;transition:0.3s; }
+        .security-toggle-slider:before { content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.15); }
+        input:checked + .security-toggle-slider { background:linear-gradient(135deg,#6366f1,#8b5cf6); }
+        input:checked + .security-toggle-slider:before { transform:translateX(22px); }
+        #lock-password-input::placeholder { letter-spacing:0;color:rgba(255,255,255,0.3); }
+        #lock-touchid-btn:hover { background:rgba(99,102,241,0.2)!important; }
+        #lock-touchid-btn.scanning { animation:touchPulse 1s ease-in-out infinite; }
+        @keyframes touchPulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.4);} 50%{box-shadow:0 0 0 16px rgba(99,102,241,0);} }
+        #lock-touchid-btn.success { background:rgba(16,185,129,0.2)!important;border-color:rgba(16,185,129,0.6)!important; }
+        #lock-touchid-btn.error { background:rgba(239,68,68,0.15)!important;border-color:rgba(239,68,68,0.5)!important;animation:shake 0.4s ease; }
+        @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 60%{transform:translateX(8px);} }
+    </style>
+
+    <script src="js/ui/lexis-lock.js"></script>
+
 </body>
 </html>
 
