@@ -25,6 +25,7 @@ class LexisUI {
         this.currentDocumentCj = '';
         this.pinnedQATItems = [];
         this.tempQATPinData = null;
+        this.activeSessionTimeMs = 0;
 
         window.saveDetectedDeadline = (days, encContext) => {
             const context = decodeURIComponent(encContext);
@@ -198,11 +199,14 @@ class LexisUI {
     async sendLexisLocalHeartbeat() {
         if (!this.hadActivitySinceLastHeartbeat) return;
         
+        // Track the active session time locally regardless of connection status
+        this.activeSessionTimeMs = (this.activeSessionTimeMs || 0) + 30000;
+        
         try {
             const { baseUrl, headers } = this.getLexisLocalConnection();
             const title = this.currentDocumentTitle || "Nový dokument";
 
-            await fetch(`${baseUrl}/api/activity/heartbeat`, {
+            await fetch(`${baseUrl}/api/activity/log`, {
                 method: 'POST',
                 headers: {
                     ...headers,
@@ -210,7 +214,8 @@ class LexisUI {
                 },
                 body: JSON.stringify({
                     documentName: title,
-                    activeSeconds: 30
+                    activeSeconds: 30,
+                    actionType: 'edit'
                 })
             });
 
@@ -219,6 +224,9 @@ class LexisUI {
         } catch (e) {
             // Silently log and ignore to allow LexisEditor to run perfectly even without LexisLocal
             console.log("LexisLocal heartbeat transmission bypassed: ", e.message);
+            // Reset activity state even if offline, so we wait for next activity
+            this.hadActivitySinceLastHeartbeat = false;
+            this.lastHeartbeatTime = Date.now();
         }
     }
 
@@ -365,6 +373,13 @@ class LexisUI {
             a.download = `${title}.html`;
             a.click();
             this.customAlert("Dokument byl stažen do počítače.");
+        }
+
+        // Auto time-tracking prompt on manual save
+        if (this.activeSessionTimeMs && this.activeSessionTimeMs >= 30000) {
+            setTimeout(() => {
+                this.showTimeTrackingDialog();
+            }, 1000);
         }
     }
 
@@ -1898,7 +1913,7 @@ class LexisUI {
                 };
                 
                 // Uložit do IndexedDB
-                await this.core.storage.set('templates', templateKey, tplObj);
+                await this.core.storage.set('templates', { id: templateKey, ...tplObj });
                 
                 // Také uložit přes Electron API, pokud existuje
                 if (window.electronAPI && window.electronAPI.saveTemplate) {
@@ -1942,7 +1957,7 @@ class LexisUI {
                 if (!this.core.knowledgeBase) this.core.knowledgeBase = [];
                 this.core.knowledgeBase.push(chunk);
                 
-                await this.core.storage.set('settings', 'knowledge-base', this.core.knowledgeBase);
+                await this.core.storage.set('settings', { key: 'knowledge-base', value: this.core.knowledgeBase });
                 this.customAlert(`✅ <b>Indexace úspěšná!</b><br><br>Dokument <b>${docTitle}</b> byl indexován do lokální znalostní báze pro AI rešerše.`);
             });
         });
@@ -2703,6 +2718,31 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 await this.saveActiveDocumentState();
             }
             
+            // Check for unlogged active time
+            if (this.activeSessionTimeMs && this.activeSessionTimeMs >= 30000) {
+                const mins = Math.max(1, Math.round(this.activeSessionTimeMs / 60000));
+                this.customConfirm(
+                    `Máte nevykázanou práci na tomto dokumentu (zaznamenáno cca ${mins} min.). Chcete ji před odchodem vykázat?`,
+                    "Ano, vykázat",
+                    "Ne, odejít bez vykázání",
+                    async (agree) => {
+                        if (agree) {
+                            this.showTimeTrackingDialog(null, () => this.proceedToStartScreen());
+                        } else {
+                            await this.proceedToStartScreen();
+                        }
+                    }
+                );
+            } else {
+                await this.proceedToStartScreen();
+            }
+        } catch (e) {
+            console.error("Chyba při přechodu na úvodní obrazovku:", e);
+        }
+    }
+
+    async proceedToStartScreen() {
+        try {
             // Mark active-document-id as null so next reload shows start screen
             await this.core.storage.set('settings', { key: 'active-document-id', value: null });
             this.currentDocumentId = null;
@@ -4185,10 +4225,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 const license = document.getElementById('prof-license').value.trim();
                 const signature = document.getElementById('prof-sig').value.trim();
 
-                await this.core.storage.set('settings', 'lawyer-name', name);
-                await this.core.storage.set('settings', 'lawyer-firm', firm);
-                await this.core.storage.set('settings', 'lawyer-license', license);
-                await this.core.storage.set('settings', 'lawyer-signature', signature);
+                await this.core.storage.set('settings', { key: 'lawyer-name', value: name });
+                await this.core.storage.set('settings', { key: 'lawyer-firm', value: firm });
+                await this.core.storage.set('settings', { key: 'lawyer-license', value: license });
+                await this.core.storage.set('settings', { key: 'lawyer-signature', value: signature });
 
                 document.body.removeChild(overlay);
                 this.customAlert("✅ <b>Profil byl úspěšně uložen!</b><br><br>Vaše osobní údaje budou automaticky používány při generování dokumentů.");
@@ -4470,28 +4510,183 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     async logTime() {
         this.checkEnterpriseFeature("Evidence práce", () => {
-            this.customPrompt("Zadejte popis úkonu (např. Studium spisu):", "Studium spisu", (desc) => {
-                if (!desc) return;
-                this.customPrompt("Zadejte čas strávený na úkonu (v hodinách):", "1.5", async (hours) => {
-                    if (!hours) return;
-                    const val = parseFloat(hours);
-                    if (isNaN(val)) return this.customAlert("Zadán neplatný čas.");
-                    
-                    const log = {
-                        desc,
-                        hours: val,
-                        date: new Date().toLocaleDateString('cs-CZ'),
-                        timestamp: Date.now()
-                    };
-
-                    const savedLogs = await this.core.storage.get('settings', 'timesheet-logs') || [];
-                    savedLogs.push(log);
-                    await this.core.storage.set('settings', 'timesheet-logs', savedLogs);
-
-                    this.customAlert(`✅ <b>Úkon zapsán!</b><br><br>Úkon <b>${desc}</b> (${val} hod.) byl úspěšně zapsán do výkazu práce.`);
-                });
-            });
+            this.showTimeTrackingDialog();
         });
+    }
+
+    showTimeTrackingDialog(prefilledHours = null, onComplete = null) {
+        // Calculate default hours
+        let defaultHours = "0.25";
+        if (prefilledHours !== null) {
+            defaultHours = parseFloat(prefilledHours).toFixed(2);
+        } else if (this.activeSessionTimeMs && this.activeSessionTimeMs > 0) {
+            const calculated = this.activeSessionTimeMs / (3600 * 1000);
+            defaultHours = Math.max(0.1, parseFloat(calculated.toFixed(2))).toString();
+        }
+
+        const defaultDocName = this.currentDocumentTitle || "Nový dokument";
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const overlay = document.createElement('div');
+        overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);font-family:'Inter',sans-serif;";
+        
+        const modal = document.createElement('div');
+        modal.style = "background:#ffffff;border-radius:16px;width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);border:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;animation: modalFadeIn 0.25s ease-out;";
+
+        // Ensure keyframes animation is present
+        if (!document.getElementById('modal-fade-in-style')) {
+            const styleSheet = document.createElement("style");
+            styleSheet.id = 'modal-fade-in-style';
+            styleSheet.innerText = `
+                @keyframes modalFadeIn {
+                    from { opacity: 0; transform: scale(0.95); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+        }
+
+        modal.innerHTML = `
+            <div style="padding:20px 24px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <h2 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">⏱️ Vykázat činnost</h2>
+                    <p style="margin:2px 0 0 0;font-size:11px;color:#64748b;">Zapsat odpracovaný čas do výkazů v LexisLocal</p>
+                </div>
+                <button id="tt-close" style="background:none;border:none;font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;outline:none;padding:0;">&times;</button>
+            </div>
+            
+            <div style="padding:24px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;">
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    <label style="font-size:12px;font-weight:600;color:#475569;">Spis / Věc / Dokument</label>
+                    <input type="text" id="tt-doc-name" placeholder="např. sp. zn. 77 EX 123/2026" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;transition:border-color 0.2s;" value="${defaultDocName}">
+                </div>
+                
+                <div style="display:flex;gap:16px;">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:#475569;">Datum</label>
+                        <input type="date" id="tt-date" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;" value="${todayStr}">
+                    </div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                        <label style="font-size:12px;font-weight:600;color:#475569;">Čas (hodiny)</label>
+                        <input type="number" id="tt-hours" step="0.05" min="0.05" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;" value="${defaultHours}">
+                    </div>
+                </div>
+                
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    <label style="font-size:12px;font-weight:600;color:#475569;">Typ úkonu</label>
+                    <select id="tt-action-type" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;appearance:none;-webkit-appearance:none;">
+                        <option value="psaní" selected>Sepisování a úpravy dokumentu</option>
+                        <option value="revize">Revize a kontrola</option>
+                        <option value="studium">Studium spisu</option>
+                        <option value="právní analýza">Právní analýza a rešerše</option>
+                        <option value="ostatní">Ostatní administrativní činnost</option>
+                    </select>
+                </div>
+                
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    <label style="font-size:12px;font-weight:600;color:#475569;">Popis (nepovinné)</label>
+                    <input type="text" id="tt-desc" placeholder="např. Příprava žaloby na zaplacení" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;">
+                </div>
+            </div>
+            
+            <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:12px;">
+                <button id="tt-cancel" style="padding:10px 18px;background:#f1f5f9;color:#475569;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:background 0.2s;">Zrušit</button>
+                <button id="tt-submit" style="padding:10px 20px;background:#2563eb;color:#ffffff;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 6px -1px rgba(37,99,235,0.2);transition:background 0.2s;">Vykázat</button>
+            </div>
+        `;
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        // Bind events
+        document.getElementById('tt-close').onclick = () => overlay.remove();
+        document.getElementById('tt-cancel').onclick = () => overlay.remove();
+        
+        const submitBtn = document.getElementById('tt-submit');
+        submitBtn.onmouseover = () => submitBtn.style.background = "#1d4ed8";
+        submitBtn.onmouseout = () => submitBtn.style.background = "#2563eb";
+        const cancelBtn = document.getElementById('tt-cancel');
+        cancelBtn.onmouseover = () => cancelBtn.style.background = "#e2e8f0";
+        cancelBtn.onmouseout = () => cancelBtn.style.background = "#f1f5f9";
+
+        submitBtn.onclick = async () => {
+            const documentName = document.getElementById('tt-doc-name').value.trim();
+            const date = document.getElementById('tt-date').value;
+            const hoursVal = parseFloat(document.getElementById('tt-hours').value);
+            const actionType = document.getElementById('tt-action-type').value;
+            const desc = document.getElementById('tt-desc').value.trim() || actionType;
+
+            if (!documentName) {
+                this.customAlert("⚠️ Prosím vyplňte název dokumentu / spisu.");
+                return;
+            }
+            if (isNaN(hoursVal) || hoursVal <= 0) {
+                this.customAlert("⚠️ Prosím vyplňte platný počet hodin.");
+                return;
+            }
+            if (!date) {
+                this.customAlert("⚠️ Prosím vyplňte datum.");
+                return;
+            }
+
+            // Post to LexisLocal backend
+            let success = false;
+            try {
+                const { baseUrl, headers } = this.getLexisLocalConnection();
+                const res = await fetch(`${baseUrl}/api/activity/custom`, {
+                    method: 'POST',
+                    headers: {
+                        ...headers,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        documentName,
+                        hours: hoursVal,
+                        actionType: desc,
+                        date
+                    })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    success = true;
+                }
+            } catch (err) {
+                console.warn("Timesheet logging to LexisLocal failed, falling back to local database:", err.message);
+            }
+
+            // Fallback (save locally in settings storage so we don't lose the log)
+            try {
+                const log = {
+                    desc: desc,
+                    hours: hoursVal,
+                    date: new Date(date).toLocaleDateString('cs-CZ'),
+                    timestamp: Date.now(),
+                    synced: success
+                };
+
+                const savedLogs = await this.core.storage.get('settings', 'timesheet-logs') || [];
+                savedLogs.push(log);
+                await this.core.storage.set('settings', { key: 'timesheet-logs', value: savedLogs });
+            } catch (err) {
+                console.error("Local storage logging failed:", err.message);
+            }
+
+            // Reset session time tracker since we've logged it
+            this.activeSessionTimeMs = 0;
+
+            overlay.remove();
+            
+            if (success) {
+                this.customAlert(`✅ <b>Činnost vykázána!</b><br><br>Čas <b>${hoursVal} hod.</b> na spis <b>${documentName}</b> byl úspěšně zaznamenán do LexisLocal.`);
+            } else {
+                this.customAlert(`✅ <b>Uloženo lokálně</b><br><br>Čas <b>${hoursVal} hod.</b> byl zaznamenán offline v editoru. Bude synchronizován po spuštění LexisLocal.`);
+            }
+
+            // Run callback (e.g. exit start screen transition)
+            if (onComplete) {
+                await onComplete();
+            }
+        };
     }
 
     async exportTimesheet() {
@@ -5233,7 +5428,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
             const templates = await this.core.storage.get('settings', 'hf-templates') || {};
             templates[`hf_${Date.now()}`] = { name, left, center, right };
-            await this.core.storage.set('settings', 'hf-templates', templates);
+            await this.core.storage.set('settings', { key: 'hf-templates', value: templates });
             this.customAlert(`✅ <b>Šablona uložena!</b><br><br>Šablona záhlaví <b>${name}</b> je uložena pro budoucí použití.`);
         });
     }
