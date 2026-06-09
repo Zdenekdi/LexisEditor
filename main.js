@@ -132,7 +132,13 @@ ipcMain.handle('search-ares', async (event, ico) => {
         if (!response.ok) {
             throw new Error(`Chyba ARES API: ${response.status} ${response.statusText}`);
         }
-        const data = await response.json();
+        let data;
+        try {
+            data = await response.json();
+        } catch (jsonErr) {
+            console.error('Chyba při parsování odpovědi ARES API:', jsonErr);
+            throw new Error(`ARES vrátil neplatná data: ${jsonErr.message}`);
+        }
         
         // Zkompilování odpovědi do čistého objektu pro frontend
         return {
@@ -633,6 +639,10 @@ ipcMain.handle('start-lexis-link', async () => {
                                 .then(r => r.json())
                                 .then(data => {
                                     document.getElementById('status').innerText = 'Hotovo: ' + (data.success ? 'OK' : 'Chyba');
+                                })
+                                .catch(err => {
+                                    console.error(err);
+                                    document.getElementById('status').innerText = 'Chyba spojení';
                                 });
                         }
                         function uploadImage(input) {
@@ -648,6 +658,10 @@ ipcMain.handle('start-lexis-link', async () => {
                                 .then(r => r.json())
                                 .then(data => {
                                     document.getElementById('status').innerText = 'Sken odeslán do PC';
+                                })
+                                .catch(err => {
+                                    console.error(err);
+                                    document.getElementById('status').innerText = 'Chyba při nahrávání';
                                 });
                             };
                             reader.readAsDataURL(input.files[0]);

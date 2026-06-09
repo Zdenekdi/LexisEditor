@@ -590,7 +590,7 @@ class LexisUI {
                 wrapper.insertBefore(wmLayer, wrapper.firstChild);
             }
             
-            wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${text}</div>`;
+            wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${window.escapeHTML(text)}</div>`;
         });
     }
 
@@ -2901,13 +2901,13 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                         card.innerHTML = `
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px;">
                                 <div style="font-weight: 700; font-size: 12px; color: #1e293b; display: flex; align-items: center; gap: 4px;">
-                                    <span>📄</span> ${doc.caseNumber}
+                                    <span>📄</span> ${window.escapeHTML(doc.caseNumber)}
                                 </div>
                                 ${deadlineBadge}
                             </div>
                             <div style="font-size: 11px; color: #475569;">
-                                <b>Žalobce:</b> ${doc.plaintiff}<br>
-                                <b>Žalovaný:</b> ${doc.defendant}
+                                <b>Žalobce:</b> ${window.escapeHTML(doc.plaintiff)}<br>
+                                <b>Žalovaný:</b> ${window.escapeHTML(doc.defendant)}
                                 ${insolvencyBadge}
                             </div>
                             <div style="font-size: 10px; color: #64748b; font-style: italic; background: #f8fafc; padding: 6px; border-radius: 4px; line-height: 1.3;">
