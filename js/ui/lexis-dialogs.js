@@ -458,9 +458,9 @@ class LexisDialogs {
                     
                     return `
                         <tr style="border-bottom:1px solid #e2e8f0;">
-                            <td style="padding:10px;font-family:monospace;font-weight:700;">${r.ico}</td>
-                            <td style="padding:10px;font-weight:600;color:#1e293b;">${r.name}</td>
-                            <td style="padding:10px;color:#2563eb;font-family:monospace;">${r.isdsId || 'Nezjištěno'}</td>
+                            <td style="padding:10px;font-family:monospace;font-weight:700;">${window.escapeHTML(r.ico)}</td>
+                            <td style="padding:10px;font-weight:600;color:#1e293b;">${window.escapeHTML(r.name)}</td>
+                            <td style="padding:10px;color:#2563eb;font-family:monospace;">${window.escapeHTML(r.isdsId || 'Nezjištěno')}</td>
                             <td style="padding:10px;">${insBadge}</td>
                         </tr>
                     `;

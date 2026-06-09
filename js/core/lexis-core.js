@@ -1,4 +1,18 @@
 /**
+ * Utility function to prevent XSS attacks by escaping HTML entities.
+ */
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.escapeHTML = escapeHTML;
+
+/**
  * SecureVault Wrapper
  * Bezpečné ukládání citlivých dat (API klíče, hesla).
  */
