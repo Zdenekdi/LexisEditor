@@ -1,3 +1,4 @@
+/* global Quill, DOMPurify, localStorage */
 /**
  * Utility function to prevent XSS attacks by escaping HTML entities.
  */
@@ -79,6 +80,9 @@ class LexisCore {
                         [Node.ELEMENT_NODE, (node, delta) => {
                             if (typeof DOMPurify !== 'undefined' && node.innerHTML) {
                                 node.innerHTML = DOMPurify.sanitize(node.innerHTML);
+                            } else if (node.innerHTML) {
+                                console.error("DOMPurify is missing! Sanitization bypassed in clipboard matcher.");
+                                node.innerHTML = "";
                             }
                             return delta;
                         }]
@@ -276,8 +280,23 @@ class LexisCore {
             updateSpis(document.getElementById('footer-area'));
         }
 
-        const cleanHtml = typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(processHtml) : processHtml;
+        if (typeof DOMPurify === 'undefined') {
+            console.error("DOMPurify is missing! Cannot safely set content.");
+            this.quill.root.innerHTML = '<p><br></p>';
+            return;
+        }
+
+        const cleanHtml = DOMPurify.sanitize(processHtml);
         this.quill.root.innerHTML = cleanHtml || '<p><br></p>';
+    }
+
+    safePasteHTML(index, html) {
+        if (typeof DOMPurify === 'undefined') {
+            console.error("DOMPurify is missing! Aborting paste to prevent XSS.");
+            return;
+        }
+        const cleanHtml = DOMPurify.sanitize(html);
+        this.quill.clipboard.dangerouslyPasteHTML(index, cleanHtml);
     }
 
     getContent() {

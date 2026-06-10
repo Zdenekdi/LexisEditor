@@ -1,3 +1,4 @@
+/* global Quill, DOMPurify, localStorage */
 /**
  * LexisUI Controller
  * Ovládá Ribbon, sidebary a interakci uživatele s LexisCore.
@@ -2026,7 +2027,7 @@ class LexisUI {
                             `;
                             
                             const range = this.core.quill.getSelection(true);
-                            this.core.quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                            this.core.safePasteHTML(range.index, html);
                         } else {
                             this.customAlert(`ARES API nenašlo žádná data nebo selhalo:\n\n${result.error}`);
                         }
@@ -2059,7 +2060,7 @@ class LexisUI {
                             <p><br></p>
                         `;
                         const range = this.core.quill.getSelection(true);
-                        this.core.quill.clipboard.dangerouslyPasteHTML(range.index, html);
+                        this.core.safePasteHTML(range.index, html);
                     } else {
                         this.customAlert("Subjekt nebyl v simulátoru ARES nalezen (použijte IČO: 27082440). Hledání v reálném registru vyžaduje spuštění v Electronu.");
                     }
@@ -4028,7 +4029,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     importISDSAttachment(content) {
         try {
             const range = this.core.quill.getSelection(true);
-            this.core.quill.clipboard.dangerouslyPasteHTML(range.index, content);
+            this.core.safePasteHTML(range.index, content);
             this.customAlert("✅ <b>Příloha byla úspěšně importována!</b><br><br>Textový obsah přílohy byl vložen přímo na pozici vašeho kurzoru.");
         } catch (e) {
             console.error("Chyba při importu přílohy z ISDS:", e);
@@ -4117,7 +4118,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 `;
                 
                 const range = this.core.quill.getLength() - 1;
-                this.core.quill.clipboard.dangerouslyPasteHTML(range, sigHtml);
+                this.core.safePasteHTML(range, sigHtml);
                 this.setDocumentStatus('final', true);
                 
                 document.body.removeChild(overlay);
@@ -4238,7 +4239,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : 0;
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, tocHtml);
+        this.core.safePasteHTML(index, tocHtml);
         this.saveActiveDocumentState();
     }
 
@@ -4269,7 +4270,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : 0;
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, titleHtml);
+        this.core.safePasteHTML(index, titleHtml);
         this.saveActiveDocumentState();
         this.updateDocumentOutline();
     }
@@ -4286,7 +4287,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             `;
             const range = this.core.quill.getSelection(true);
             const index = range ? range.index : this.core.quill.getLength();
-            this.core.quill.clipboard.dangerouslyPasteHTML(index, illHtml);
+            this.core.safePasteHTML(index, illHtml);
             this.saveActiveDocumentState();
         });
     }
@@ -4298,7 +4299,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             const bookmarkHtml = `<span id="${cleanName}" style="background: rgba(37,99,235,0.15); border-bottom: 2px dotted #2563eb; font-weight: 500;" title="Záložka: ${cleanName}">🔖 ${cleanName}</span>`;
             const range = this.core.quill.getSelection(true);
             const index = range ? range.index : this.core.quill.getLength();
-            this.core.quill.clipboard.dangerouslyPasteHTML(index, bookmarkHtml);
+            this.core.safePasteHTML(index, bookmarkHtml);
             this.saveActiveDocumentState();
         });
     }
@@ -4337,7 +4338,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         const numHtml = `<span style="padding: 2px 6px; background: #e2e8f0; border-radius: 4px; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: bold; color: #475569;" title="Dynamické číslo stránky">🔢 Strana 1</span>`;
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, numHtml);
+        this.core.safePasteHTML(index, numHtml);
         this.saveActiveDocumentState();
     }
 
@@ -4367,7 +4368,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, sigBlockHtml);
+        this.core.safePasteHTML(index, sigBlockHtml);
         this.saveActiveDocumentState();
     }
 
@@ -4391,7 +4392,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, mySigHtml);
+        this.core.safePasteHTML(index, mySigHtml);
         this.saveActiveDocumentState();
     }
 
@@ -4410,7 +4411,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             <p style="text-align: center; font-size: 12px; color: #64748b; font-style: italic; margin-top: -8px; margin-bottom: 15px;">[Název a účel článku]</p>
         `.replace(/ {2,}/g, '');
 
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, articleHtml);
+        this.core.safePasteHTML(index, articleHtml);
         this.saveActiveDocumentState();
         this.updateDocumentOutline();
     }
@@ -4428,7 +4429,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             <p style="margin-left: 20px; color: #475569;">(1) </p>
         `.replace(/ {2,}/g, '');
 
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, paraHtml);
+        this.core.safePasteHTML(index, paraHtml);
         this.saveActiveDocumentState();
         this.updateDocumentOutline();
     }
@@ -4444,7 +4445,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             <p><br></p>
         `.replace(/ {2,}/g, '');
 
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, citationHtml);
+        this.core.safePasteHTML(index, citationHtml);
         this.saveActiveDocumentState();
     }
 
@@ -4605,7 +4606,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, html);
+        this.core.safePasteHTML(index, html);
         this.saveActiveDocumentState();
         this.updateDocumentOutline();
     }
@@ -5765,7 +5766,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         let index = range ? range.index : this.core.quill.getLength();
         
         // Zabalíme do odstavce
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, `<p>${html}</p><p><br></p>`);
+        this.core.safePasteHTML(index, `<p>${html}</p><p><br></p>`);
         this.core.quill.setSelection(index + 2); // orientační posun kurzoru
         
         this.closeContacts();
