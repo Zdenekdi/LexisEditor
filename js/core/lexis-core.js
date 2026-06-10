@@ -46,6 +46,7 @@ class SecureVault {
         return {};
     }
 }
+window.SecureVault = SecureVault;
 
 /**
  * LexisCore SDK v1.0
