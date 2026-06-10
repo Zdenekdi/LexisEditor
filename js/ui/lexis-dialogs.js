@@ -1,3 +1,4 @@
+/* global Quill, DOMPurify, localStorage */
 /**
  * LexisDialogs Helper
  * Spravuje pomocné dialogy, kalkulačky a generátory.
@@ -150,18 +151,14 @@ class LexisDialogs {
         const name = nameInput.value.trim() || "[JMÉNO ZMOCNITELE]";
         const type = typeSelect.value;
         
-        let paText = "";
-        if (type === 'procesní') {
-            paText = `
+        const paText = type === 'procesní' ? `
                 <h1>PLNÁ MOC (PROCESNÍ)</h1>
                 <p>Já, níže podepsaný/á:</p>
                 <p><b>${name}</b>, nar. [DOPLNIT], trvale bytem [DOPLNIT]</p>
                 <p>tímto uděluji procesní plnou moc advokátní kanceláři [DOPLNIT] k tomu, aby mě zastupovala ve všech právních věcech, před soudy, orgány státní správy i samosprávy a vůči třetím osobám v plném rozsahu.</p>
                 <p>V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
                 <p>.......................................<br><b>${name}</b> (zmocnitel)</p>
-            `.replace(/ {2,}/g, '');
-        } else {
-            paText = `
+            `.replace(/ {2,}/g, '') : `
                 <h1>PLNÁ MOC (OBECNÁ)</h1>
                 <p>Já, níže podepsaný/á:</p>
                 <p><b>${name}</b>, nar. [DOPLNIT], trvale bytem [DOPLNIT]</p>
@@ -169,12 +166,11 @@ class LexisDialogs {
                 <p>V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
                 <p>.......................................<br><b>${name}</b> (zmocnitel)</p>
             `.replace(/ {2,}/g, '');
-        }
         
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
         
-        this.core.quill.clipboard.dangerouslyPasteHTML(index, paText);
+        this.core.safePasteHTML(index, paText);
         nameInput.value = '';
         
         this.customAlert("✅ <b>Plná moc vygenerována</b><br><br>Šablona plné moci byla úspěšně vložena na pozici kurzoru.");
@@ -311,7 +307,6 @@ class LexisDialogs {
             }
 
             // Render Footer
-            let footerHtml = "";
             let buttons = "";
             if (step === 1) {
                 buttons = `<button id="cw-next" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;">Pokračovat &rarr;</button>`;
@@ -331,7 +326,7 @@ class LexisDialogs {
                     <button id="cw-send" style="padding:8px 20px;background:#16a34a;color:#fff;font-weight:700;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;display:flex;align-items:center;gap:6px;">🚀 Odeslat přes ISDS</button>
                 `;
             }
-            footerHtml = `
+            const footerHtml = `
                 <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;align-items:center;height:60px;box-sizing:border-box;">
                     ${buttons}
                 </div>

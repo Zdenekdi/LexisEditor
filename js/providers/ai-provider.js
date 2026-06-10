@@ -1,3 +1,4 @@
+/* global Quill, DOMPurify, localStorage */
 /**
  * Lexis AI Provider
  * Zprostředkovává komunikaci s lokálními i cloudovými AI modely.
@@ -67,127 +68,138 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
         // --- PŘIDÁNO: Globální instrukce pro záhlaví a zápatí ---
         systemPromptToUse += `\n\nDŮLEŽITÉ: Při generování smluv a podání generuj VŽDY pouze tělo dokumentu. Záhlaví a zápatí dokumentu nech na pokoji. Pokud z kontextu znáš "číslo jednací" nebo "číslo spisu", přidej kamkoliv do své odpovědi speciální skrytý HTML tag: <meta data-spis="ZDE_TVOJE_HODNOTA" /> (např. <meta data-spis="123/2024" />). Zbytek generuj jako čisté HTML (nadpisy, odstavce, bold).`;
 
-        // 0. LexisLocal Swarm Swarm Orchestrator
-        if (provider === 'lexislocal') {
-            const modelSelect = document.getElementById('lexislocal-model');
-            const selectedModel = modelSelect ? modelSelect.value : 'llama3';
-            
-            let contextText = "";
-            if (window.quill) {
-                const range = window.quill.getSelection();
-                if (range && range.length > 0) {
-                    contextText = window.quill.getText(range.index, range.length);
-                }
-            }
-            
-            // Heuristically adjust endpoint URL to LexisLocal server port (4000) if defaulted to Ollama (11434)
-            let baseEndpoint = endpoint;
-            if (baseEndpoint.includes("11434") || baseEndpoint.includes("/api/generate")) {
-                const isHttps = endpoint.startsWith("https:");
-                baseEndpoint = `${isHttps ? "https" : "http"}://localhost:4000`;
-            }
-            if (baseEndpoint.endsWith("/")) {
-                baseEndpoint = baseEndpoint.slice(0, -1);
-            }
-            
-            const headers = { "Content-Type": "application/json" };
-            if (apiKey) {
-                headers["X-API-Token"] = apiKey;
-            }
-            
-            const response = await fetch(`${baseEndpoint}/api/agent/${agentId}`, {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify({
-                    prompt: prompt,
-                    context: contextText,
-                    model: selectedModel
-                })
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                return data.response;
-            }
-            throw new Error(`LexisLocal Swarm vrátila status ${response.status}`);
-        }
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-        // 1. Apple Intelligence (apfel) / OpenAI / DeepSeek / LM Studio / Anthropic
-        if (provider === 'apfel' || provider === 'openai' || provider === 'deepseek' || provider === 'lmstudio' || provider === 'anthropic') {
-            const headers = { "Content-Type": "application/json" };
-            if (apiKey) {
-                headers["Authorization"] = `Bearer ${apiKey}`;
-            }
+        try {
+            // 0. LexisLocal Swarm Swarm Orchestrator
+            if (provider === 'lexislocal') {
+                const modelSelect = document.getElementById('lexislocal-model');
+                const selectedModel = modelSelect ? modelSelect.value : 'llama3';
 
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify({
-                    model: model,
-                    messages: [
-                        { role: "system", content: systemPromptToUse },
-                        { role: "user", content: prompt }
-                    ],
-                    temperature: 0.3
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.choices && data.choices[0] && data.choices[0].message) {
-                    return data.choices[0].message.content;
-                }
-            }
-            throw new Error(`API vrátilo status ${response.status}`);
-        }
-
-        // 2. Nativní Ollama (/api/generate)
-        if (provider === 'ollama') {
-            const response = await fetch(endpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: model,
-                    prompt: prompt,
-                    system: systemPromptToUse,
-                    stream: false,
-                    options: {
-                        temperature: 0.3
+                let contextText = "";
+                if (window.quill) {
+                    const range = window.quill.getSelection();
+                    if (range && range.length > 0) {
+                        contextText = window.quill.getText(range.index, range.length);
                     }
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                return data.response;
-            }
-            throw new Error(`Ollama vrátila status ${response.status}`);
-        }
-
-        // 3. Google Gemini
-        if (provider === 'google') {
-            const url = `${endpoint}?key=${apiKey}`;
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            parts: [
-                                { text: `${systemPromptToUse}\n\nUživatel: ${prompt}` }
-                            ]
-                        }
-                    ]
-                })
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
-                    return data.candidates[0].content.parts[0].text;
                 }
+
+                // Heuristically adjust endpoint URL to LexisLocal server port (4000) if defaulted to Ollama (11434)
+                let baseEndpoint = endpoint;
+                if (baseEndpoint.includes("11434") || baseEndpoint.includes("/api/generate")) {
+                    const isHttps = endpoint.startsWith("https:");
+                    baseEndpoint = `${isHttps ? "https" : "http"}://localhost:4000`;
+                }
+                if (baseEndpoint.endsWith("/")) {
+                    baseEndpoint = baseEndpoint.slice(0, -1);
+                }
+
+                const headers = { "Content-Type": "application/json" };
+                if (apiKey) {
+                    headers["X-API-Token"] = apiKey;
+                }
+
+                const response = await fetch(`${baseEndpoint}/api/agent/${agentId}`, {
+                    method: "POST",
+                    headers: headers,
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        context: contextText,
+                        model: selectedModel
+                    }),
+                    signal: controller.signal
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.response;
+                }
+                throw new Error(`LexisLocal Swarm vrátila status ${response.status}`);
             }
-            throw new Error(`Gemini vrátilo status ${response.status}`);
+
+            // 1. Apple Intelligence (apfel) / OpenAI / DeepSeek / LM Studio / Anthropic
+            if (provider === 'apfel' || provider === 'openai' || provider === 'deepseek' || provider === 'lmstudio' || provider === 'anthropic') {
+                const headers = { "Content-Type": "application/json" };
+                if (apiKey) {
+                    headers["Authorization"] = `Bearer ${apiKey}`;
+                }
+
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: headers,
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [
+                            { role: "system", content: systemPromptToUse },
+                            { role: "user", content: prompt }
+                        ],
+                        temperature: 0.3
+                    }),
+                    signal: controller.signal
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.choices && data.choices[0] && data.choices[0].message) {
+                        return data.choices[0].message.content;
+                    }
+                }
+                throw new Error(`API vrátilo status ${response.status}`);
+            }
+
+            // 2. Nativní Ollama (/api/generate)
+            if (provider === 'ollama') {
+                const response = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: model,
+                        prompt: prompt,
+                        system: systemPromptToUse,
+                        stream: false,
+                        options: {
+                            temperature: 0.3
+                        }
+                    }),
+                    signal: controller.signal
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.response;
+                }
+                throw new Error(`Ollama vrátila status ${response.status}`);
+            }
+
+            // 3. Google Gemini
+            if (provider === 'google') {
+                const url = `${endpoint}?key=${apiKey}`;
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                parts: [
+                                    { text: `${systemPromptToUse}\n\nUživatel: ${prompt}` }
+                                ]
+                            }
+                        ]
+                    }),
+                    signal: controller.signal
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]) {
+                        return data.candidates[0].content.parts[0].text;
+                    }
+                }
+                throw new Error(`Gemini vrátilo status ${response.status}`);
+            }
+        } finally {
+            clearTimeout(timeoutId);
         }
 
     } catch (error) {

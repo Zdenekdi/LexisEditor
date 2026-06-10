@@ -126,9 +126,14 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
 
 // IPC Handler pro vyhledávání v ARES (Česká republika)
 ipcMain.handle('search-ares', async (event, ico) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds timeout
+
     try {
         // Nové REST API Ministerstva financí
-        const response = await fetch(`https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${ico}`);
+        const response = await fetch(`https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${ico}`, {
+            signal: controller.signal
+        });
         if (!response.ok) {
             throw new Error(`Chyba ARES API: ${response.status} ${response.statusText}`);
         }
@@ -153,7 +158,12 @@ ipcMain.handle('search-ares', async (event, ico) => {
         };
     } catch (error) {
         console.error('Chyba při volání ARES:', error);
+        if (error.name === 'AbortError') {
+            return { success: false, error: 'Vypršel časový limit (15s) pro spojení s ARES API.' };
+        }
         return { success: false, error: error.message };
+    } finally {
+        clearTimeout(timeoutId);
     }
 });
 
