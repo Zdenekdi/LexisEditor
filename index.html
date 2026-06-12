@@ -397,6 +397,7 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="calculateFee()"><div class="icon-sq">🏷️</div>Poplatek</div>
+                    <div class="btn-icon" onclick="calculateTariff()"><div class="icon-sq">⚖️</div>Odměna</div>
                     <div class="btn-icon" onclick="openDeadlineCalc()"><div class="icon-sq">⏳</div>Lhůtník</div>
                     <div class="btn-icon" onclick="calculateInterests()"><div class="icon-sq">💹</div>Úroky</div>
                 </div>
@@ -549,10 +550,28 @@
         <div id="tab-lexisai" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="toggleAIDrawer(true)"><div class="icon-sq">✨</div>Otevřít AI Bridge</div>
+                    <div class="btn-icon" onclick="toggleAIDrawer(true)"><div class="icon-sq">✨</div>AI Bridge</div>
+                    <div class="btn-icon" onclick="askAIAboutSelection()"><div class="icon-sq">🔍</div>Analyzovat</div>
+                    <div class="btn-icon" onclick="rewriteSelection()"><div class="icon-sq">📝</div>Přepsat</div>
+                    <div class="btn-icon" onclick="explainSelection()"><div class="icon-sq">💡</div>Vysvětlit</div>
+                    <div class="btn-icon" onclick="translateSelection()"><div class="icon-sq">🌐</div>Přeložit</div>
+                </div>
+                <div class="group-label">Analýza a úpravy výběru</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="checkLegalRisks()"><div class="icon-sq">🛡️</div>Hledat rizika</div>
+                    <div class="btn-icon" onclick="summarizeDocument()"><div class="icon-sq">📋</div>Shrnutí</div>
+                    <div class="btn-icon" onclick="generateClause()"><div class="icon-sq">✍️</div>Nová doložka</div>
+                    <div class="btn-icon" onclick="continueWriting()"><div class="icon-sq">⚡</div>Dopsat AI</div>
+                </div>
+                <div class="group-label">Celý dokument a tvorba</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
                     <div class="btn-icon" onclick="openLexisLink()"><div class="icon-sq">📱</div>LexisLink Remote</div>
                 </div>
-                <div class="group-label">LexisAI</div>
+                <div class="group-label">Propojení</div>
             </div>
         </div>
 
@@ -1085,8 +1104,10 @@
                     <span style="font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 0.5px;">🤖 AGENT SWARMU:</span>
                     <select id="lexislocal-agent" class="combo-box" style="width: 100%; padding: 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
                         <option value="resersnik">📚 Rešeršník</option>
+                        <option value="spisovatel">📝 Spisovatel</option>
                         <option value="stylista">✍️ Stylista</option>
                         <option value="kontrolor">⚖️ Kontrolor</option>
+                        <option value="sekretarka">⏰ Sekretářka</option>
                     </select>
                 </div>
                 <div id="lexislocal-model-box" style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
@@ -1416,6 +1437,119 @@
                 lexisUI.customAlert("ℹ️ <b>Žádný výběr</b><br><br>Nejprve prosím označte myší část textu, kterou chcete analyzovat pomocí LexisAI.");
             }
         };
+
+        window.rewriteSelection = () => {
+            const range = lexisCore.quill.getSelection();
+            if (range && range.length > 0) {
+                const text = lexisCore.quill.getText(range.index, range.length);
+                lexisUI.toggleAIDrawer(true);
+                const input = document.getElementById('ai-prompt');
+                if (input) {
+                    input.value = `Přeformuluj a vylepši následující právní text, zachovej význam, ale zlepši stylistiku a přesnost:\n\n"${text}"`;
+                    window.sendAIQuery();
+                }
+            } else {
+                lexisUI.customAlert("ℹ️ <b>Žádný výběr</b><br><br>Nejprve prosím označte myší text, který chcete přepsat pomocí LexisAI.");
+            }
+        };
+
+        window.explainSelection = () => {
+            const range = lexisCore.quill.getSelection();
+            if (range && range.length > 0) {
+                const text = lexisCore.quill.getText(range.index, range.length);
+                lexisUI.toggleAIDrawer(true);
+                const input = document.getElementById('ai-prompt');
+                if (input) {
+                    input.value = `Vysvětli laicky i právně význam a právní důsledky následující smluvní doložky:\n\n"${text}"`;
+                    window.sendAIQuery();
+                }
+            } else {
+                lexisUI.customAlert("ℹ️ <b>Žádný výběr</b><br><br>Nejprve prosím označte myší doložku, kterou chcete vysvětlit.");
+            }
+        };
+
+        window.checkLegalRisks = () => {
+            lexisUI.toggleAIDrawer(true);
+            const input = document.getElementById('ai-prompt');
+            if (input) {
+                const range = lexisCore.quill.getSelection();
+                let text = "";
+                if (range && range.length > 0) {
+                    text = lexisCore.quill.getText(range.index, range.length);
+                    input.value = `Analyzuj možná právní rizika, nevýhodná ustanovení a slabá místa v této části textu:\n\n"${text}"`;
+                } else {
+                    text = lexisCore.quill.getText();
+                    input.value = `Analyzuj možná právní rizika, jednostranně nevýhodná ustanovení a slabá místa v celém tomto dokumentu:\n\n"${text.substring(0, 8000)}"`;
+                }
+                window.sendAIQuery();
+            }
+        };
+
+        window.summarizeDocument = () => {
+            lexisUI.toggleAIDrawer(true);
+            const input = document.getElementById('ai-prompt');
+            if (input) {
+                const range = lexisCore.quill.getSelection();
+                let text = "";
+                if (range && range.length > 0) {
+                    text = lexisCore.quill.getText(range.index, range.length);
+                    input.value = `Vytvoř stručné, přehledné a strukturované shrnutí této části textu:\n\n"${text}"`;
+                } else {
+                    text = lexisCore.quill.getText();
+                    input.value = `Vytvoř stručné, přehledné a strukturované manažerské shrnutí celého tohoto dokumentu (hlavní předmět, závazky, lhůty):\n\n"${text.substring(0, 8000)}"`;
+                }
+                window.sendAIQuery();
+            }
+        };
+
+        window.translateSelection = () => {
+            const range = lexisCore.quill.getSelection();
+            if (range && range.length > 0) {
+                const text = lexisCore.quill.getText(range.index, range.length);
+                lexisUI.customPrompt("Zadejte cílový jazyk (např. angličtina, němčina):", "angličtina", (lang) => {
+                    if (!lang) return;
+                    lexisUI.toggleAIDrawer(true);
+                    const input = document.getElementById('ai-prompt');
+                    if (input) {
+                        input.value = `Přelož následující právní text do jazyka [${lang}] a zajisti, aby byla použita správná a přesná právní terminologie:\n\n"${text}"`;
+                        window.sendAIQuery();
+                    }
+                });
+            } else {
+                lexisUI.customAlert("ℹ️ <b>Žádný výběr</b><br><br>Nejprve prosím označte myší text, který chcete přeložit.");
+            }
+        };
+
+        window.generateClause = () => {
+            lexisUI.customPrompt("Zadejte účel/popis doložky (např. Smluvní pokuta za prodlení, Rozhodčí doložka):", "", (desc) => {
+                if (!desc) return;
+                lexisUI.toggleAIDrawer(true);
+                const input = document.getElementById('ai-prompt');
+                if (input) {
+                    input.value = `Vygeneruj profesionální českou smluvní doložku pro následující účel: "${desc}". Odpověz zněním doložky a přidej stručný komentář k jejímu použití.`;
+                    window.sendAIQuery();
+                }
+            });
+        };
+
+        window.continueWriting = () => {
+            const range = lexisCore.quill.getSelection();
+            const index = range ? range.index : lexisCore.quill.getLength();
+            const start = Math.max(0, index - 1500);
+            const textBefore = lexisCore.quill.getText(start, index - start);
+            
+            if (textBefore.trim().length === 0) {
+                lexisUI.customAlert("ℹ️ <b>Prázdný dokument</b><br><br>Pro pokračování v psaní musí dokument obsahovat alespoň nějaký text před kurzorem.");
+                return;
+            }
+            
+            lexisUI.toggleAIDrawer(true);
+            const input = document.getElementById('ai-prompt');
+            if (input) {
+                input.value = `Pokračuj v psaní a rozviň následující rozepsaný právní text. Navážeš přesně na jeho konec, udržíš stejný styl, terminologii a formátování:\n\n"${textBefore}"`;
+                window.sendAIQuery();
+            }
+        };
         
         window.anonymizeSelection = () => {
             lexisUI.anonymize();
@@ -1438,6 +1572,7 @@
         window.setViewMode = (mode) => lexisUI.setViewMode(mode);
         window.startMailMerge = () => lexisUI.startMailMerge();
         window.calculateFee = () => lexisUI.showFeeCalc();
+        window.calculateTariff = () => lexisUI.showTariffCalc();
         window.calculateInterests = () => lexisUI.showInterestCalc();
         window.openDeadlineCalc = () => lexisUI.showDeadlineCalc();
         window.insertSignatureBlock = () => lexisUI.insertSignatureBlock();
@@ -1873,7 +2008,7 @@
                         <div style="display:flex;align-items:center;gap:12px;">
                             <span style="font-size:24px;">👆</span>
                             <div style="flex-grow:1;">
-                                <div style="font-size:13px;font-weight:700;color:#065f46;">Touch ID</div>
+                                <div id="sec-touchid-title" style="font-size:13px;font-weight:700;color:#065f46;">Touch ID</div>
                                 <div id="sec-touchid-status" style="font-size:11px;color:#059669;margin-top:2px;">Detekuji dostupnost...</div>
                             </div>
                             <label class="security-toggle">

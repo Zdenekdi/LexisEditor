@@ -63,6 +63,10 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
 1. Hledej nevýhodná ujednání, skryté automatické prolongace a nejasné platební podmínky.
 2. Upozorni na ustanovení, která by mohla být neplatná pro rozpor se zákonem nebo dobrými mravy.
 3. Vytvoř seznam chybějících klíčových ustanovení.`;
+        } else if (agentId === 'spisovatel') {
+            systemPromptToUse = `Jsi špičkový český advokát a mistr legislativního a kontraktuálního draftování (Lexis Writing Agent). Tvým úkolem je na základě zadání sestavovat precizní, bezchybné a strukturované právní dokumenty (smlouvy, podání k soudu, odvolání, žaloby) a zapracovávat do nich věcné či stylistické připomínky uživatele s maximálním právním a jazykovým citem.`;
+        } else if (agentId === 'sekretarka') {
+            systemPromptToUse = `Jsi vysoce organizovaná a profesionální advokátní sekretářka (Lexis Secretary Agent). Tvým úkolem je pomáhat advokátům strukturovat úkoly, shrnout termíny, upravovat tón e-mailové komunikace s klienty a organizovat spisové složky.`;
         }
 
         // --- PŘIDÁNO: Globální instrukce pro záhlaví a zápatí ---
