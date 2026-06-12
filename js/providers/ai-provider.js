@@ -69,7 +69,7 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
         systemPromptToUse += `\n\nDŮLEŽITÉ: Při generování smluv a podání generuj VŽDY pouze tělo dokumentu. Záhlaví a zápatí dokumentu nech na pokoji. Pokud z kontextu znáš "číslo jednací" nebo "číslo spisu", přidej kamkoliv do své odpovědi speciální skrytý HTML tag: <meta data-spis="ZDE_TVOJE_HODNOTA" /> (např. <meta data-spis="123/2024" />). Zbytek generuj jako čisté HTML (nadpisy, odstavce, bold).`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout for local LLM load
 
         try {
             // 0. LexisLocal Swarm Swarm Orchestrator
