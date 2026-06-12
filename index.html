@@ -890,7 +890,7 @@
 
     <div class="workspace">
             <!-- Left Sidebar -->
-            <div class="side-panels" id="sidebar">
+            <div class="side-panels collapsed" id="sidebar">
                 <!-- Obsah sidebaru (Doložky, Generátory) -->
                 <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--border); background: var(--ribbon-bg);">
                     <span style="font-weight: 700; font-size: 11px; color: var(--text-title); text-transform: uppercase; letter-spacing: 0.5px;">📚 KNIHOVNA A DOLOŽKY</span>
@@ -1021,7 +1021,7 @@
             </div>
 
             <!-- Right Sidebar -->
-            <div class="right-panels" id="right-sidebar">
+            <div class="right-panels collapsed" id="right-sidebar">
                 <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--border); background: var(--ribbon-bg);">
                     <span style="font-weight: 700; font-size: 11px; color: var(--text-title); text-transform: uppercase; letter-spacing: 0.5px;">📖 REFERENCE</span>
                     <span style="cursor: pointer; font-size: 14px; color: #94a3b8; font-weight: bold; transition: color 0.2s;" onclick="toggleSidebar('right-sidebar')" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">✕</span>
@@ -1267,6 +1267,7 @@
             const aiTab         = document.getElementById('ai-tab');
             const commentTab    = document.getElementById('comment-tab');
 
+            // Left sidebar tab positioning
             if (sidebar && sidebarTab) {
                 if (!sidebar.classList.contains('collapsed')) {
                     const r = sidebar.getBoundingClientRect();
@@ -1275,30 +1276,26 @@
                     sidebarTab.style.left = '0px';
                 }
             }
-            if (rightSidebar && referenceTab) {
-                if (!rightSidebar.classList.contains('collapsed')) {
-                    const r = rightSidebar.getBoundingClientRect();
-                    referenceTab.style.right = (window.innerWidth - r.left) + 'px';
-                } else {
-                    referenceTab.style.right = '0px';
-                }
+
+            // Right side tabs positioning (Unified offset to prevent overlap)
+            let rightOffset = 0;
+            if (aiDrawer && aiDrawer.classList.contains('open')) {
+                const r = aiDrawer.getBoundingClientRect();
+                rightOffset = Math.max(rightOffset, window.innerWidth - r.left);
             }
-            if (aiDrawer && aiTab) {
-                if (aiDrawer.classList.contains('open')) {
-                    const r = aiDrawer.getBoundingClientRect();
-                    aiTab.style.right = (window.innerWidth - r.left) + 'px';
-                } else {
-                    aiTab.style.right = '0px';
-                }
+            if (commentDrawer && commentDrawer.classList.contains('open')) {
+                const r = commentDrawer.getBoundingClientRect();
+                rightOffset = Math.max(rightOffset, window.innerWidth - r.left);
             }
-            if (commentDrawer && commentTab) {
-                if (commentDrawer.classList.contains('open')) {
-                    const r = commentDrawer.getBoundingClientRect();
-                    commentTab.style.right = (window.innerWidth - r.left) + 'px';
-                } else {
-                    commentTab.style.right = '0px';
-                }
+            if (rightSidebar && !rightSidebar.classList.contains('collapsed')) {
+                const r = rightSidebar.getBoundingClientRect();
+                rightOffset = Math.max(rightOffset, window.innerWidth - r.left);
             }
+
+            const offsetStr = rightOffset + 'px';
+            if (referenceTab) referenceTab.style.right = offsetStr;
+            if (aiTab) aiTab.style.right = offsetStr;
+            if (commentTab) commentTab.style.right = offsetStr;
         }
         window.addEventListener('resize', repositionTabs);
 

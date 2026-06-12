@@ -1476,7 +1476,65 @@ class LexisUI {
             const systemPrompt = "Jsi špičkový a přesný právní asistent.";
             const response = await this.core.callAI(promptText, systemPrompt);
             clearInterval(timerId);
-            loadingMsg.innerText = response;
+            
+            // Format response (support simple markdown-like bold/italic and newlines)
+            const formattedResponse = response
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            loadingMsg.innerHTML = `<div>${formattedResponse}</div>`;
+            
+            // Check if agent is 'spisovatel'
+            const agentSelect = document.getElementById('lexislocal-agent');
+            const agentId = agentSelect ? agentSelect.value : 'resersnik';
+            
+            if (agentId === 'spisovatel') {
+                // Insert directly into the editor
+                const range = this.core.quill.getSelection(true);
+                const index = range ? range.index : this.core.quill.getLength();
+                
+                let htmlToInsert = response
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                if (!htmlToInsert.startsWith('<p>')) {
+                    htmlToInsert = `<p>${htmlToInsert}</p>`;
+                }
+                
+                this.core.safePasteHTML(index, htmlToInsert);
+                
+                // Add a small success notice to the chat message
+                const notice = document.createElement('div');
+                notice.style = "font-size: 10px; color: #16a34a; margin-top: 8px; font-weight: bold; display: flex; align-items: center; gap: 4px;";
+                notice.innerHTML = `<span>✅ Automaticky vloženo do dokumentu</span>`;
+                loadingMsg.appendChild(notice);
+            } else {
+                // Add button to insert manually
+                const insertBtn = document.createElement('button');
+                insertBtn.style = "margin-top: 8px; padding: 4px 8px; font-size: 10px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: background 0.2s;";
+                insertBtn.innerText = "📥 Vložit do dokumentu";
+                insertBtn.onclick = () => {
+                    const range = this.core.quill.getSelection(true);
+                    const index = range ? range.index : this.core.quill.getLength();
+                    let htmlToInsert = response
+                        .replace(/\n\n/g, '</p><p>')
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+                    
+                    if (!htmlToInsert.startsWith('<p>')) {
+                        htmlToInsert = `<p>${htmlToInsert}</p>`;
+                    }
+                    this.core.safePasteHTML(index, htmlToInsert);
+                    insertBtn.innerText = "✅ Vloženo";
+                    insertBtn.disabled = true;
+                    insertBtn.style.background = "#10b981";
+                };
+                loadingMsg.appendChild(insertBtn);
+            }
             
             if (status !== 'Enterprise') {
                 const badge = document.createElement('div');
