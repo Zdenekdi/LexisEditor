@@ -1536,6 +1536,25 @@ class LexisUI {
                 loadingMsg.appendChild(insertBtn);
             }
             
+            // Check if agent got a command to send email
+            const lowercasePrompt = promptText.toLowerCase();
+            const hasMailKeyword = lowercasePrompt.includes('mail') || lowercasePrompt.includes('pošt');
+            const hasSendKeyword = lowercasePrompt.includes('pošli') || 
+                                   lowercasePrompt.includes('odešli') || 
+                                   lowercasePrompt.includes('odeslat') || 
+                                   lowercasePrompt.includes('poslat') || 
+                                   lowercasePrompt.includes('zašli') || 
+                                   lowercasePrompt.includes('zaslat') || 
+                                   lowercasePrompt.includes('send') ||
+                                   lowercasePrompt.includes('emailuj') ||
+                                   lowercasePrompt.includes('e-mailuj');
+            
+            if (hasMailKeyword && hasSendKeyword) {
+                setTimeout(() => {
+                    this.sendViaEmail();
+                }, 1000);
+            }
+            
             if (status !== 'Enterprise') {
                 const badge = document.createElement('div');
                 badge.style = "font-size: 9px; color:#f43f5e; margin-top:5px; font-weight:bold;";
@@ -1969,7 +1988,9 @@ class LexisUI {
     sendViaEmail() {
         const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
         const subject = "Dokument z LexisEditoru: " + docTitle;
-        const body = "V příloze zasílám vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
+        const documentText = this.core.getText() || "";
+        const emailContent = documentText.length < 1500 ? documentText : (documentText.substring(0, 1500) + "\n\n...[Text zkrácen z důvodu limitu délky odkazu]...");
+        const body = `${emailContent}\n\n---\nOdesláno z LexisEditoru`;
         window.location.href = `mailto:kontakt@nexusstack.eu?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
 
