@@ -1007,6 +1007,10 @@ class LexisUI {
         this.dialogs.showFeeCalc();
     }
 
+    showTariffCalc() {
+        this.dialogs.showTariffCalc();
+    }
+
     showInterestCalc() {
         this.dialogs.showInterestCalc();
     }
@@ -1892,7 +1896,7 @@ class LexisUI {
         const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
         const subject = "Dokument z LexisEditoru: " + docTitle;
         const body = "V příloze zasílám vygenerovaný právní dokument.\n\n---\nOdesláno z LexisEditoru";
-        window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = `mailto:kontakt@nexusstack.eu?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
 
     async saveAsTemplateDialog() {
@@ -4868,8 +4872,12 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             'editFooter': 'Upravit zápatí stránky (hladký přesun a focus).',
             'insertPageNumber': 'Vložit pole s dynamickým číslem stránky.',
             'calculateFee': 'Spočítat soudní poplatek podle výše nároku.',
+            'calculateTariff': 'Spočítat mimosmluvní odměnu advokáta podle vyhlášky č. 177/1996 Sb. (Advokátní tarif).',
             'openDeadlineCalc': 'Spočítat procesní lhůtu a zkontrolovat pracovní dny.',
             'calculateInterests': 'Spočítat úrok z prodlení podle nařízení vlády.',
+            'translateSelection': 'Přeložit vybraný právní text do zvoleného jazyka.',
+            'generateClause': 'Vygenerovat novou smluvní doložku na základě popisu.',
+            'continueWriting': 'Nechat AI navázat a dopsat text za pozicí kurzoru.',
             'insertSignatureBlock': 'Vložit formální podpisový blok na konec dokumentu.',
             'insertMySignature': 'Vložit váš uložený digitální podpis.',
             'anonymizeSelection': 'Spustit automatickou anonymizaci citlivých osobních údajů v dokumentu.',
