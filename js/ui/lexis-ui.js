@@ -1453,14 +1453,29 @@ class LexisUI {
         output.scrollTop = output.scrollHeight;
         
         const loadingMsg = document.createElement('div');
-        loadingMsg.style = "padding: 8px 12px; border-radius: 8px; background: #f1f5f9; margin-bottom: 10px; font-size:12px; color:#64748b;";
-        loadingMsg.innerText = "AI přemýšlí...";
+        loadingMsg.style = "padding: 8px 12px; border-radius: 8px; background: #f1f5f9; margin-bottom: 10px; font-size:12px; color:#64748b; min-width: 150px;";
         output.appendChild(loadingMsg);
         output.scrollTop = output.scrollHeight;
+        
+        const startTime = Date.now();
+        const timerId = setInterval(() => {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            const dots = '.'.repeat((elapsed % 3) + 1);
+            loadingMsg.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 12px; height: 12px; border: 2px solid #cbd5e1; border-top: 2px solid #7c3aed; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite; flex-shrink: 0;"></span>
+                        <span style="font-weight: 500;">AI přemýšlí${dots}</span>
+                    </div>
+                    <span style="font-size: 10px; color: #94a3b8; font-weight: 600; white-space: nowrap;">${elapsed} s</span>
+                </div>
+            `;
+        }, 500);
         
         try {
             const systemPrompt = "Jsi špičkový a přesný právní asistent.";
             const response = await this.core.callAI(promptText, systemPrompt);
+            clearInterval(timerId);
             loadingMsg.innerText = response;
             
             if (status !== 'Enterprise') {
@@ -1470,6 +1485,7 @@ class LexisUI {
                 loadingMsg.appendChild(badge);
             }
         } catch (e) {
+            clearInterval(timerId);
             loadingMsg.innerText = "Chyba při komunikaci s AI.";
         }
         output.scrollTop = output.scrollHeight;
