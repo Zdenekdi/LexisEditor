@@ -12,17 +12,52 @@ let mainWindow;
 
 // --- BIOMETRIC / TOUCH ID SUPPORT ---
 ipcMain.handle('authenticate-biometric', async (event, reason) => {
-    if (process.platform !== 'darwin') return { success: false, error: 'Biometrika je dostupná pouze na macOS.' };
-    
-    try {
-        if (!systemPreferences.canPromptTouchID()) {
-            return { success: false, error: 'Touch ID není na tomto zařízení dostupné nebo nastavené.' };
+    if (process.platform === 'darwin') {
+        try {
+            if (!systemPreferences.canPromptTouchID()) {
+                return { success: false, error: 'Touch ID není na tomto zařízení dostupné nebo nastavené.' };
+            }
+            await systemPreferences.promptTouchID(reason || 'Ověření pro přístup k zabezpečeným údajům');
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
         }
-        
-        await systemPreferences.promptTouchID(reason || 'Ověření pro přístup k zabezpečeným údajům');
-        return { success: true };
-    } catch (e) {
-        return { success: false, error: e.message };
+    } else if (process.platform === 'win32') {
+        const { exec } = require('child_process');
+        return new Promise((resolve) => {
+            const psScript = `
+                [Void][System.Reflection.Assembly]::LoadWithPartialName("System.Runtime.WindowsRuntime")
+                try {
+                    $status = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("${reason || 'Ověření pro přístup k zabezpečeným údajům'}").GetAwaiter().GetResult()
+                    if ($status -eq "Verified") {
+                        Write-Output "SUCCESS"
+                    } else {
+                        Write-Output "ERROR: $status"
+                    }
+                } catch {
+                    Write-Output "ERROR: $_"
+                }
+            `.trim();
+            
+            const tempScriptPath = path.join(app.getPath('temp'), 'verify_hello.ps1');
+            fs.writeFileSync(tempScriptPath, psScript, 'utf-8');
+            
+            exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`, (error, stdout) => {
+                try { fs.unlinkSync(tempScriptPath); } catch(e) {}
+                if (error) {
+                    resolve({ success: false, error: error.message });
+                } else {
+                    const output = stdout.trim();
+                    if (output === "SUCCESS") {
+                        resolve({ success: true });
+                    } else {
+                        resolve({ success: false, error: output || "Ověření Windows Hello selhalo." });
+                    }
+                }
+            });
+        });
+    } else {
+        return { success: false, error: 'Biometrické ověření není na této platformě podporováno.' };
     }
 });
 
@@ -848,10 +883,41 @@ ipcMain.handle('lock-verify-password', async (event, inputPassword) => {
 
 // Touch ID dostupnost
 ipcMain.handle('lock-touchid-available', async () => {
-    if (process.platform !== 'darwin') return { available: false };
-    try {
-        return { available: systemPreferences.canPromptTouchID() };
-    } catch (e) {
-        return { available: false };
+    if (process.platform === 'darwin') {
+        try {
+            return { available: systemPreferences.canPromptTouchID() };
+        } catch (e) {
+            return { available: false };
+        }
+    } else if (process.platform === 'win32') {
+        const { exec } = require('child_process');
+        return new Promise((resolve) => {
+            const checkScript = `
+                [Void][System.Reflection.Assembly]::LoadWithPartialName("System.Runtime.WindowsRuntime")
+                try {
+                    $avail = [Windows.Security.Credentials.UI.UserConsentVerifier]::GetAvailabilityAsync().GetAwaiter().GetResult()
+                    if ($avail -eq "Available") {
+                        Write-Output "AVAILABLE"
+                    } else {
+                        Write-Output "UNAVAILABLE"
+                    }
+                } catch {
+                    Write-Output "UNAVAILABLE"
+                }
+            `.trim();
+            
+            const tempCheckPath = path.join(app.getPath('temp'), 'check_hello.ps1');
+            fs.writeFileSync(tempCheckPath, checkScript, 'utf-8');
+            
+            exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempCheckPath}"`, (error, stdout) => {
+                try { fs.unlinkSync(tempCheckPath); } catch(e) {}
+                if (error) {
+                    resolve({ available: false });
+                } else {
+                    resolve({ available: stdout.trim() === "AVAILABLE" });
+                }
+            });
+        });
     }
+    return { available: false };
 });

@@ -1,7 +1,7 @@
 {
   "name": "lexiseditor",
   "productName": "LexisEditor",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Zdenekdi/LexisEditor.git"
@@ -82,10 +82,6 @@
     "html-to-docx": "^1.8.0",
     "node-forge": "^1.3.1",
     "pdf-parse": "^1.1.1"
-  },
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
   },
   "keywords": [],
   "type": "commonjs",

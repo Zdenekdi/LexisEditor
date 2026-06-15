@@ -11,6 +11,8 @@ class LexisLock {
         this._touchIdAvailable = false;
         this._config = null; // { enabled, method, touchIdEnabled, hasPassword }
         this._unlocked = false;
+        this._isMac = navigator.userAgent.indexOf('Mac') >= 0;
+        this._biometricName = this._isMac ? 'Touch ID' : 'Windows Hello';
 
         // Inicializace po načtení stránky
         window.addEventListener('DOMContentLoaded', () => this._init());
@@ -41,12 +43,14 @@ class LexisLock {
         el.style.display = 'flex';
         this._unlocked = false;
 
-        // Zobraz Touch ID sekci pokud je dostupná a povolená
+        // Zobraz biometrickou sekci pokud je dostupná a povolená
         const touchIdSection = document.getElementById('lock-touchid-section');
         if (touchIdSection) {
             if (this._touchIdAvailable && this._config?.touchIdEnabled) {
                 touchIdSection.style.display = 'block';
-                // Automaticky spusť Touch ID po 400ms
+                const label = document.getElementById('lock-touchid-label');
+                if (label) label.textContent = this._biometricName;
+                // Automaticky spusť ověření po 400ms
                 setTimeout(() => this.tryTouchId(), 400);
             } else {
                 touchIdSection.style.display = 'none';
@@ -105,7 +109,7 @@ class LexisLock {
         const label = document.getElementById('lock-touchid-label');
 
         if (btn) btn.classList.add('scanning');
-        if (label) label.textContent = 'Čekám na Touch ID...';
+        if (label) label.textContent = `Čekám na ${this._biometricName}...`;
 
         try {
             const result = await window.electronAPI.authenticateBiometric('Odemknout LexisEditor');
@@ -118,16 +122,16 @@ class LexisLock {
             } else {
                 if (btn) { btn.classList.remove('scanning'); btn.classList.add('error'); }
                 if (icon) icon.textContent = '❌';
-                if (label) label.textContent = result.error || 'Touch ID selhalo';
+                if (label) label.textContent = result.error || `${this._biometricName} selhalo`;
                 setTimeout(() => {
                     if (btn) { btn.classList.remove('error'); }
                     if (icon) icon.textContent = '👆';
-                    if (label) label.textContent = 'Touch ID';
+                    if (label) label.textContent = this._biometricName;
                 }, 2000);
             }
         } catch (e) {
             if (btn) btn.classList.remove('scanning');
-            if (label) label.textContent = 'Touch ID nedostupné';
+            if (label) label.textContent = `${this._biometricName} nedostupné`;
         }
     }
 
@@ -241,13 +245,19 @@ class LexisLock {
         const settingsBody = document.getElementById('sec-settings-body');
         if (settingsBody) settingsBody.style.display = this._config?.enabled ? 'flex' : 'none';
 
-        // Touch ID row
+        // Touch ID / Windows Hello row
         const touchIdRow = document.getElementById('sec-touchid-row');
         const touchIdCb = document.getElementById('sec-touchid-enabled');
         const touchIdStatus = document.getElementById('sec-touchid-status');
+        const touchIdTitle = document.getElementById('sec-touchid-title');
         if (touchIdRow) touchIdRow.style.display = this._touchIdAvailable ? 'block' : 'none';
         if (touchIdCb) touchIdCb.checked = this._config?.touchIdEnabled || false;
-        if (touchIdStatus) touchIdStatus.textContent = this._touchIdAvailable ? 'Touch ID je dostupné na tomto Macu.' : 'Touch ID není dostupné.';
+        if (touchIdTitle) touchIdTitle.textContent = this._biometricName;
+        if (touchIdStatus) {
+            touchIdStatus.textContent = this._touchIdAvailable 
+                ? (this._isMac ? 'Touch ID je dostupné na tomto Macu.' : 'Windows Hello je dostupné na tomto zařízení.')
+                : (this._isMac ? 'Touch ID není dostupné.' : 'Windows Hello není dostupné.');
+        }
 
         // Heslo
         const hasPassEl = document.getElementById('sec-has-password');
@@ -300,7 +310,7 @@ class LexisLock {
             touchIdEnabled: enabled
         });
         if (this._config) this._config.touchIdEnabled = enabled;
-        this._showToast(enabled ? '👆 Touch ID povoleno.' : '👆 Touch ID vypnuto.', 'info');
+        this._showToast(enabled ? `👆 ${this._biometricName} povoleno.` : `👆 ${this._biometricName} vypnuto.`, 'info');
     }
 
     async savePassword() {
