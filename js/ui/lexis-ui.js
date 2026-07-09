@@ -1926,6 +1926,17 @@ class LexisUI {
                     </div>
 
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
+                            <span>📜 Auditní stopa (AI Act Ledger)</span>
+                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:#003399; color:white; border:none; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">Ověřit</button>
+                        </h4>
+                        <div id="ledger-verification-status" style="font-size:10px; margin-bottom:8px; font-weight:bold;"></div>
+                        <div id="ledger-recent-transactions" style="font-size:10px; color:#64748b; display:flex; flex-direction:column; gap:4px;">
+                            Načítám poslední transakce...
+                        </div>
+                    </div>
+
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
                         <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
                             🔑 Správa lokálního šifrování
                         </h4>
@@ -1987,6 +1998,58 @@ class LexisUI {
                     `;
                 } catch (e) {
                     statusEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`;
+                }
+            };
+
+            window.verifyLedgerIntegrity = async () => {
+                const statusEl = document.getElementById('ledger-verification-status');
+                if (!statusEl) return;
+                statusEl.innerHTML = "Ověřuji hashovací blockchain řetězec...";
+                statusEl.style.color = "#64748b";
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/audit/transparency/verify`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při verifikaci.");
+                    
+                    const data = await response.json();
+                    if (data.valid) {
+                        statusEl.innerHTML = "✅ Integrita ledgeru je 100% v pořádku!";
+                        statusEl.style.color = "#16a34a";
+                    } else {
+                        statusEl.innerHTML = `❌ Narušena integrita: ${data.reason}`;
+                        statusEl.style.color = "#ef4444";
+                    }
+                } catch (e) {
+                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
+                    statusEl.style.color = "#ef4444";
+                }
+            };
+
+            window.loadRecentLedgerTransactions = async () => {
+                const listEl = document.getElementById('ledger-recent-transactions');
+                if (!listEl) return;
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/audit/transparency`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při načítání transakcí.");
+                    
+                    const logs = await response.json();
+                    if (logs.length === 0) {
+                        listEl.innerHTML = "Žádné záznamy v ledgeru.";
+                        return;
+                    }
+                    
+                    const recent = logs.slice(-5).reverse();
+                    listEl.innerHTML = recent.map(log => `
+                        <div style="padding:4px; background:white; border:1px solid #e2e8f0; border-radius:4px; font-family:monospace; font-size:9px;">
+                            <strong>[${log.action}]</strong> ${log.prompt ? log.prompt.substring(0, 40) + '...' : ''}<br>
+                            <span style="color:#94a3b8;">Hash: ${log.hash ? log.hash.substring(0, 12) + '...' : 'none'}</span>
+                        </div>
+                    `).join('');
+                } catch (e) {
+                    listEl.innerHTML = "Chyba při načítání auditních logů.";
                 }
             };
 
@@ -2056,7 +2119,100 @@ class LexisUI {
 
             if (actions) actions.style.display = 'none';
             window.loadSovereignTelemetry();
+            window.loadRecentLedgerTransactions();
         }
+    }
+
+    async anonymizeDocument() {
+        const text = this.core.getText();
+        if (!text || !text.trim()) {
+            this.dialogs.customAlert("Dokument je prázdný, není co anonymizovat.");
+            return;
+        }
+
+        try {
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/document/anonymize`, {
+                method: 'POST',
+                headers: conn.headers,
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+            const data = await response.json();
+            
+            this.showAnonymizationDialog(text, data.anonymized);
+        } catch (e) {
+            this.dialogs.customAlert("Nepodařilo se anonymizovat dokument: " + e.message);
+        }
+    }
+
+    showAnonymizationDialog(originalText, anonymizedText) {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(15, 23, 42, 0.6)';
+        overlay.style.backdropFilter = 'blur(8px)';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+        overlay.style.fontFamily = "'Inter', sans-serif";
+
+        const dialog = document.createElement('div');
+        dialog.style.background = 'white';
+        dialog.style.padding = '25px';
+        dialog.style.borderRadius = '12px';
+        dialog.style.maxWidth = '650px';
+        dialog.style.width = '90%';
+        dialog.style.boxShadow = '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)';
+        dialog.style.display = 'flex';
+        dialog.style.flexDirection = 'column';
+        dialog.style.gap = '15px';
+
+        dialog.innerHTML = `
+            <h3 style="margin: 0; color: #003399; display: flex; align-items: center; gap: 8px; font-size: 16px;">
+                <span>🛡️</span> GDPR Data Shield Anonymizace
+            </h3>
+            <p style="margin: 0; font-size: 11px; color: #64748b; line-height: 1.4;">
+                Níže vidíte náhled textu po odstranění citlivých údajů. Můžete jej před nahrazením dále ručně upravit.
+            </p>
+            <div style="display: flex; gap: 15px; height: 250px;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 10px; font-weight: bold; color: #64748b;">PŮVODNÍ TEXT</span>
+                    <textarea readonly style="flex: 1; font-size: 10px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; resize: none; background: #f8fafc; color: #94a3b8;">${originalText}</textarea>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-size: 10px; font-weight: bold; color: #16a34a;">ANONYMIZOVANÝ TEXT</span>
+                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 10px; padding: 8px; border: 1px solid #16a34a; border-radius: 6px; resize: none; background: #f0fdf4; color: #166534;">${anonymizedText}</textarea>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                <button id="btn-anon-cancel" style="padding: 8px 16px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569;">Zrušit</button>
+                <button id="btn-anon-confirm" style="padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">Nahradit text v dokumentu</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        dialog.querySelector('#btn-anon-cancel').onclick = () => {
+            document.body.removeChild(overlay);
+        };
+
+        dialog.querySelector('#btn-anon-confirm').onclick = () => {
+            const finalText = dialog.querySelector('#anonymized-preview-text').value;
+            const anonymizedHtml = finalText
+                .split('\\n')
+                .map(para => para.trim() ? `<p>${para}</p>` : '<p><br></p>')
+                .join('');
+            this.core.setContent(anonymizedHtml);
+            document.body.removeChild(overlay);
+        };
+    }
     }
 
     scanForVariables() {
