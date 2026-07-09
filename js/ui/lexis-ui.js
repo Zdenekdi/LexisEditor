@@ -1906,6 +1906,156 @@ class LexisUI {
         } else if (subTab === 'kb') {
             output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
             if (actions) actions.style.display = 'none';
+        } else if (subTab === 'sovereignty') {
+            output.innerHTML = `
+                <div style="font-family: system-ui, sans-serif; color: #1e293b; line-height: 1.5;">
+                    <h3 style="margin-top:0; color:#003399; display:flex; align-items:center; gap:8px; font-size: 14px;">
+                        <span>🇪🇺</span> Technologická suverenita EU
+                    </h3>
+                    <p style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom: 15px;">
+                        Systém běží lokálně a plně odpovídá evropským nařízením o ochraně osobních údajů (GDPR) a suverenitě.
+                    </p>
+                    
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
+                            🔋 Ekologická Telemetrie & Spotřeba
+                        </h4>
+                        <div id="sovereign-telemetry-status" style="font-size:11px; display:flex; flex-direction:column; gap:6px;">
+                            Načítám telemetrická data z lokálního serveru...
+                        </div>
+                    </div>
+
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
+                            🔑 Správa lokálního šifrování
+                        </h4>
+                        <p style="margin:0 0 8px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                            Vektorové databáze (RAG) jsou kryptograficky odděleny pro každý spis. Můžete rotovat šifrovací klíče.
+                        </p>
+                        <button onclick="window.rotateLocalKeys()" style="width:100%; padding:6px 12px; background:#003399; color:white; border:none; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">
+                            🔄 Rotovat šifrovací klíče
+                        </button>
+                        <div id="key-rotation-status" style="font-size:10px; margin-top:5px; font-weight:bold;"></div>
+                    </div>
+
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
+                            📦 Dlouhodobá archivace (PDF/A Deskriptor)
+                        </h4>
+                        <p style="margin:0 0 8px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                            Stáhněte si standardizovaná metadata v Dublin Core XML formátu k aktuálnímu dokumentu.
+                        </p>
+                        <button onclick="window.downloadArchivalMetadata()" style="width:100%; padding:6px 12px; background:#16a34a; color:white; border:none; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">
+                            📥 Stáhnout Dublin Core XML
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            window.loadSovereignTelemetry = async () => {
+                const statusEl = document.getElementById('sovereign-telemetry-status');
+                if (!statusEl) return;
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/system/telemetry`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+                    
+                    const stats = await response.json();
+                    statusEl.innerHTML = `
+                        <table style="width:100%; border-collapse:collapse; font-size:10px; margin-top:5px;">
+                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
+                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">Systém:</td>
+                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.platform} (${stats.arch})</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
+                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">CPU Cores / Uptime:</td>
+                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.cpuCores} jader / ${Math.round(stats.uptimeSeconds / 3600)} hod</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
+                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">Zatížení systému (Load):</td>
+                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.systemLoad}</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
+                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">RAM (Celkem / Volno):</td>
+                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.memoryTotalGb} GB / ${stats.memoryFreeGb} GB</td>
+                            </tr>
+                            <tr style="height:20px;">
+                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">VRAM (Celkem / Volno):</td>
+                                <td style="text-align:right; font-weight:700; color:#003399; padding:2px 0;">${stats.vramTotalGb} GB / ${stats.vramFreeGb} GB</td>
+                            </tr>
+                        </table>
+                    `;
+                } catch (e) {
+                    statusEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`;
+                }
+            };
+
+            window.rotateLocalKeys = async () => {
+                const statusEl = document.getElementById('key-rotation-status');
+                if (!statusEl) return;
+                statusEl.innerHTML = "Rotuji klíče a přešifrovávám databázi...";
+                statusEl.style.color = "#64748b";
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/system/rotate-key`, { method: 'POST', headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při rotaci klíče.");
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        statusEl.innerHTML = "✅ Klíč úspěšně rotován a RAG indexy přešifrovány!";
+                        statusEl.style.color = "#16a34a";
+                    } else {
+                        throw new Error(data.error || "Neznámá chyba.");
+                    }
+                } catch (e) {
+                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
+                    statusEl.style.color = "#ef4444";
+                }
+            };
+
+            window.downloadArchivalMetadata = async () => {
+                try {
+                    const title = this.currentDocumentTitle || "Nový dokument";
+                    const creator = (await this.core.storage.get('settings', 'lawyer-name')) || "JUDr. Martin Černý";
+                    const description = this.core.getText().substring(0, 200).trim() || "Archivovaný dokument";
+                    const language = document.getElementById('app-lang')?.value || "cs";
+
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/document/archive`, {
+                        method: 'POST',
+                        headers: conn.headers,
+                        body: JSON.stringify({
+                            title,
+                            creator,
+                            subject: 'Právní dokument',
+                            description,
+                            type: 'Text',
+                            language,
+                            rights: 'Copyright (c) ' + new Date().getFullYear() + ' ' + creator
+                        })
+                    });
+
+                    if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+
+                    const xmlText = await response.text();
+                    
+                    const blob = new Blob([xmlText], { type: 'application/xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_metadata.xml`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert("Chyba při stahování metadat: " + e.message);
+                }
+            };
+
+            if (actions) actions.style.display = 'none';
+            window.loadSovereignTelemetry();
         }
     }
 
