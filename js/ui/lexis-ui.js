@@ -1895,40 +1895,97 @@ class LexisUI {
                     <button onclick="document.getElementById('ai-prompt').value='Vyhledej judikáty ohledně smluvní pokuty'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-bottom:5px;">Smluvní pokuta</button>
                 `;
             }
-        } else if (subTab === 'summary') {
-            output.innerHTML = "📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.";
-            if (actions) {
-                actions.style.display = 'flex';
-                actions.innerHTML = `
-                    <button onclick="document.getElementById('ai-prompt').value='Vytvoř stručné a strukturované shrnutí tohoto textu.'; window.sendAIQuery()" style="padding:8px 16px; background:var(--word-blue); color:white; border:none; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ Spustit shrnutí</button>
-                `;
-            }
-        } else if (subTab === 'kb') {
-            output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
-            if (actions) actions.style.display = 'none';
         } else if (subTab === 'sovereignty') {
             output.innerHTML = `
-                <div style="font-family: system-ui, sans-serif; color: #1e293b; line-height: 1.5;">
-                    <h3 style="margin-top:0; color:#003399; display:flex; align-items:center; gap:8px; font-size: 14px;">
-                        <span>🇪🇺</span> Technologická suverenita EU
-                    </h3>
-                    <p style="font-size:11px; color:#64748b; line-height:1.4; margin-bottom: 15px;">
-                        Systém běží lokálně a plně odpovídá evropským nařízením o ochraně osobních údajů (GDPR) a suverenitě.
+                <style>
+                    .sov-card {
+                        background: rgba(255, 255, 255, 0.7);
+                        backdrop-filter: blur(10px);
+                        border: 1px solid rgba(226, 232, 240, 0.8);
+                        border-radius: 12px;
+                        padding: 14px;
+                        margin-bottom: 15px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .sov-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+                        border-color: rgba(99, 102, 241, 0.4);
+                    }
+                    .sov-btn {
+                        width: 100%;
+                        padding: 8px 14px;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        transition: all 0.2s ease-in-out;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+                    }
+                    .sov-btn-blue {
+                        background: linear-gradient(135deg, #003399, #1e40af);
+                        color: white;
+                    }
+                    .sov-btn-blue:hover {
+                        background: linear-gradient(135deg, #1e40af, #1d4ed8);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 6px rgba(30, 64, 175, 0.2);
+                    }
+                    .sov-btn-green {
+                        background: linear-gradient(135deg, #16a34a, #15803d);
+                        color: white;
+                    }
+                    .sov-btn-green:hover {
+                        background: linear-gradient(135deg, #15803d, #166534);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 6px rgba(22, 163, 74, 0.2);
+                    }
+                    .ledger-dot {
+                        width: 6px;
+                        height: 6px;
+                        background: #6366f1;
+                        border-radius: 50%;
+                        display: inline-block;
+                        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+                    }
+                    .ledger-badge {
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 8px;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                </style>
+                <div style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; line-height: 1.5; padding: 5px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <h3 style="margin:0; color:#003399; display:flex; align-items:center; gap:8px; font-size: 14px; font-weight: 800;">
+                            <span>🇪🇺</span> Technologická suverenita
+                        </h3>
+                        <span style="font-size: 9px; font-weight: bold; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px;">Lokální AI</span>
+                    </div>
+                    <p style="font-size:11px; color:#64748b; line-height:1.4; margin: 0 0 15px 0;">
+                        Systém běží lokálně na vašem HW a plně odpovídá evropským nařízením o ochraně osobních údajů (GDPR) a AI Act.
                     </p>
                     
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
-                            🔋 Ekologická Telemetrie & Spotřeba
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>🔋</span> Ekologická Telemetrie & HW
                         </h4>
                         <div id="sovereign-telemetry-status" style="font-size:11px; display:flex; flex-direction:column; gap:6px;">
                             Načítám telemetrická data z lokálního serveru...
                         </div>
                     </div>
 
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
-                            <span>📜 Auditní stopa (AI Act Ledger)</span>
-                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:#003399; color:white; border:none; border-radius:4px; font-size:9px; font-weight:bold; cursor:pointer;">Ověřit</button>
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="display:flex; align-items:center; gap:6px;"><span>📜</span> AI Act Ledger (Audit)</span>
+                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:rgba(0,51,153,0.1); color:#003399; border:1px solid rgba(0,51,153,0.2); border-radius:4px; font-size:9px; font-weight:800; cursor:pointer; transition: all 0.2s;">Ověřit integritu</button>
                         </h4>
                         <div id="ledger-verification-status" style="font-size:10px; margin-bottom:8px; font-weight:bold;"></div>
                         <div id="ledger-recent-transactions" style="font-size:10px; color:#64748b; display:flex; flex-direction:column; gap:4px;">
@@ -1936,27 +1993,27 @@ class LexisUI {
                         </div>
                     </div>
 
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; margin-bottom:15px;">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
-                            🔑 Správa lokálního šifrování
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>🔑</span> Rotace šifrovacích klíčů
                         </h4>
-                        <p style="margin:0 0 8px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
                             Vektorové databáze (RAG) jsou kryptograficky odděleny pro každý spis. Můžete rotovat šifrovací klíče.
                         </p>
-                        <button onclick="window.rotateLocalKeys()" style="width:100%; padding:6px 12px; background:#003399; color:white; border:none; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">
+                        <button onclick="window.rotateLocalKeys()" class="sov-btn sov-btn-blue">
                             🔄 Rotovat šifrovací klíče
                         </button>
                         <div id="key-rotation-status" style="font-size:10px; margin-top:5px; font-weight:bold;"></div>
                     </div>
 
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px;">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
-                            📦 Dlouhodobá archivace (PDF/A Deskriptor)
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>📦</span> Dublin Core PDF/A Archivace
                         </h4>
-                        <p style="margin:0 0 8px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
                             Stáhněte si standardizovaná metadata v Dublin Core XML formátu k aktuálnímu dokumentu.
                         </p>
-                        <button onclick="window.downloadArchivalMetadata()" style="width:100%; padding:6px 12px; background:#16a34a; color:white; border:none; border-radius:4px; font-size:10px; font-weight:bold; cursor:pointer;">
+                        <button onclick="window.downloadArchivalMetadata()" class="sov-btn sov-btn-green">
                             📥 Stáhnout Dublin Core XML
                         </button>
                     </div>
@@ -1972,29 +2029,42 @@ class LexisUI {
                     if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
                     
                     const stats = await response.json();
+                    
+                    const ramUsedGb = stats.memoryTotalGb - stats.memoryFreeGb;
+                    const ramPct = Math.round((ramUsedGb / stats.memoryTotalGb) * 100);
+                    
+                    const vramTotal = stats.vramTotalGb || 8;
+                    const vramFree = stats.vramFreeGb || 5;
+                    const vramUsedGb = vramTotal - vramFree;
+                    const vramPct = Math.round((vramUsedGb / vramTotal) * 100);
+
                     statusEl.innerHTML = `
-                        <table style="width:100%; border-collapse:collapse; font-size:10px; margin-top:5px;">
-                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
-                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">Systém:</td>
-                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.platform} (${stats.arch})</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
-                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">CPU Cores / Uptime:</td>
-                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.cpuCores} jader / ${Math.round(stats.uptimeSeconds / 3600)} hod</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
-                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">Zatížení systému (Load):</td>
-                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.systemLoad}</td>
-                            </tr>
-                            <tr style="border-bottom:1px solid #e2e8f0; height:20px;">
-                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">RAM (Celkem / Volno):</td>
-                                <td style="text-align:right; font-weight:700; padding:2px 0;">${stats.memoryTotalGb} GB / ${stats.memoryFreeGb} GB</td>
-                            </tr>
-                            <tr style="height:20px;">
-                                <td style="color:#64748b; font-weight:bold; padding:2px 0;">VRAM (Celkem / Volno):</td>
-                                <td style="text-align:right; font-weight:700; color:#003399; padding:2px 0;">${stats.vramTotalGb} GB / ${stats.vramFreeGb} GB</td>
-                            </tr>
-                        </table>
+                        <div style="font-size: 10px; color: #64748b; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                            <div><strong>OS:</strong> ${stats.platform} (${stats.arch})</div>
+                            <div style="text-align: right;"><strong>CPU:</strong> ${stats.cpuCores} jader</div>
+                            <div><strong>Uptime:</strong> ${Math.round(stats.uptimeSeconds / 3600)} hod</div>
+                            <div style="text-align: right;"><strong>Zatížení:</strong> ${stats.systemLoad}</div>
+                        </div>
+                        
+                        <div style="margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                                <span>🧠 Operační paměť (RAM)</span>
+                                <span>${ramUsedGb.toFixed(1)} / ${stats.memoryTotalGb} GB (${ramPct}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${ramPct}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 3px;"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                                <span>🔋 Grafická paměť (VRAM)</span>
+                                <span>${vramUsedGb.toFixed(1)} / ${vramTotal} GB (${vramPct}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${vramPct}%; height: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); border-radius: 3px;"></div>
+                            </div>
+                        </div>
                     `;
                 } catch (e) {
                     statusEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`;
@@ -2037,19 +2107,41 @@ class LexisUI {
                     
                     const logs = await response.json();
                     if (logs.length === 0) {
-                        listEl.innerHTML = "Žádné záznamy v ledgeru.";
+                        listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#94a3b8; font-size:10px;'>Žádné záznamy v ledgeru.</div>";
                         return;
                     }
                     
-                    const recent = logs.slice(-5).reverse();
-                    listEl.innerHTML = recent.map(log => `
-                        <div style="padding:4px; background:white; border:1px solid #e2e8f0; border-radius:4px; font-family:monospace; font-size:9px;">
-                            <strong>[${log.action}]</strong> ${log.prompt ? log.prompt.substring(0, 40) + '...' : ''}<br>
-                            <span style="color:#94a3b8;">Hash: ${log.hash ? log.hash.substring(0, 12) + '...' : 'none'}</span>
+                    const recent = logs.slice(-4).reverse();
+                    listEl.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px; position: relative;">
+                            ${recent.map((log, idx) => {
+                                const isKeyRotation = log.action && log.action.includes('rotate');
+                                const badgeColor = isKeyRotation ? 'background:#fee2e2; color:#ef4444;' : 'background:#e0f2fe; color:#0369a1;';
+                                return `
+                                    <div style="display: flex; gap: 10px; align-items: flex-start; position: relative;">
+                                        <div style="display: flex; flex-direction: column; align-items: center;">
+                                            <span class="ledger-dot"></span>
+                                            ${idx < recent.length - 1 ? '<div style="width: 1px; height: 35px; background: #e2e8f0; margin-top: 4px;"></div>' : ''}
+                                        </div>
+                                        <div style="flex: 1; font-size: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                                <span style="font-weight: bold; color: #1e293b;">${log.action}</span>
+                                                <span class="ledger-badge" style="${badgeColor}">${log.humanApproved ? 'ověřeno' : 'systém'}</span>
+                                            </div>
+                                            <div style="color: #64748b; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                                                ${log.prompt || 'Bez dodatečných parametrů'}
+                                            </div>
+                                            <div style="color: #94a3b8; font-size: 8px; font-family: monospace; margin-top: 1px;">
+                                                Hash: ${log.hash ? log.hash.substring(0, 16) : 'N/A'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
                         </div>
-                    `).join('');
+                    `;
                 } catch (e) {
-                    listEl.innerHTML = "Chyba při načítání auditních logů.";
+                    listEl.innerHTML = "<div style='color:#ef4444; font-size:10px;'>Chyba při načítání auditních logů.</div>";
                 }
             };
 
@@ -2120,6 +2212,17 @@ class LexisUI {
             if (actions) actions.style.display = 'none';
             window.loadSovereignTelemetry();
             window.loadRecentLedgerTransactions();
+        } else if (subTab === 'summary') {
+            output.innerHTML = "📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.";
+            if (actions) {
+                actions.style.display = 'flex';
+                actions.innerHTML = `
+                    <button onclick="document.getElementById('ai-prompt').value='Vytvoř stručné a strukturované shrnutí tohoto textu.'; window.sendAIQuery()" style="padding:8px 16px; background:var(--word-blue); color:white; border:none; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ Spustit shrnutí</button>
+                `;
+            }
+        } else if (subTab === 'kb') {
+            output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
+            if (actions) actions.style.display = 'none';
         }
     }
 
@@ -2154,63 +2257,85 @@ class LexisUI {
         overlay.style.left = '0';
         overlay.style.width = '100%';
         overlay.style.height = '100%';
-        overlay.style.background = 'rgba(15, 23, 42, 0.6)';
-        overlay.style.backdropFilter = 'blur(8px)';
+        overlay.style.background = 'rgba(15, 23, 42, 0.4)';
+        overlay.style.backdropFilter = 'blur(12px)';
         overlay.style.display = 'flex';
         overlay.style.justifyContent = 'center';
         overlay.style.alignItems = 'center';
         overlay.style.zIndex = '9999';
         overlay.style.fontFamily = "'Inter', sans-serif";
+        overlay.style.transition = 'all 0.3s ease';
 
         const dialog = document.createElement('div');
-        dialog.style.background = 'white';
-        dialog.style.padding = '25px';
-        dialog.style.borderRadius = '12px';
-        dialog.style.maxWidth = '650px';
+        dialog.style.background = 'rgba(255, 255, 255, 0.95)';
+        dialog.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+        dialog.style.padding = '30px';
+        dialog.style.borderRadius = '16px';
+        dialog.style.maxWidth = '750px';
         dialog.style.width = '90%';
-        dialog.style.boxShadow = '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)';
+        dialog.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25)';
         dialog.style.display = 'flex';
         dialog.style.flexDirection = 'column';
-        dialog.style.gap = '15px';
+        dialog.style.gap = '20px';
+        dialog.style.transform = 'scale(0.95)';
+        dialog.style.transition = 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
         dialog.innerHTML = `
-            <h3 style="margin: 0; color: #003399; display: flex; align-items: center; gap: 8px; font-size: 16px;">
-                <span>🛡️</span> GDPR Data Shield Anonymizace
-            </h3>
-            <p style="margin: 0; font-size: 11px; color: #64748b; line-height: 1.4;">
-                Níže vidíte náhled textu po odstranění citlivých údajů. Můžete jej před nahrazením dále ručně upravit.
-            </p>
-            <div style="display: flex; gap: 15px; height: 250px;">
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
-                    <span style="font-size: 10px; font-weight: bold; color: #64748b;">PŮVODNÍ TEXT</span>
-                    <textarea readonly style="flex: 1; font-size: 10px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; resize: none; background: #f8fafc; color: #94a3b8;">${originalText}</textarea>
-                </div>
-                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
-                    <span style="font-size: 10px; font-weight: bold; color: #16a34a;">ANONYMIZOVANÝ TEXT</span>
-                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 10px; padding: 8px; border: 1px solid #16a34a; border-radius: 6px; resize: none; background: #f0fdf4; color: #166534;">${anonymizedText}</textarea>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; background: rgba(22, 163, 74, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #16a34a;">🛡️</div>
+                <div>
+                    <h3 style="margin: 0; color: #1e293b; font-size: 15px; font-weight: 800;">GDPR Data Shield Anonymizace</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
+                        Detekovali a odstranili jsme citlivé údaje. Zkontrolujte výsledek a uložte změny.
+                    </p>
                 </div>
             </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
-                <button id="btn-anon-cancel" style="padding: 8px 16px; background: #e2e8f0; border: none; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569;">Zrušit</button>
-                <button id="btn-anon-confirm" style="padding: 8px 16px; background: #16a34a; color: white; border: none; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer;">Nahradit text v dokumentu</button>
+            
+            <div style="display: flex; gap: 20px; height: 320px;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase;">PŮVODNÍ TEXT</span>
+                    <textarea readonly style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; resize: none; background: #f8fafc; color: #94a3b8; line-height: 1.5; font-family: inherit;">${originalText}</textarea>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 10px; font-weight: 800; color: #16a34a; letter-spacing: 0.5px; text-transform: uppercase;">ANONYMIZOVANÝ TEXT</span>
+                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #bbf7d0; border-radius: 8px; resize: none; background: #f0fdf4; color: #166534; line-height: 1.5; font-family: inherit; outline: none; transition: border-color 0.2s;">${anonymizedText}</textarea>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 5px;">
+                <button id="btn-anon-cancel" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; color: #475569; transition: background 0.2s;">Zrušit</button>
+                <button id="btn-anon-confirm" style="padding: 10px 20px; background: linear-gradient(135deg, #16a34a, #15803d); color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);">Nahradit text v dokumentu</button>
             </div>
         `;
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
+        setTimeout(() => {
+            dialog.style.transform = 'scale(1)';
+        }, 10);
+
         dialog.querySelector('#btn-anon-cancel').onclick = () => {
-            document.body.removeChild(overlay);
+            dialog.style.transform = 'scale(0.95)';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 250);
         };
 
         dialog.querySelector('#btn-anon-confirm').onclick = () => {
             const finalText = dialog.querySelector('#anonymized-preview-text').value;
             const anonymizedHtml = finalText
-                .split('\\n')
+                .split('\n')
                 .map(para => para.trim() ? `<p>${para}</p>` : '<p><br></p>')
                 .join('');
             this.core.setContent(anonymizedHtml);
-            document.body.removeChild(overlay);
+            
+            dialog.style.transform = 'scale(0.95)';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 250);
         };
     }
     }
