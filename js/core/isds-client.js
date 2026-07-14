@@ -173,6 +173,79 @@ function parseGetDeliveryInfoResponse(xml) {
     return { status, dmID: pickTag(xml, 'dmID'), events };
 }
 
+// ---------- Stav zprávy: číselník ----------
+
+// Mapování dmMessageStatus na čitelný stav. Právně podstatné: 3=dodána (jen
+// v schránce), 4=doručena přihlášením, 5=doručena fikcí (po 10 dnech).
+const MESSAGE_STATUS = {
+    1: 'Podána',
+    2: 'Prošla antivirovou kontrolou',
+    3: 'Dodána do schránky',
+    4: 'Doručena přihlášením',
+    5: 'Doručena fikcí',
+    6: 'Přečtena',
+    7: 'Nedoručitelná',
+    8: 'Smazána',
+    9: 'V datovém trezoru',
+    10: 'Obsah smazán'
+};
+function messageStatusLabel(code) {
+    const n = parseInt(code, 10);
+    return MESSAGE_STATUS[n] || `Stav ${code}`;
+}
+// Je zpráva právně doručena? (přihlášením nebo fikcí)
+function isDelivered(code) {
+    const n = parseInt(code, 10);
+    return n === 4 || n === 5;
+}
+
+// ---------- GetMessageStateChanges (hromadné stavy více zpráv) ----------
+// Vrátí jen zprávy, kterým se od zadaného času změnil stav — efektivní pro objem
+// (místo dotazu na každou zprávu zvlášť). Čas ve formátu ISO.
+function buildGetMessageStateChangesRequest(fromTime, toTime) {
+    const parts = [];
+    if (fromTime) parts.push(`<p:dmFromTime>${escapeXml(fromTime)}</p:dmFromTime>`);
+    if (toTime) parts.push(`<p:dmToTime>${escapeXml(toTime)}</p:dmToTime>`);
+    return soapEnvelope(`<p:GetMessageStateChanges>${parts.join('')}</p:GetMessageStateChanges>`);
+}
+
+// Vrátí { status, changes: [{ dmID, status, statusLabel, delivered, time }] }.
+function parseGetMessageStateChangesResponse(xml) {
+    const status = parseStatus(xml);
+    // Struktura záznamu se může u živé odpovědi lišit — parser je tolerantní.
+    let records = pickAll(xml, 'dmStatusChangesRecord');
+    if (records.length === 0) records = pickAll(xml, 'dmRecord');
+    const changes = records.map(inner => {
+        const st = pickTag(inner, 'dmMessageStatus');
+        return {
+            dmID: pickTag(inner, 'dmID'),
+            status: st,
+            statusLabel: messageStatusLabel(st),
+            delivered: isDelivered(st),
+            time: pickTag(inner, 'dmStateChanged') || pickTag(inner, 'dmEventTime')
+        };
+    }).filter(r => r.dmID);
+    return { status, changes };
+}
+
+// ---------- GetSignedDeliveryInfo (podepsaná doručenka — právní doklad) ----------
+function buildGetSignedDeliveryInfoRequest(dmID) {
+    return soapEnvelope(`<p:GetSignedDeliveryInfo><p:dmID>${escapeXml(dmID)}</p:dmID></p:GetSignedDeliveryInfo>`);
+}
+
+// Vrátí { status, dmID, signedData (base64 CMS — archivovat jako doklad), events }.
+// Podepsaná data (dmSignature) jsou průkazná doručenka; ověření CMS podpisu je
+// samostatný krok. Události parsujeme best-effort z obsahu.
+function parseGetSignedDeliveryInfoResponse(xml) {
+    const status = parseStatus(xml);
+    const signedData = pickTag(xml, 'dmSignature') || pickTag(xml, 'dmSignedDeliveryInfo');
+    const events = pickAll(xml, 'dmEvent').map(inner => ({
+        time: pickTag(inner, 'dmEventTime'),
+        descr: pickTag(inner, 'dmEventDescr')
+    }));
+    return { status, dmID: pickTag(xml, 'dmID'), signedData: signedData ? signedData.replace(/\s+/g, '') : null, events };
+}
+
 // ---------- GetOwnerInfoFromLogin (test přihlášení) ----------
 
 function buildGetOwnerInfoRequest() {
@@ -210,5 +283,12 @@ module.exports = {
     buildGetDeliveryInfoRequest,
     parseGetDeliveryInfoResponse,
     buildGetOwnerInfoRequest,
-    parseGetOwnerInfoResponse
+    parseGetOwnerInfoResponse,
+    MESSAGE_STATUS,
+    messageStatusLabel,
+    isDelivered,
+    buildGetMessageStateChangesRequest,
+    parseGetMessageStateChangesResponse,
+    buildGetSignedDeliveryInfoRequest,
+    parseGetSignedDeliveryInfoResponse
 };
