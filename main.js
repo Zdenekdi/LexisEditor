@@ -7,6 +7,8 @@ const HTMLToDOCX = require('html-to-docx');
 const axios = null; // Removed in favor of native fetch
 const pdf = require('pdf-parse');
 const forge = require('node-forge');
+const crypto = require('crypto');
+const lexisLinkSec = require('./js/core/lexis-link-security.js');
 
 let mainWindow;
 
@@ -633,8 +635,13 @@ ipcMain.handle('get-ai-config', async () => {
 });
 
 // --- LEXISLINK SERVER (v3.0 Office Mode) ---
+// Bezpečnost: server běží v LAN (telefon ↔ PC), proto NENÍ vázán na 127.0.0.1,
+// ale každý požadavek musí nést párovací token generovaný při startu.
+// Token se předává v QR kódu (url) a tím i do /remote stránky.
 let lexisLinkServer = null;
+let lexisLinkToken = null;
 const LEXIS_LINK_PORT = 3300;
+const LEXIS_LINK_MAX_BODY = 25 * 1024 * 1024; // 25 MB strop pro upload
 
 function getLocalIp() {
     const interfaces = os.networkInterfaces();
@@ -648,11 +655,87 @@ function getLocalIp() {
     return 'localhost';
 }
 
+// Zastavení serveru (a zneplatnění tokenu).
+ipcMain.handle('stop-lexis-link', async () => {
+    if (lexisLinkServer) {
+        try { lexisLinkServer.close(); } catch (e) {}
+        lexisLinkServer = null;
+        lexisLinkToken = null;
+    }
+    return { success: true };
+});
+
 ipcMain.handle('start-lexis-link', async () => {
-    if (lexisLinkServer) return { success: true, url: 'http://' + getLocalIp() + ':' + LEXIS_LINK_PORT + '/remote' };
+    const ip = getLocalIp();
+    if (lexisLinkServer) {
+        return {
+            success: true,
+            url: 'http://' + ip + ':' + LEXIS_LINK_PORT + '/remote?token=' + lexisLinkToken,
+            token: lexisLinkToken
+        };
+    }
+
+    // Nový silný párovací token pro tuto relaci.
+    lexisLinkToken = lexisLinkSec.generateToken();
+
+    function applyCors(req, res) {
+        const origin = req.headers.origin;
+        if (origin && lexisLinkSec.isKnownOrigin(origin, LEXIS_LINK_PORT, ip)) {
+            res.setHeader('Access-Control-Allow-Origin', origin);
+            res.setHeader('Vary', 'Origin');
+        }
+        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+
+    function requireToken(req, res, parsedUrl) {
+        if (lexisLinkSec.isValidToken(req, parsedUrl, lexisLinkToken)) return true;
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Neautorizováno' }));
+        return false;
+    }
+
+    // Přečte tělo requestu s tvrdým stropem velikosti (obrana proti DoS).
+    function readBody(req, res, onData) {
+        let body = '';
+        let aborted = false;
+        req.on('data', chunk => {
+            if (aborted) return;
+            body += chunk.toString();
+            if (body.length > LEXIS_LINK_MAX_BODY) {
+                aborted = true;
+                res.writeHead(413, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Data jsou příliš velká.' }));
+                req.destroy();
+            }
+        });
+        req.on('end', () => { if (!aborted) onData(body); });
+    }
 
     lexisLinkServer = http.createServer((req, res) => {
-        if (req.url === '/remote') {
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        } catch (e) {
+            res.writeHead(400); res.end(); return;
+        }
+        const pathName = parsedUrl.pathname;
+
+        if (req.method === 'OPTIONS') {
+            applyCors(req, res);
+            res.writeHead(204);
+            res.end();
+            return;
+        }
+
+        if (pathName === '/remote') {
+            // I samotná ovládací stránka vyžaduje platný token, jinak by ji
+            // načetl kdokoli v síti a získal funkční tlačítka.
+            if (!lexisLinkSec.isValidToken(req, parsedUrl, lexisLinkToken)) {
+                res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end('<!DOCTYPE html><meta charset="utf-8"><h2>401 – Neautorizováno</h2><p>Otevřete LexisLink naskenováním QR kódu přímo z aplikace LexisEditor.</p>');
+                return;
+            }
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
             const remoteHtml = `
                 <!DOCTYPE html>
@@ -678,9 +761,11 @@ ipcMain.handle('start-lexis-link', async () => {
                     </div>
                     <div class="status" id="status">Připojeno k LexisEditoru</div>
                     <script>
+                        const TOKEN = ${JSON.stringify(lexisLinkToken)};
+                        function authHeaders(extra) { return Object.assign({ 'Authorization': 'Bearer ' + TOKEN }, extra || {}); }
                         function sendCommand(cmd) {
                             document.getElementById('status').innerText = 'Odesílám: ' + cmd;
-                            fetch('/api/command?cmd=' + cmd, { method: 'POST' })
+                            fetch('/api/command?cmd=' + encodeURIComponent(cmd), { method: 'POST', headers: authHeaders() })
                                 .then(r => r.json())
                                 .then(data => {
                                     document.getElementById('status').innerText = 'Hotovo: ' + (data.success ? 'OK' : 'Chyba');
@@ -695,10 +780,10 @@ ipcMain.handle('start-lexis-link', async () => {
                             document.getElementById('status').innerText = 'Nahrávám sken...';
                             const reader = new FileReader();
                             reader.onload = function(e) {
-                                fetch('/api/upload', { 
-                                    method: 'POST', 
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ image: e.target.result }) 
+                                fetch('/api/upload', {
+                                    method: 'POST',
+                                    headers: authHeaders({ 'Content-Type': 'application/json' }),
+                                    body: JSON.stringify({ image: e.target.result })
                                 })
                                 .then(r => r.json())
                                 .then(data => {
@@ -716,72 +801,81 @@ ipcMain.handle('start-lexis-link', async () => {
                 </html>
             `;
             res.end(remoteHtml);
-        } else if (req.url.startsWith('/api/command')) {
-            const url = new URL(req.url, `http://${req.headers.host}`);
-            const cmd = url.searchParams.get('cmd');
-            
+        } else if (pathName === '/api/command') {
+            applyCors(req, res);
+            if (!requireToken(req, res, parsedUrl)) return;
+            const cmd = parsedUrl.searchParams.get('cmd');
             if (mainWindow) {
                 mainWindow.webContents.send('lexis-link-command', cmd);
             }
-            
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
-        } else if (req.url === '/api/import' && req.method === 'POST') {
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', () => {
+        } else if (pathName === '/api/import' && req.method === 'POST') {
+            applyCors(req, res);
+            if (!requireToken(req, res, parsedUrl)) return;
+            readBody(req, res, (body) => {
                 try {
                     const data = JSON.parse(body);
-                    const authHeader = req.headers['authorization'];
-                    
-                    // Jednoduchá kontrola klíče (v produkci v3.1 vylepšíme)
-                    // if (authHeader !== `Bearer ${connectKey}`) ...
-                    
                     if (mainWindow) {
                         mainWindow.webContents.send('lexis-connect-import', data);
                         mainWindow.show();
                         mainWindow.focus();
                     }
-                    
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, message: 'Dokument byl importován do LexisEditoru.' }));
                 } catch (e) {
-                    res.writeHead(400);
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: false, error: 'Neplatný JSON' }));
                 }
             });
-        } else if (req.url === '/api/upload' && req.method === 'POST') {
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', () => {
+        } else if (pathName === '/api/upload' && req.method === 'POST') {
+            applyCors(req, res);
+            if (!requireToken(req, res, parsedUrl)) return;
+            readBody(req, res, (body) => {
                 try {
                     const data = JSON.parse(body);
                     if (mainWindow && data.image) {
                         mainWindow.webContents.send('lexis-link-scan', data.image);
                         mainWindow.show();
                     }
-                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true }));
                 } catch (e) {
-                    res.writeHead(400);
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: false }));
                 }
             });
-        } else if (req.method === 'OPTIONS') {
-            res.writeHead(204, {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-            });
-            res.end();
         } else {
             res.writeHead(404);
             res.end();
         }
     });
 
-    lexisLinkServer.listen(LEXIS_LINK_PORT);
-    return { success: true, url: 'http://' + getLocalIp() + ':' + LEXIS_LINK_PORT + '/remote' };
+    // Bind s ošetřením chyb (obsazený port apod.) — úspěch se hlásí až po bindu.
+    return await new Promise((resolve) => {
+        const onError = (err) => {
+            console.error('LexisLink server error:', err);
+            lexisLinkServer = null;
+            lexisLinkToken = null;
+            resolve({
+                success: false,
+                error: err && err.code === 'EADDRINUSE'
+                    ? 'Port ' + LEXIS_LINK_PORT + ' je již obsazený jinou aplikací.'
+                    : (err ? err.message : 'Nepodařilo se spustit LexisLink server.')
+            });
+        };
+        lexisLinkServer.once('error', onError);
+        lexisLinkServer.listen(LEXIS_LINK_PORT, () => {
+            lexisLinkServer.removeListener('error', onError);
+            // Za běhu logujeme případné pozdější chyby, ale neshazujeme proces.
+            lexisLinkServer.on('error', (e) => console.error('LexisLink runtime error:', e));
+            resolve({
+                success: true,
+                url: 'http://' + ip + ':' + LEXIS_LINK_PORT + '/remote?token=' + lexisLinkToken,
+                token: lexisLinkToken
+            });
+        });
+    });
 });
 
 // IPC Handler pro vyhledávání soudních jednání (InfoJednání)
@@ -811,24 +905,34 @@ ipcMain.handle('query-infojednani', async (event, queryParams) => {
 
 const lockConfigPath = path.join(app.getPath('userData'), 'lexis_lock.json');
 
-// Uložení nastavení zámku (enable/disable + zašifrované heslo)
+// Uložení nastavení zámku (enable/disable + jednosměrně hašované heslo)
+// Heslo se ukládá jako scrypt hash se solí — NELZE ho zpětně dešifrovat.
+function hashPasswordScrypt(password) {
+    const salt = crypto.randomBytes(16);
+    const keylen = 64;
+    const derived = crypto.scryptSync(password, salt, keylen);
+    return { salt: salt.toString('hex'), hash: derived.toString('hex'), keylen };
+}
+
 ipcMain.handle('lock-save-config', async (event, config) => {
     try {
+        let existing = {};
+        if (fs.existsSync(lockConfigPath)) {
+            try { existing = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8')); } catch (e) {}
+        }
         const toSave = {
             enabled: !!config.enabled,
             method: config.method || 'password', // 'touchid' | 'password' | 'both'
             touchIdEnabled: !!config.touchIdEnabled,
         };
         if (config.password) {
-            toSave.passwordHash = safeStorage.encryptString(config.password).toString('base64');
-        } else {
-            // Ponechat existující hash pokud existuje
-            if (fs.existsSync(lockConfigPath)) {
-                try {
-                    const existing = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8'));
-                    if (existing.passwordHash) toSave.passwordHash = existing.passwordHash;
-                } catch(e) {}
-            }
+            toSave.passwordScrypt = hashPasswordScrypt(config.password);
+        } else if (existing.passwordScrypt) {
+            // Ponechat existující scrypt hash.
+            toSave.passwordScrypt = existing.passwordScrypt;
+        } else if (existing.passwordHash) {
+            // Ponechat starý (legacy) hash — migruje se při příštím ověření.
+            toSave.passwordHash = existing.passwordHash;
         }
         fs.writeFileSync(lockConfigPath, JSON.stringify(toSave, null, 2), 'utf-8');
         return { success: true };
@@ -848,7 +952,7 @@ ipcMain.handle('lock-get-config', async () => {
                 enabled: !!raw.enabled,
                 method: raw.method || 'password',
                 touchIdEnabled: !!raw.touchIdEnabled,
-                hasPassword: !!raw.passwordHash
+                hasPassword: !!(raw.passwordScrypt || raw.passwordHash)
             };
         }
     } catch (e) {
@@ -867,14 +971,42 @@ ipcMain.handle('lock-delete-config', async () => {
     }
 });
 
-// Ověření hesla (porovnání s uloženým hashem)
+// Ověření hesla (scrypt v konstantním čase; legacy hash se migruje na scrypt)
 ipcMain.handle('lock-verify-password', async (event, inputPassword) => {
     try {
         if (!fs.existsSync(lockConfigPath)) return { success: false, error: 'Žádná konfigurace.' };
         const raw = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8'));
-        if (!raw.passwordHash) return { success: false, error: 'Heslo není nastaveno.' };
-        const stored = safeStorage.decryptString(Buffer.from(raw.passwordHash, 'base64'));
-        return { success: stored === inputPassword };
+
+        // Preferovaná cesta: scrypt hash se solí, porovnání v konstantním čase.
+        if (raw.passwordScrypt && raw.passwordScrypt.salt && raw.passwordScrypt.hash) {
+            const salt = Buffer.from(raw.passwordScrypt.salt, 'hex');
+            const keylen = raw.passwordScrypt.keylen || 64;
+            const derived = crypto.scryptSync(inputPassword || '', salt, keylen);
+            const stored = Buffer.from(raw.passwordScrypt.hash, 'hex');
+            const ok = derived.length === stored.length && crypto.timingSafeEqual(derived, stored);
+            return { success: ok };
+        }
+
+        // Legacy (reverzibilní safeStorage) — ověř a rovnou upgraduj na scrypt.
+        if (raw.passwordHash) {
+            let stored = '';
+            try {
+                stored = safeStorage.decryptString(Buffer.from(raw.passwordHash, 'base64'));
+            } catch (e) {
+                return { success: false, error: 'Uložené heslo nelze ověřit na tomto zařízení.' };
+            }
+            const ok = lexisLinkSec.timingSafeEqualStr(stored, inputPassword || '');
+            if (ok) {
+                try {
+                    raw.passwordScrypt = hashPasswordScrypt(inputPassword);
+                    delete raw.passwordHash;
+                    fs.writeFileSync(lockConfigPath, JSON.stringify(raw, null, 2), 'utf-8');
+                } catch (e) { /* migrace je best-effort */ }
+            }
+            return { success: ok };
+        }
+
+        return { success: false, error: 'Heslo není nastaveno.' };
     } catch (e) {
         console.error('Chyba při ověřování hesla:', e);
         return { success: false, error: e.message };
