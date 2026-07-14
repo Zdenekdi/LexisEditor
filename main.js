@@ -10,6 +10,15 @@ const forge = require('node-forge');
 const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
 
+// Ověří dostupnost systémového šifrování (Keychain/DPAPI/keyring). Na systémech
+// bez něj by safeStorage.encryptString vyhodil výjimku — raději hlásíme jasnou
+// chybu a citlivá data neuložíme, než abychom je ukládali v plaintextu.
+function ensureSafeStorage() {
+    if (!safeStorage.isEncryptionAvailable()) {
+        throw new Error('Systémové šifrování (Keychain/DPAPI) není na tomto zařízení dostupné, citlivé údaje nebyly uloženy.');
+    }
+}
+
 let mainWindow;
 
 // --- BIOMETRIC / TOUCH ID SUPPORT ---
@@ -242,7 +251,18 @@ ipcMain.handle('save-template', (event, type, content) => {
                 currentTemplates = JSON.parse(fs.readFileSync(templatesPath, 'utf-8'));
             } catch(e) {}
         }
-        currentTemplates[type] = content;
+        // Zachovat strukturu šablony {title, desc, icon, content}. Když přijde
+        // jen řetězec (HTML), aktualizujeme pouze .content; jinak sloučíme objekt.
+        const existing = (currentTemplates[type] && typeof currentTemplates[type] === 'object')
+            ? currentTemplates[type]
+            : {};
+        if (typeof content === 'string') {
+            currentTemplates[type] = { ...existing, content };
+        } else if (content && typeof content === 'object') {
+            currentTemplates[type] = { ...existing, ...content };
+        } else {
+            currentTemplates[type] = existing;
+        }
         fs.writeFileSync(templatesPath, JSON.stringify(currentTemplates, null, 2), 'utf-8');
         return { success: true };
     } catch (e) {
@@ -352,6 +372,7 @@ const isdsConfigPath = path.join(app.getPath('userData'), 'isds_config.json');
 ipcMain.handle('save-isds-config', async (event, config) => {
     try {
         // Šifrování hesla pomocí systému (Windows DPAPI / Mac Keychain)
+        ensureSafeStorage();
         const encryptedPassword = safeStorage.encryptString(config.password);
         const configToSave = {
             login: config.login,
@@ -390,6 +411,7 @@ const postConfigPath = path.join(app.getPath('userData'), 'post_config.json');
 
 ipcMain.handle('save-post-config', async (event, config) => {
     try {
+        ensureSafeStorage();
         const encryptedPassword = safeStorage.encryptString(config.password);
         const configToSave = {
             login: config.login,
@@ -574,7 +596,8 @@ ipcMain.handle('import-zfo', async (event, filePath) => {
         while ((fileMatch = fileRegex.exec(xmlContent)) !== null) {
             const fileXml = fileMatch[1];
             const nameMatch = fileXml.match(/<dmFileDescr>(.*?)<\/dmFileDescr>/);
-            const contentMatch = fileXml.match(/<dmEncodedContent>(.*?)<\/dmEncodedContent>/);
+            // Base64 obsah přílohy bývá víceřádkový → [\s\S]*? (dřív .*? selhalo na zalomení).
+            const contentMatch = fileXml.match(/<dmEncodedContent>([\s\S]*?)<\/dmEncodedContent>/);
             if (nameMatch && contentMatch) {
                 attachments.push({
                     name: nameMatch[1],
@@ -615,6 +638,7 @@ ipcMain.handle('save-ai-config', async (event, config) => {
     try {
         let encryptedKey = '';
         if (config.apiKey) {
+            ensureSafeStorage();
             encryptedKey = safeStorage.encryptString(config.apiKey).toString('base64');
         }
         const configToSave = {
