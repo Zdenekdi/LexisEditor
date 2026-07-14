@@ -37,18 +37,25 @@
         return '';
     }
 
-    // Vytáhne náležitosti z textu dokumentu.
+    // Vytáhne náležitosti z textu dokumentu (funguje na JAKÉMKOLI dokumentu
+    // otevřeném v editoru, nejen na datové zprávě).
     function extract(text) {
+        // Spisová značka — varianty „sp. zn.", „spis. zn.", „spisová značka",
+        // „Naše/Vaše sp. zn." + samostatný vzor „12 C 34/2026".
         const spzn = firstMatch(text, [
-            /sp(?:\.|isov[áa])?\s*(?:zn(?:\.|a[čc]ka)?)[:\s]*([0-9]+\s*[A-Za-zÀ-ž]{1,6}\s*[0-9]+\s*\/\s*[0-9]{2,4})/i,
-            /\b([0-9]+\s*[A-Z][A-Za-zÀ-ž]{0,5}\s*[0-9]+\s*\/\s*[0-9]{2,4})\b/
+            /(?:na[šs]e\s+|va[šs]e\s+)?sp(?:\.|is(?:\.|ov[áa]))?\s*zn(?:\.|a[čc]ka)?\s*[:.]?\s*([0-9]+\s*[A-Za-zÀ-ž]{1,6}\s*[0-9]+\s*\/\s*[0-9]{2,4})/i,
+            /\b([0-9]+\s+[A-Za-zÀ-ž]{1,5}\s+[0-9]+\s*\/\s*[0-9]{2,4})\b/
         ]);
+        // Číslo jednací — „č.j.", „č. j.", „čj", „Č.j.", „číslo jednací",
+        // volitelně s „Naše/Vaše". Accentovaná forma je bezpečná; ASCII „c.j."
+        // vyžaduje tečku, aby nechytalo prózu typu „Věc je…".
         const cj = firstMatch(text, [
-            /[čcČC]\.?\s*j\.?\s*[:.]?\s*([^\n]{2,60})/,
-            /[čcČC][íi]slo\s+jednac[íi][:\s]*([^\n]{2,60})/i
+            /(?:na[šs]e\s+|va[šs]e\s+)?[čČ]\.?\s*j\.?\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/i,
+            /(?:na[šs]e\s+|va[šs]e\s+)?[cC]\s*\.\s*j\.?\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/,
+            /[čcČC][íi]slo\s+jednac[íi]\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/i
         ]);
-        const ico = firstMatch(text, [/I[ČC]O?[:\s]*([0-9]{8})\b/i, /\b([0-9]{8})\b/]);
-        const vec = firstMatch(text, [/V[ěe]c[:\s]+([^\n]{3,120})/i]);
+        const ico = firstMatch(text, [/I[ČC]O?\s*[:.]?\s*([0-9]{8})\b/i, /\b([0-9]{8})\b/]);
+        const vec = firstMatch(text, [/V[ěe]c\s*[:.]?\s+([^\n]{3,120})/i]);
         const court = detectCourt(text);
         // Identifikace subjektu, kterému odpovídáme: přednostně soud, jinak Věc/IČO.
         let subject = '';
