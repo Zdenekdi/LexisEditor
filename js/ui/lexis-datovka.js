@@ -45,16 +45,29 @@
     function currentDoc() {
         const core = window.lexisCore;
         const html = core && core.getContent ? core.getContent() : (document.querySelector('.ql-editor') || {}).innerHTML || '';
+        const editorEl = document.querySelector('.ql-editor');
+        const text = (core && core.getText) ? core.getText() : (editorEl ? editorEl.innerText : '');
         const header = document.getElementById('header-area');
         const footer = document.getElementById('footer-area');
         const titleEl = document.getElementById('window-doc-title');
         return {
             html,
+            text,
             css: collectCss(),
             headerHtml: header ? header.innerHTML : '',
             footerHtml: footer ? footer.innerHTML : '',
             title: (titleEl && titleEl.innerText.trim()) || 'Dokument'
         };
+    }
+
+    // Detekuje soud zmíněný v textu dokumentu (stejná logika jako v editoru).
+    function detectCourtInText(text) {
+        if (!text || !Array.isArray(window.COURT_PATTERNS)) return null;
+        const norm = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        for (const court of window.COURT_PATTERNS) {
+            try { if (new RegExp(court.pattern, 'i').test(norm)) return court; } catch (e) {}
+        }
+        return null;
     }
 
     function closeOverlay(el) {
@@ -125,6 +138,8 @@
             <label style="font-size:12px; font-weight:700; color:#334155;">Předmět</label>
             <input id="dtv-subject" value="${esc(doc.title)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
 
+            <div id="dtv-suggest" style="margin-bottom:10px;"></div>
+
             <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">Přidat příjemce</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
                 <button class="dtv-add" data-mode="ic" style="flex:1; min-width:110px; padding:8px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px;">🔎 Dle IČO</button>
@@ -168,6 +183,30 @@
             });
         }
         renderList();
+
+        // Návrh soudu detekovaného v dokumentu — přidání příjemce na jedno kliknutí.
+        (function suggestCourt() {
+            const suggestEl = card.querySelector('#dtv-suggest');
+            const detected = detectCourtInText(doc.text);
+            if (!detected) return;
+            // Přesnější název ze registru, pokud ho lze spárovat.
+            let officialName = detected.nazev;
+            try {
+                if (window.LexisCourtISDS && window.LexisCourtISDS.findCourtInRegistry) {
+                    const reg = window.LexisCourtISDS.findCourtInRegistry(detected.nazev);
+                    if (reg && reg.nazev) officialName = reg.nazev;
+                }
+            } catch (e) {}
+            suggestEl.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 10px;">
+                    <div style="font-size:12px; color:#1e3a8a;">📍 V dokumentu: <b>${esc(officialName)}</b></div>
+                    <button id="dtv-suggest-add" style="border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; padding:6px 12px; flex-shrink:0;">Přidat soud</button>
+                </div>`;
+            suggestEl.querySelector('#dtv-suggest-add').onclick = async () => {
+                setStatus(`Ověřuji schránku: ${officialName}…`);
+                await findAndAdd({ firmName: officialName, dbType: 'OVM' }, officialName);
+            };
+        })();
 
         async function findAndAdd(query, label) {
             setStatus('Ověřuji schránku…');
