@@ -588,6 +588,8 @@ ipcMain.handle('test-isds-connection', async (event, creds) => {
 // query = { ic?, dbID?, firmName?, dbType? }
 ipcMain.handle('isds-find-databox', async (event, creds, query) => {
     try {
+        creds = (creds && creds.login) ? creds : readIsdsCreds();
+        if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
         const soapBody = isdsClient.buildFindDataBoxRequest(query || {});
         const res = await isdsCall(creds, 'search', 'FindDataBox', soapBody);
         const parsed = isdsClient.parseFindDataBoxResponse(res.text);
@@ -624,6 +626,33 @@ ipcMain.handle('isds-send-message', async (event, creds, message) => {
     } catch (error) {
         console.error('ISDS Send Error:', error);
         return { success: false, error: error.message };
+    }
+});
+
+// Tichý render aktuálního dokumentu do PDF (base64) — pro přílohu datové zprávy
+// bez dialogu na uložení.
+ipcMain.handle('render-pdf-base64', async (event, htmlContent, cssContent, headerHtml, footerHtml) => {
+    const printWindow = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+    try {
+        const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${cssContent || ''}
+            body { margin: 0; padding: 0; background: white; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style></head><body>
+            <div id="editor-wrapper" style="border:none; box-shadow:none; width:auto; display:flex; flex-direction:column;">
+                ${headerHtml ? `<div class="page-header" id="header-area" style="padding: 10mm 20mm 5mm 20mm;">${headerHtml}</div>` : ''}
+                <div class="ql-container ql-snow" style="border:none; flex-grow:1;"><div class="ql-editor">${htmlContent}</div></div>
+                ${footerHtml ? `<div class="page-footer" id="footer-area" style="padding: 5mm 20mm 10mm 20mm; margin-top:auto;">${footerHtml}</div>` : ''}
+            </div></body></html>`;
+        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+        const pdfBuffer = await printWindow.webContents.printToPDF({
+            margins: { marginType: 'none' }, pageSize: 'A4', printBackground: true, landscape: false
+        });
+        return { success: true, base64: pdfBuffer.toString('base64') };
+    } catch (e) {
+        console.error('render-pdf-base64 error:', e);
+        return { success: false, error: e.message };
+    } finally {
+        if (!printWindow.isDestroyed()) printWindow.destroy();
     }
 });
 

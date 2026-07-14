@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isdsOutboxRetry: (id) => ipcRenderer.invoke('isds-outbox-retry', id),
     isdsOutboxRefreshStatus: (fromTime) => ipcRenderer.invoke('isds-outbox-refresh-status', fromTime),
     onIsdsOutboxChanged: (callback) => ipcRenderer.on('isds-outbox-changed', () => callback()),
+    renderPdfBase64: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('render-pdf-base64', html, css, headerHtml, footerHtml),
     testPostConnection: (creds) => ipcRenderer.invoke('test-post-connection', creds),
     authenticateBiometric: (reason) => ipcRenderer.invoke('authenticate-biometric', reason),
     importPdf: () => ipcRenderer.invoke('import-pdf'),
