@@ -32,7 +32,7 @@ const COURT_PATTERNS = [
   {
     "nazev": "Krajský soud Ústí nad Labem",
     "kod": "KSSCEUL",
-    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:ust[i]*\\s+(?:nad\\s+)?lab)"
+    "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?ust[i]*\\s+(?:nad\\s+)?lab"
   },
   {
     "nazev": "Městský soud Praha",
@@ -447,12 +447,12 @@ const COURT_PATTERNS = [
   {
     "nazev": "Okresní soud Ústí nad Labem",
     "kod": "OSSCEUL",
-    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti [a-za-ž]*"
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti\\s+nad\\s+labem"
   },
   {
     "nazev": "Okresní soud Ústí nad Orlicí",
     "kod": "OSVYCUO",
-    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti [a-za-ž]*"
+    "pattern": "okresn[i|iho|im|ich]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?usti\\s+nad\\s+orlici"
   },
   {
     "nazev": "Okresní soud Vsetín",

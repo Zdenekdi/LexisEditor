@@ -1009,9 +1009,67 @@ const COURT_TYPES = {
     okresni:  "Okresní soudy"
 };
 
+// ─────────────────────────────────────────────────────────────
+//  ISDS — validace formátu, join klíč a bezpečnostní pojistka
+//
+//  ⚠️ DŮLEŽITÉ: Vestavěné ISDS identifikátory NEJSOU ověřené proti
+//  oficiálnímu registru (mojedatovaschranka.cz / justice.cz); některé
+//  jsou zjevně placeholder (sekvenční nebo duplicitní — např. KS Praha
+//  a MS Praha sdílí "snkabbm"). NESMÍ se použít pro reálné doručení bez
+//  ověření — hrozí odeslání do cizí/neplatné datové schránky. Proto je
+//  ISDS_DATA_VERIFIED = false a odesílací tok musí volat getCourtIsds()
+//  a při verified=false vyžádat ruční potvrzení / vyhledání ISDS.
+// ─────────────────────────────────────────────────────────────
+const ISDS_DATA_VERIFIED = false;
+
+// Formát ISDS je 7 znaků z [a-z0-9] (např. "5azzytb").
+function isValidIsdsFormat(id) {
+    return typeof id === 'string' && /^[a-z0-9]{7}$/.test(id);
+}
+
+// Normalizace názvu soudu pro spolehlivý join (odstraní " v "/" ve ",
+// diakritiku a přebytečné mezery, malá písmena).
+function normalizeCourtName(name) {
+    return String(name || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\bve?\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Join klíč: najde záznam v COURT_REGISTRY podle zkratky nebo (normalizovaného)
+// názvu z COURT_PATTERNS — dřív mezi oběma tabulkami žádná vazba nebyla.
+function findCourtInRegistry(nameOrCode) {
+    if (!nameOrCode) return null;
+    const norm = normalizeCourtName(nameOrCode);
+    return COURT_REGISTRY.find(c =>
+        c.zkratka === nameOrCode ||
+        normalizeCourtName(c.nazev) === norm
+    ) || null;
+}
+
+// Bezpečné získání ISDS soudu. Vrací i příznaky valid/verified — volající
+// NESMÍ automaticky odeslat, pokud verified=false, ale musí vyzvat k ověření.
+function getCourtIsds(court) {
+    const entry = typeof court === 'string' ? findCourtInRegistry(court) : court;
+    if (!entry || !entry.isds) return { isds: null, valid: false, verified: false };
+    const valid = isValidIsdsFormat(entry.isds);
+    return { isds: entry.isds, valid, verified: ISDS_DATA_VERIFIED && valid };
+}
+
+const COURT_ISDS_API = {
+    ISDS_DATA_VERIFIED,
+    isValidIsdsFormat,
+    normalizeCourtName,
+    findCourtInRegistry,
+    getCourtIsds
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { COURT_REGISTRY, COURT_TYPES };
+    module.exports = { COURT_REGISTRY, COURT_TYPES, ...COURT_ISDS_API };
 } else {
     window.COURT_REGISTRY = COURT_REGISTRY;
     window.COURT_TYPES = COURT_TYPES;
+    window.LexisCourtISDS = COURT_ISDS_API;
 }
