@@ -27,7 +27,8 @@ class LexisContacts {
             else all.push(contact);
         }
         this._contacts = all;
-        await this.storage.set('settings', 'contacts-db', all);
+        // storage.set(storeName, data) bere 2 argumenty; settings má keyPath 'key'.
+        await this.storage.set('settings', { key: 'contacts-db', value: all });
         return contact;
     }
 
@@ -35,7 +36,7 @@ class LexisContacts {
         let all = await this.getAll();
         all = all.filter(c => c.id !== id);
         this._contacts = all;
-        await this.storage.set('settings', 'contacts-db', all);
+        await this.storage.set('settings', { key: 'contacts-db', value: all });
     }
 
     async importFromCsv(csvText) {

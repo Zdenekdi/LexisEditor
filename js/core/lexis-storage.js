@@ -14,7 +14,9 @@ class LexisStorage {
      * Inicializuje IndexedDB a provede případný upgrade schématu.
      */
     async init() {
-        return new Promise((resolve, reject) => {
+        // Dedup: opakovaná volání init() vrací tentýž slib (LexisCore i ready()).
+        if (this._initPromise) return this._initPromise;
+        this._initPromise = new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
 
             request.onerror = (event) => {
@@ -57,6 +59,16 @@ class LexisStorage {
                 }
             };
         });
+        return this._initPromise;
+    }
+
+    /**
+     * Zajistí, že je databáze inicializovaná (líná inicializace).
+     * Díky tomu DB operace neselžou, i když init() ještě neproběhl.
+     */
+    async ready() {
+        if (this.db) return;
+        await this.init();
     }
 
     /**
@@ -98,6 +110,7 @@ class LexisStorage {
     // --- DATABÁZOVÉ OPERACE (Promise wrapper) ---
 
     async get(storeName, key) {
+        await this.ready();
         return new Promise((resolve, reject) => {
             if (!this.db) return reject("Databáze není inicializována");
             const tx = this.db.transaction(storeName, 'readonly');
@@ -110,6 +123,7 @@ class LexisStorage {
     }
 
     async set(storeName, data) {
+        await this.ready();
         return new Promise((resolve, reject) => {
             if (!this.db) return reject("Databáze není inicializována");
             const tx = this.db.transaction(storeName, 'readwrite');
@@ -122,6 +136,7 @@ class LexisStorage {
     }
 
     async getAll(storeName) {
+        await this.ready();
         return new Promise((resolve, reject) => {
             if (!this.db) return reject("Databáze není inicializována");
             const tx = this.db.transaction(storeName, 'readonly');
@@ -134,6 +149,7 @@ class LexisStorage {
     }
 
     async delete(storeName, key) {
+        await this.ready();
         return new Promise((resolve, reject) => {
             if (!this.db) return reject("Databáze není inicializována");
             const tx = this.db.transaction(storeName, 'readwrite');

@@ -68,7 +68,14 @@ class LexisCore {
 
     init() {
         this.registerBlots();
-        
+
+        // Inicializace lokální databáze (IndexedDB). Bez tohoto volání zůstane
+        // this.storage.db === null a všechny DB operace (kontakty, dokumenty,
+        // doložky) skončí chybou „Databáze není inicializována".
+        this.storageReady = this.storage.init().catch(err => {
+            console.error('[LexisCore] Inicializace úložiště selhala:', err);
+        });
+
         this.quill = new Quill(this.containerId, {
             theme: 'snow',
             modules: {
