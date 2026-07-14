@@ -140,6 +140,9 @@ app.whenReady().then(() => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
 
+    // Po startu obnovit sledování doručenek, pokud z minula zbyly nedoručené zprávy.
+    setTimeout(() => { try { ensureDeliveryPoller(); } catch (e) {} }, 8000);
+
     // --- AUTO-UPDATER LOGIC ---
     if (autoUpdater) {
         autoUpdater.autoDownload = true;
@@ -489,6 +492,44 @@ async function runOutbox() {
         _outboxTick = false;
     }
     if (mainWindow) mainWindow.webContents.send('isds-outbox-changed');
+    ensureDeliveryPoller(); // po odeslání začni automaticky sledovat doručení
+}
+
+// --- Automatická fronta doručenek ---
+// Periodicky dotahuje stavy doručení odeslaných zpráv (GetMessageStateChanges),
+// dokud jsou nějaké nedoručené. Šetří ISDS: běží jen když je co sledovat.
+let _deliveryPoller = null;
+const DELIVERY_POLL_MS = 20 * 60 * 1000; // 20 minut
+
+function outboxHasUndelivered() {
+    return getOutbox().getAll().some(i => i.status === 'sent'); // odesláno, zatím nedoručeno
+}
+
+async function pollDeliveryOnce() {
+    const creds = readIsdsCreds();
+    if (!creds || !creds.login) return;
+    const from = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const to = new Date().toISOString();
+    try {
+        const soapBody = isdsClient.buildGetMessageStateChangesRequest(from, to);
+        const res = await isdsCall(creds, 'info', 'GetMessageStateChanges', soapBody);
+        const parsed = isdsClient.parseGetMessageStateChangesResponse(res.text);
+        const updated = getOutbox().applyStateChanges(parsed.changes);
+        if (updated && mainWindow) mainWindow.webContents.send('isds-outbox-changed');
+    } catch (e) {
+        console.error('Delivery poll error:', e.message);
+    }
+}
+
+function ensureDeliveryPoller() {
+    if (_deliveryPoller) return;
+    if (!outboxHasUndelivered()) return;
+    // Hned jeden dotaz, pak periodicky.
+    pollDeliveryOnce();
+    _deliveryPoller = setInterval(async () => {
+        if (!outboxHasUndelivered()) { clearInterval(_deliveryPoller); _deliveryPoller = null; return; }
+        await pollDeliveryOnce();
+    }, DELIVERY_POLL_MS);
 }
 
 // Hromadné zařazení do fronty (i více příjemců pro stejný dokument).

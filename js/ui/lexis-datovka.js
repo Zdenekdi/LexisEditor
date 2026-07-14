@@ -73,6 +73,41 @@
         return { overlay, card };
     }
 
+    // Vyhledávací picker soudů z registru. onPick(court) dostane vybraný soud.
+    function showCourtPicker(onPick) {
+        const courts = Array.isArray(window.COURT_REGISTRY) ? window.COURT_REGISTRY : [];
+        if (courts.length === 0) { toast('Registr soudů není načten.'); return; }
+        const { overlay, card } = makeOverlay(`
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2 style="margin:0; font-size:16px; color:#0f172a;">⚖️ Vybrat soud</h2>
+                <button id="cp-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+            </div>
+            <input id="cp-search" placeholder="Hledat soud…" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+            <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Po výběru se ověří <b>reálná</b> schránka soudu přes ISDS (FindDataBox).</div>
+            <div id="cp-list" style="max-height:52vh; overflow:auto;"></div>`, 520);
+        const listEl = card.querySelector('#cp-list');
+        const searchEl = card.querySelector('#cp-search');
+        function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+        function renderCourts(filter) {
+            const f = norm(filter);
+            const matched = courts.filter(c => !f || norm(c.nazev).includes(f) || norm(c.zkratka).includes(f) || norm(c.mesto).includes(f)).slice(0, 200);
+            listEl.innerHTML = matched.length ? matched.map((c, i) => `
+                <div class="cp-item" data-i="${courts.indexOf(c)}" style="padding:8px 6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:12px;">
+                    <div style="font-weight:700; color:#0f172a;">${esc(c.nazev)}</div>
+                    <div style="color:#64748b;">${esc(c.mesto || '')}${c.zkratka ? ' · ' + esc(c.zkratka) : ''}</div>
+                </div>`).join('') : '<div style="font-size:12px; color:#94a3b8; padding:12px; text-align:center;">Nic nenalezeno.</div>';
+            listEl.querySelectorAll('.cp-item').forEach(el => el.onclick = () => {
+                const court = courts[parseInt(el.getAttribute('data-i'), 10)];
+                closeOverlay(overlay);
+                onPick(court);
+            });
+        }
+        renderCourts('');
+        searchEl.oninput = () => renderCourts(searchEl.value);
+        searchEl.focus();
+        card.querySelector('#cp-close').onclick = () => closeOverlay(overlay);
+    }
+
     // ---------------- Odesílací dialog ----------------
 
     window.openDatovkaDialog = function () {
@@ -161,8 +196,11 @@
                 const id = promptText('Zadejte ID datové schránky (7 znaků):');
                 if (id) await findAndAdd({ dbID: id.trim() }, id);
             } else if (mode === 'court') {
-                const name = promptText('Zadejte název soudu (např. Okresní soud v Ostravě):');
-                if (name) await findAndAdd({ firmName: name.trim(), dbType: 'OVM' }, name);
+                showCourtPicker(async (court) => {
+                    setStatus(`Ověřuji schránku: ${court.nazev}…`);
+                    // Ověříme reálnou schránku soudu přes ISDS (ne smyšlené ISDS z registru).
+                    await findAndAdd({ firmName: court.nazev, dbType: 'OVM' }, court.nazev);
+                });
             } else if (mode === 'contacts') {
                 await addFromContacts(setStatus);
             }
