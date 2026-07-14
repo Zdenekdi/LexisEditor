@@ -149,10 +149,12 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
         });
 
         if (filePath) {
-            // Konverze HTML (z Quill editoru) do čistého DOCX bufferu
+            // Konverze HTML (z Quill editoru) do čistého DOCX bufferu.
+            // header:true je nutné, jinak se předaná hlavička do DOCX nevloží.
             const fileBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
                 table: { row: { cantSplit: true } },
-                footer: true,
+                header: !!headerHtml,
+                footer: !!footerHtml,
                 pageNumber: true,
             }, footerHtml || null);
             
@@ -276,16 +278,17 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtm
             const docxPath = basePath + '.docx';
             const pdfPath = basePath + '.pdf';
 
-            // 1. Export DOCX
+            // 1. Export DOCX (header:true jinak hlavička vypadne)
             const docxBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
                 table: { row: { cantSplit: true } },
-                footer: true,
+                header: !!headerHtml,
+                footer: !!footerHtml,
                 pageNumber: true,
             }, footerHtml || null);
             fs.writeFileSync(docxPath, docxBuffer);
 
             // 2. Export PDF přes skryté okno
-            const printWindow = new BrowserWindow({ 
+            const printWindow = new BrowserWindow({
                 show: false,
                 webPreferences: {
                     offscreen: true
@@ -317,17 +320,22 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtm
                 </html>
             `;
             
-            await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
-            
-            const pdfBuffer = await printWindow.webContents.printToPDF({
-                marginsType: 1, // No margins (handled by CSS)
-                pageSize: 'A4',
-                printBackground: true,
-                landscape: false
-            });
-            
-            fs.writeFileSync(pdfPath, pdfBuffer);
-            printWindow.destroy();
+            try {
+                await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+
+                const pdfBuffer = await printWindow.webContents.printToPDF({
+                    // marginsType:1 je zastaralé (dvojité okraje). Okraje řeší CSS.
+                    margins: { marginType: 'none' },
+                    pageSize: 'A4',
+                    printBackground: true,
+                    landscape: false
+                });
+
+                fs.writeFileSync(pdfPath, pdfBuffer);
+            } finally {
+                // Okno vždy uklidit — i při chybě, jinak dochází k leaku.
+                if (!printWindow.isDestroyed()) printWindow.destroy();
+            }
 
             return { success: true, docxPath, pdfPath };
         }

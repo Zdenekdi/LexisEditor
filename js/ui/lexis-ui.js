@@ -2338,7 +2338,6 @@ class LexisUI {
             }, 250);
         };
     }
-    }
 
     scanForVariables() {
         const form = document.getElementById('variables-form');
@@ -2463,7 +2462,17 @@ class LexisUI {
 
     exportWebPreview() {
         const html = this.core.getContent();
-        const blob = new Blob([html], { type: 'text/html' });
+        const headerArea = document.getElementById('header-area');
+        const footerArea = document.getElementById('footer-area');
+        const headerHtml = headerArea ? headerArea.innerHTML : '';
+        const footerHtml = footerArea ? footerArea.innerHTML : '';
+        // Náhled musí obsahovat hlavičku i patičku, jinak vypadají jinak než dokument.
+        const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Náhled</title></head><body>`
+            + (headerHtml ? `<div class="page-header" style="padding:10mm 20mm 5mm;">${headerHtml}</div>` : '')
+            + `<div class="ql-editor">${html}</div>`
+            + (footerHtml ? `<div class="page-footer" style="padding:5mm 20mm 10mm;">${footerHtml}</div>` : '')
+            + `</body></html>`;
+        const blob = new Blob([full], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
     }
@@ -2520,11 +2529,16 @@ class LexisUI {
             const html = this.core.getContent();
             const text = this.core.getText();
             const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
-            
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+
             const bundle = {
                 title: docTitle,
                 html: html,
                 text: text,
+                // Hlavička a patička musí být součástí bundlu, jinak se při re-importu ztratí.
+                headerHtml: headerArea ? headerArea.innerHTML : '',
+                footerHtml: footerArea ? footerArea.innerHTML : '',
                 exportedAt: new Date().toISOString(),
                 version: '3.5.0',
                 footnotes: this.core.footnotes || []
