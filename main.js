@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
 const isdsClient = require('./js/core/isds-client.js');
 const { IsdsOutbox } = require('./js/core/isds-outbox.js');
+const { IsdsInbox } = require('./js/core/isds-inbox.js');
 
 // Sdílené volání ISDS webové služby. creds = { login, pass, env, host?, basePath? }.
 // service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
@@ -527,6 +528,100 @@ ipcMain.handle('isds-outbox-refresh-status', async (event, fromTime) => {
     } catch (e) {
         return { success: false, error: e.message };
     }
+});
+
+// --- ISDS INBOX (příchozí datové zprávy) ---
+let _isdsInbox = null;
+function getInbox() {
+    if (!_isdsInbox) {
+        _isdsInbox = new IsdsInbox({ filePath: path.join(app.getPath('userData'), 'isds_inbox.json') });
+    }
+    return _isdsInbox;
+}
+
+// Uloží přílohy zprávy na disk a vrátí metadata s cestami.
+function saveInboxAttachments(dmID, files) {
+    const dir = path.join(app.getPath('userData'), 'isds_prilohy', String(dmID).replace(/[^\w-]/g, '_'));
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    const out = [];
+    for (const f of (files || [])) {
+        const safe = String(f.name || 'priloha').replace(/[^\w\-. ]+/g, '_');
+        const filePath = path.join(dir, safe);
+        try {
+            fs.writeFileSync(filePath, Buffer.from(f.base64 || '', 'base64'));
+            out.push({ name: f.name, mimeType: f.mimeType, path: filePath });
+        } catch (e) {
+            out.push({ name: f.name, mimeType: f.mimeType, path: null });
+        }
+    }
+    return out;
+}
+
+// Stáhne obsah jedné zprávy (SPOUŠTÍ doručení) a uloží přílohy.
+async function inboxDownloadOne(creds, dmID) {
+    const soapBody = isdsClient.buildMessageDownloadRequest(dmID);
+    const res = await isdsCall(creds, 'messages', 'MessageDownload', soapBody);
+    const parsed = isdsClient.parseMessageDownloadResponse(res.text);
+    if (!parsed.status.ok) throw new Error(parsed.status.message || `Stažení selhalo (HTTP ${res.httpStatus}).`);
+    const saved = saveInboxAttachments(dmID, parsed.files);
+    getInbox().markDownloaded(dmID, parsed.envelope, saved);
+    return { envelope: parsed.envelope, files: saved };
+}
+
+// Obnoví seznam příchozích. mode 'envelope' = jen obálky (BEZ spuštění doručení),
+// 'download' = stáhne obsah nových zpráv (SPUSTÍ doručení).
+ipcMain.handle('isds-inbox-refresh', async (event, mode, fromTime) => {
+    try {
+        const creds = readIsdsCreds();
+        if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
+        const from = fromTime || new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+        const to = new Date().toISOString();
+        const soapBody = isdsClient.buildGetListOfReceivedMessagesRequest(from, to, { limit: 1000 });
+        const res = await isdsCall(creds, 'info', 'GetListOfReceivedMessages', soapBody);
+        const parsed = isdsClient.parseMessageListResponse(res.text);
+        if (!parsed.status.ok && parsed.messages.length === 0) {
+            return { success: false, error: parsed.status.message || `Načtení selhalo (HTTP ${res.httpStatus}).` };
+        }
+        getInbox().upsertEnvelopes(parsed.messages);
+        let downloaded = 0;
+        if (mode === 'download') {
+            for (const it of getInbox().getNew()) {
+                try { await inboxDownloadOne(creds, it.dmID); downloaded++; }
+                catch (e) { console.error('Inbox auto-download error:', e.message); }
+            }
+        }
+        return { success: true, downloaded, items: getInbox().getAll() };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('isds-inbox-list', async () => {
+    try { return { success: true, items: getInbox().getAll() }; }
+    catch (e) { return { success: false, error: e.message, items: [] }; }
+});
+
+// Explicitní stažení jedné zprávy (SPUSTÍ doručení) — na výslovnou akci uživatele.
+ipcMain.handle('isds-inbox-download', async (event, dmID) => {
+    try {
+        const creds = readIsdsCreds();
+        if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
+        const r = await inboxDownloadOne(creds, dmID);
+        return { success: true, files: r.files, item: getInbox().getById(dmID) };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Otevře uloženou přílohu příchozí zprávy.
+ipcMain.handle('isds-inbox-open-file', async (event, filePath) => {
+    try { await shell.openPath(filePath); return { success: true }; }
+    catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('isds-inbox-mark-deadline', async (event, dmID) => {
+    try { getInbox().markDeadlineCreated(dmID); return { success: true }; }
+    catch (e) { return { success: false, error: e.message }; }
 });
 
 // --- DOPIS ONLINE BRIDGE (Česká pošta) ---
