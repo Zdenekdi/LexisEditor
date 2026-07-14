@@ -571,6 +571,30 @@ ipcMain.handle('isds-outbox-refresh-status', async (event, fromTime) => {
     }
 });
 
+// Uloží PODEPSANOU doručenku (CMS) jako právní doklad k odeslané zprávě.
+ipcMain.handle('isds-save-signed-delivery', async (event, dmID) => {
+    try {
+        const creds = readIsdsCreds();
+        if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
+        const soapBody = isdsClient.buildGetSignedDeliveryInfoRequest(dmID);
+        const res = await isdsCall(creds, 'info', 'GetSignedDeliveryInfo', soapBody);
+        const parsed = isdsClient.parseGetSignedDeliveryInfoResponse(res.text);
+        if (!parsed.signedData) {
+            return { success: false, error: parsed.status.message || 'Podepsanou doručenku se nepodařilo získat.' };
+        }
+        const { filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Uložit podepsanou doručenku (právní doklad)',
+            defaultPath: `dorucenka_${String(dmID).replace(/\D/g, '')}.p7s`,
+            filters: [{ name: 'Podepsaná doručenka', extensions: ['p7s', 'der', 'zfo'] }]
+        });
+        if (!filePath) return { success: false, canceled: true };
+        fs.writeFileSync(filePath, Buffer.from(parsed.signedData, 'base64'));
+        return { success: true, path: filePath, events: parsed.events };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
 // --- ISDS INBOX (příchozí datové zprávy) ---
 let _isdsInbox = null;
 function getInbox() {

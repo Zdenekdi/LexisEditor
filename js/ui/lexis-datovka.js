@@ -331,6 +331,7 @@
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                         ${badge(it.status)}
+                        ${it.dmID ? `<button class="ob-receipt" data-id="${esc(it.dmID)}" title="Uložit podepsanou doručenku (právní doklad)" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">📄 Doručenka</button>` : ''}
                         ${(it.status === 'failed' || it.status === 'review') ? `<button class="ob-retry" data-id="${esc(it.id)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">Opakovat</button>` : ''}
                     </div>
                 </div>`).join('');

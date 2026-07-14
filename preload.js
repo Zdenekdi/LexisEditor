@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isdsOutboxList: () => ipcRenderer.invoke('isds-outbox-list'),
     isdsOutboxRetry: (id) => ipcRenderer.invoke('isds-outbox-retry', id),
     isdsOutboxRefreshStatus: (fromTime) => ipcRenderer.invoke('isds-outbox-refresh-status', fromTime),
+    isdsSaveSignedDelivery: (dmID) => ipcRenderer.invoke('isds-save-signed-delivery', dmID),
     onIsdsOutboxChanged: (callback) => ipcRenderer.on('isds-outbox-changed', () => callback()),
     renderPdfBase64: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('render-pdf-base64', html, css, headerHtml, footerHtml),
     openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
