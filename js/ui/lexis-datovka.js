@@ -103,6 +103,7 @@
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                 <div style="font-size:11px; color:#64748b;">Přílohou bude aktuální dokument jako PDF.</div>
                 <div style="display:flex; gap:8px;">
+                    <button id="dtv-inbox" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">📥 Přijaté</button>
                     <button id="dtv-outbox" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">📤 Odeslané</button>
                     <button id="dtv-send" style="padding:9px 16px; border:none; background:#16a34a; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Odeslat všem</button>
                 </div>
@@ -185,6 +186,7 @@
 
         card.querySelector('#dtv-close').onclick = () => closeOverlay(overlay);
         card.querySelector('#dtv-outbox').onclick = () => { closeOverlay(overlay); window.openDatovkaOutbox(); };
+        card.querySelector('#dtv-inbox').onclick = () => { closeOverlay(overlay); window.openDatovkaInbox(); };
 
         card.querySelector('#dtv-send').onclick = async () => {
             if (recipients.length === 0) { setStatus('Přidejte alespoň jednoho příjemce.'); return; }
@@ -273,6 +275,105 @@
         load();
         // Auto-obnova při změně fronty.
         if (api().onIsdsOutboxChanged) api().onIsdsOutboxChanged(() => load());
+    };
+
+    // ---------------- Inbox (příchozí zprávy) ----------------
+
+    let inboxMode = 'envelope'; // 'envelope' = jen upozornění, 'download' = plné stažení
+
+    window.openDatovkaInbox = function () {
+        if (!api() || !api().isdsInboxList) { toast('Přijaté zprávy jsou dostupné jen v desktopové aplikaci.'); return; }
+        const { overlay, card } = makeOverlay(`
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2 style="margin:0; font-size:17px; color:#0f172a;">📥 Přijaté datové zprávy</h2>
+                <button id="ib-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                <label style="font-size:12px; color:#334155; display:flex; align-items:center; gap:6px;">
+                    Režim:
+                    <select id="ib-mode" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;">
+                        <option value="envelope">Jen upozornění (nespustí doručení)</option>
+                        <option value="download">Automaticky stáhnout (spustí doručení)</option>
+                    </select>
+                </label>
+                <button id="ib-refresh" style="padding:8px 14px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">🔄 Načíst přijaté</button>
+            </div>
+            <div id="ib-warn" style="font-size:11px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px; margin-bottom:10px;">
+                ⚠️ „Stáhnout" u zprávy stáhne její obsah, což se považuje za <b>doručení přihlášením</b> a spustí běh lhůty. „Jen upozornění" doručení nespouští.
+            </div>
+            <div id="ib-list">Klikni na „Načíst přijaté".</div>`, 720);
+        const listEl = card.querySelector('#ib-list');
+        const modeSel = card.querySelector('#ib-mode');
+        modeSel.value = inboxMode;
+        modeSel.onchange = () => { inboxMode = modeSel.value; };
+
+        function fmtTime(t) { return t ? String(t).replace('T', ' ').slice(0, 16) : ''; }
+
+        function render(items) {
+            if (!items || items.length === 0) { listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:18px;">Zatím žádné přijaté zprávy. Klikni na „Načíst přijaté".</div>'; return; }
+            items.sort((a, b) => (b.deliveryTime || '').localeCompare(a.deliveryTime || ''));
+            listEl.innerHTML = items.map(it => {
+                const downloaded = it.localStatus === 'downloaded';
+                const filesHtml = downloaded && it.files && it.files.length
+                    ? '<div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;">' + it.files.map((f, fi) => `<button class="ib-file" data-id="${esc(it.dmID)}" data-fi="${fi}" style="border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">📎 ${esc(f.name)}</button>`).join('') + '</div>'
+                    : '';
+                return `
+                <div style="padding:9px 6px; border-bottom:1px solid #f1f5f9;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+                        <div style="font-size:12px; min-width:0;">
+                            <div style="font-weight:700; color:#0f172a;">${esc(it.sender || it.senderId || 'Neznámý odesílatel')}</div>
+                            <div style="color:#334155;">${esc(it.annotation || '(bez předmětu)')}</div>
+                            <div style="color:#64748b; font-size:11px;">Doručeno: ${esc(fmtTime(it.deliveryTime)) || '—'} · ${esc(it.statusLabel || '')}${downloaded ? ' · staženo' : ''}</div>
+                            ${filesHtml}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px; flex-shrink:0; align-items:flex-end;">
+                            ${!downloaded ? `<button class="ib-dl" data-id="${esc(it.dmID)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⬇️ Stáhnout</button>` : ''}
+                            <button class="ib-deadline" data-id="${esc(it.dmID)}" style="border:none; background:${it.deadlineCreated ? '#e2e8f0' : '#16a34a'}; color:${it.deadlineCreated ? '#475569' : '#fff'}; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⏳ ${it.deadlineCreated ? 'Lhůta ✓' : 'Vytvořit lhůtu'}</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            listEl.querySelectorAll('.ib-dl').forEach(btn => btn.onclick = async () => {
+                if (!window.confirm('Stažením se zpráva považuje za DORUČENOU a spustí se běh lhůty. Pokračovat?')) return;
+                btn.textContent = '…'; btn.disabled = true;
+                const res = await api().isdsInboxDownload(btn.getAttribute('data-id'));
+                if (!res || !res.success) { toast('Stažení selhalo: ' + ((res && res.error) || '')); }
+                load();
+            });
+            listEl.querySelectorAll('.ib-file').forEach(btn => btn.onclick = async () => {
+                const it = (window._ibItems || []).find(x => String(x.dmID) === btn.getAttribute('data-id'));
+                const f = it && it.files[parseInt(btn.getAttribute('data-fi'), 10)];
+                if (f && f.path) await api().isdsInboxOpenFile(f.path);
+                else toast('Soubor není uložen.');
+            });
+            listEl.querySelectorAll('.ib-deadline').forEach(btn => btn.onclick = () => {
+                const it = (window._ibItems || []).find(x => String(x.dmID) === btn.getAttribute('data-id'));
+                if (!it) return;
+                const delivered = it.deliveryTime ? String(it.deliveryTime).slice(0, 10) : '';
+                closeOverlay(overlay);
+                window.openDeadlineDialog({
+                    title: it.annotation || ('Zpráva od ' + (it.sender || it.senderId || '')),
+                    deliveredAt: delivered,
+                    days: 15,
+                    description: `Datová zpráva od ${it.sender || it.senderId || ''} (dmID ${it.dmID}).`
+                });
+                api().isdsInboxMarkDeadline(it.dmID);
+            });
+        }
+        async function load() {
+            try { const res = await api().isdsInboxList(); window._ibItems = (res && res.items) || []; render(window._ibItems); }
+            catch (e) { listEl.innerHTML = '<div style="color:#dc2626;">Chyba: ' + esc(e.message) + '</div>'; }
+        }
+        card.querySelector('#ib-close').onclick = () => closeOverlay(overlay);
+        card.querySelector('#ib-refresh').onclick = async () => {
+            listEl.innerHTML = 'Načítám přijaté zprávy…';
+            const res = await api().isdsInboxRefresh(modeSel.value);
+            if (!res || !res.success) { listEl.innerHTML = '<div style="color:#dc2626;">Chyba: ' + esc((res && res.error) || '') + '</div>'; return; }
+            window._ibItems = res.items || [];
+            render(window._ibItems);
+        };
+        load();
     };
 
     // ---------------- Kalendář lhůt (Apple / Google / Outlook) ----------------
