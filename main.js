@@ -27,10 +27,16 @@ ipcMain.handle('authenticate-biometric', async (event, reason) => {
     } else if (process.platform === 'win32') {
         const { exec } = require('child_process');
         return new Promise((resolve) => {
+            // Důvod se NIKDY neinterpoluje do těla skriptu (obrana proti PowerShell
+            // injection). Předává se přes proměnnou prostředí a ve skriptu se jen čte.
+            const safeReason = String(reason || 'Ověření pro přístup k zabezpečeným údajům')
+                .replace(/[\r\n]+/g, ' ')
+                .slice(0, 200);
             const psScript = `
                 [Void][System.Reflection.Assembly]::LoadWithPartialName("System.Runtime.WindowsRuntime")
                 try {
-                    $status = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync("${reason || 'Ověření pro přístup k zabezpečeným údajům'}").GetAwaiter().GetResult()
+                    $reason = $env:LEXIS_BIO_REASON
+                    $status = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync($reason).GetAwaiter().GetResult()
                     if ($status -eq "Verified") {
                         Write-Output "SUCCESS"
                     } else {
@@ -40,11 +46,11 @@ ipcMain.handle('authenticate-biometric', async (event, reason) => {
                     Write-Output "ERROR: $_"
                 }
             `.trim();
-            
+
             const tempScriptPath = path.join(app.getPath('temp'), 'verify_hello.ps1');
             fs.writeFileSync(tempScriptPath, psScript, 'utf-8');
-            
-            exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`, (error, stdout) => {
+
+            exec(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tempScriptPath}"`, { env: { ...process.env, LEXIS_BIO_REASON: safeReason } }, (error, stdout) => {
                 try { fs.unlinkSync(tempScriptPath); } catch(e) {}
                 if (error) {
                     resolve({ success: false, error: error.message });
