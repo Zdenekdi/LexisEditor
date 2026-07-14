@@ -1416,6 +1416,34 @@
         window.applyStyle = (style) => lexisUI.applyStyle(style);
         window.applyHighlight = (color) => lexisUI.applyHighlight(color);
         window.setLineHeight = (val) => lexisUI.setLineHeight(val);
+
+        // Jádrové formátování z pásu Domů (písmo/velikost/barva) — dříve nedefinované.
+        window.applyFont = (value) => {
+            const q = lexisCore.quill; q.focus();
+            q.format('font', value || false);
+        };
+        window.applySize = (value) => {
+            const q = lexisCore.quill; q.focus();
+            q.format('size', value || false);
+        };
+        window.applyColor = (value) => {
+            const q = lexisCore.quill; q.focus();
+            q.format('color', value || false);
+        };
+
+        // Napojení existujících metod LexisUI na globální onclick handlery.
+        // checkHierarchy/checkTerminology jen počítají — výsledky vykreslíme do panelu auditu.
+        window.checkHierarchy = () => {
+            const r = lexisUI.checkHierarchy();
+            lexisUI.renderAuditResults(r);
+            lexisUI.customAlert(r.length ? `Kontrola hierarchie: nalezeno ${r.length} upozornění (viz levý panel).` : '✅ Hierarchie a číslování jsou v pořádku.');
+        };
+        window.checkTerminology = () => {
+            const r = lexisUI.checkTerminology();
+            lexisUI.renderAuditResults(r);
+            lexisUI.customAlert(r.length ? `Kontrola pojmů: nalezeno ${r.length} upozornění (viz levý panel).` : '✅ Terminologie je jednotná.');
+        };
+        window.openContacts = () => lexisUI.openContacts();
         window.toggleDictation = () => lexisUI.toggleDictation();
         window.openPostDialog = () => lexisUI.openPostDialog();
         window.syncCloud = (service) => lexisUI.syncCloud(service);

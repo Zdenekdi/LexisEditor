@@ -112,6 +112,20 @@ class LexisCore {
         });
         Quill.register(LineHeightStyle, true);
 
+        // Rodina písma jako inline style (bez whitelistu) — umožní libovolné
+        // písmo z ribbonu (výchozí Quill 'font' je class-based jen serif/monospace).
+        const FontStyle = new Parchment.Attributor.Style('font', 'font-family', {
+            scope: Parchment.Scope.INLINE
+        });
+        Quill.register(FontStyle, true);
+
+        // Velikost písma jako inline style v px (výchozí Quill 'size' whitelist
+        // neumožňuje px hodnoty).
+        const SizeStyle = new Parchment.Attributor.Style('size', 'font-size', {
+            scope: Parchment.Scope.INLINE
+        });
+        Quill.register(SizeStyle, true);
+
         class ArticleBlot extends Block {}
         ArticleBlot.blotName = 'article';
         ArticleBlot.tagName = 'P';

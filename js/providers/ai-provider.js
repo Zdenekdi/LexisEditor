@@ -5,6 +5,9 @@
  * Podporuje Apple Intelligence (apfel), Ollama, OpenAI, DeepSeek, Google Gemini a LM Studio.
  */
 const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český právní asistent.") => {
+    // Deklarováno ve scope funkce (ne v try) — jinak by odkaz v catch bloku
+    // (offline fallback) házel ReferenceError a fallback by se nikdy nespustil.
+    let enableOfflineFallback = true;
     try {
         let provider = "ollama";
         let model = "llama3";
@@ -21,7 +24,6 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
         if (endEl) endpoint = endEl.value;
         if (keyEl) apiKey = keyEl.value;
 
-        let enableOfflineFallback = true;
         const fallbackEl = document.getElementById('ai-offline-fallback');
         if (fallbackEl) enableOfflineFallback = fallbackEl.checked;
 
