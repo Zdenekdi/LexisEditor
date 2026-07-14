@@ -26,6 +26,22 @@ SOAP 1.1, jmenný prostor `http://isds.czechpoint.cz/v20`, autentizace HTTP Basi
 > proto konfigurovatelné (`creds.host`, `creds.basePath`). Ověř je proti údajům,
 > které dostaneš k WS přístupu.
 
+## Registrace / získání přístupu
+
+**Testovací prostředí (czebox) — zdarma, doporučeno pro vývoj:**
+
+1. Přihlas se do své **reálné** datové schránky (mojedatovaschranka.cz).
+2. Vlevo nahoře **Nastavení → „Pro vývojáře" → „Zřídit schránku v testovacím prostředí"**.
+3. Zvol typ schránky a vyplň **fiktivní** údaje.
+4. Poznamenej si vygenerované **uživatelské jméno a heslo**.
+5. Přihlas se na `https://www.czebox.cz`, změň heslo a zadej reálný e-mail (přijde ověřovací kód).
+6. Testovací schránka je připravená — přihlašovací údaje vlož do `ISDS_LOGIN` / `ISDS_PASSWORD` (`ISDS_ENV=test`).
+
+**Produkce:** pro přístup přes webové služby jménem a heslem je potřeba v nastavení
+schránky povolit přístup přes rozhraní; pro systémový certifikát (styl spisové
+služby) je samostatný proces. Vývojářská dokumentace a podpora: portál
+**poradnaisds.cz** (registrace na `registrace.poradnaisds.cz`).
+
 ## Jak otestovat na vlastní / testovací schránce
 
 1. Získej přístup k **webovým službám** ISDS (ne jen do webového rozhraní) a pro
