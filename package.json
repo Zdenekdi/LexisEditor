@@ -14,7 +14,8 @@
     "dist": "npm version patch --no-git-tag-version && electron-builder",
     "test": "jest",
     "test:e2e": "playwright test",
-    "test:all": "npm run test && npm run test:e2e"
+    "test:all": "npm run test && npm run test:e2e",
+    "isds-test": "node scripts/isds-test.js"
   },
   "build": {
     "appId": "com.lexiseditor.app",

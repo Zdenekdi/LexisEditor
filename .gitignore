@@ -8,6 +8,7 @@ release-builds/
 *.exe
 *.app
 .env
+isds.env
 
 # Historie editoru a lokální data
 lexis_history.json

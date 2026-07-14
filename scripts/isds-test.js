@@ -25,7 +25,31 @@
  * testuj primárně na czebox.
  */
 
+const fs = require('fs');
+const path = require('path');
 const isds = require('../js/core/isds-client.js');
+
+// Volitelně načte údaje z isds.env v kořeni projektu (KEY=VALUE na řádek),
+// aby se nemusely psát do příkazové řádky. Proměnné z prostředí mají přednost.
+(function loadEnvFile() {
+    try {
+        const envPath = path.join(__dirname, '..', 'isds.env');
+        if (!fs.existsSync(envPath)) return;
+        const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+            const eq = trimmed.indexOf('=');
+            if (eq === -1) continue;
+            const key = trimmed.slice(0, eq).trim();
+            let val = trimmed.slice(eq + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                val = val.slice(1, -1);
+            }
+            if (process.env[key] === undefined && key) process.env[key] = val;
+        }
+    } catch (e) { /* volitelné */ }
+})();
 
 const creds = {
     login: process.env.ISDS_LOGIN,
