@@ -18,32 +18,40 @@ window.escapeHTML = escapeHTML;
  * Bezpečné ukládání citlivých dat (API klíče, hesla).
  */
 class SecureVault {
+    constructor() {
+        // Fallback bez Electronu: tajemství držíme jen v paměti relace.
+        // Do localStorage je NEUKLÁDÁME — base64 (btoa) není šifrování a byla by
+        // čitelná z konzole/XSS; navíc btoa padá na Unicode. Trvalé bezpečné
+        // uložení zajišťuje pouze desktopová verze přes safeStorage.
+        this._memoryStore = {};
+    }
+
     async save(key, value) {
         if (window.electronAPI && window.electronAPI.saveAIConfig) {
             const config = await this.getAll();
             config[key] = value;
             return await window.electronAPI.saveAIConfig(config);
-        } else {
-            localStorage.setItem(`secure_${key}`, btoa(value));
-            return true;
         }
+        this._memoryStore[key] = value;
+        // Úklid případného starého nešifrovaného záznamu.
+        try { localStorage.removeItem(`secure_${key}`); } catch (e) {}
+        console.warn('[SecureVault] Bez desktopové verze se citlivé klíče neukládají trvale (pouze pro tuto relaci).');
+        return true;
     }
 
     async get(key) {
         if (window.electronAPI && window.electronAPI.getAIConfig) {
             const config = await window.electronAPI.getAIConfig();
             return config ? config[key] : null;
-        } else {
-            const val = localStorage.getItem(`secure_${key}`);
-            return val ? atob(val) : null;
         }
+        return Object.prototype.hasOwnProperty.call(this._memoryStore, key) ? this._memoryStore[key] : null;
     }
 
     async getAll() {
         if (window.electronAPI && window.electronAPI.getAIConfig) {
             return await window.electronAPI.getAIConfig() || {};
         }
-        return {};
+        return { ...this._memoryStore };
     }
 }
 window.SecureVault = SecureVault;
@@ -106,6 +114,33 @@ class LexisCore {
             this.scheduleAutoTools();
             if (this.options.onTextChange) this.options.onTextChange();
         });
+
+        // Sanitizace vkládaného obsahu PŘED parsováním Quillem (obrana proti XSS).
+        // Clipboard matcher sanitizuje až po sestavení delty, což je pozdě; proto
+        // vložené HTML nejdřív pročistíme DOMPurify a teprve pak vložíme.
+        this.quill.root.addEventListener('paste', (e) => {
+            try {
+                if (!e.clipboardData) return;
+                const html = e.clipboardData.getData('text/html');
+                if (!html) return; // prostý text nenese XSS — necháme Quill
+                e.preventDefault();
+                e.stopPropagation();
+                let clean = html;
+                if (typeof DOMPurify !== 'undefined') {
+                    clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+                } else {
+                    // Bez DOMPurify vložíme jen prostý text (bezpečné).
+                    const tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    clean = (tmp.textContent || '').replace(/[<>&]/g, '');
+                }
+                const range = this.quill.getSelection(true) || { index: this.quill.getLength(), length: 0 };
+                if (range.length) this.quill.deleteText(range.index, range.length, 'user');
+                this.quill.clipboard.dangerouslyPasteHTML(range.index, clean, 'user');
+            } catch (err) {
+                console.error('[LexisCore] Chyba při sanitizaci vloženého obsahu:', err);
+            }
+        }, true);
     }
 
     registerBlots() {
