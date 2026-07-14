@@ -9,6 +9,34 @@ const pdf = require('pdf-parse');
 const forge = require('node-forge');
 const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
+const isdsClient = require('./js/core/isds-client.js');
+
+// Sdílené volání ISDS webové služby. creds = { login, pass, env, host?, basePath? }.
+// service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
+async function isdsCall(creds, service, operation, soapBody) {
+    const env = (creds && creds.env === 'production') ? 'production' : 'test';
+    const override = (creds && (creds.host || creds.basePath)) ? { host: creds.host, basePath: creds.basePath } : null;
+    const url = isdsClient.buildEndpoint(env, service, override);
+    const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/xml; charset=utf-8',
+                'SOAPAction': isdsClient.soapAction(operation),
+                'Authorization': `Basic ${auth}`
+            },
+            body: soapBody,
+            signal: controller.signal
+        });
+        const text = await response.text();
+        return { httpStatus: response.status, ok: response.ok, text, url };
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 // Ověří dostupnost systémového šifrování (Keychain/DPAPI/keyring). Na systémech
 // bez něj by safeStorage.encryptString vyhodil výjimku — raději hlásíme jasnou
@@ -448,41 +476,75 @@ ipcMain.handle('get-post-config', async () => {
 // --- ISDS CONNECTION TEST ---
 ipcMain.handle('test-isds-connection', async (event, creds) => {
     try {
-        const url = creds.env === 'production' 
-            ? 'https://www.mojedatovaschranka.cz/asws/ds' 
-            : 'https://ws.mojedatovaschranka.cz/asws/ds';
-            
-        const soapRequest = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:isds="http://isds.czechpoint.cz/v20">
-  <soap:Body>
-    <isds:GetOwnerInfoFromLogin/>
-  </soap:Body>
-</soap:Envelope>`;
-
-        const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
-        
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'text/xml; charset=utf-8',
-                'Authorization': `Basic ${auth}`
-            },
-            body: soapRequest
-        });
-
-        const data = await response.text();
-
-        if (data.includes('dbID')) {
-            const nameMatch = data.match(/<dbName>(.*?)<\/dbName>/);
-            return { success: true, owner: nameMatch ? nameMatch[1] : 'Ověřeno' };
-        } else if (data.includes('dmErrMessage')) {
-            const errMsg = data.match(/<dmErrMessage>(.*?)<\/dmErrMessage>/);
-            return { success: false, error: errMsg ? errMsg[1] : 'Chyba přihlášení' };
+        const soapBody = isdsClient.buildGetOwnerInfoRequest();
+        const res = await isdsCall(creds, 'manage', 'GetOwnerInfoFromLogin', soapBody);
+        const parsed = isdsClient.parseGetOwnerInfoResponse(res.text);
+        if (parsed.dbID) {
+            return { success: true, owner: parsed.firmName || parsed.dbID };
         }
-        
-        return { success: false, error: 'Neočekávaná odpověď serveru' };
+        return { success: false, error: parsed.status.message || `Přihlášení selhalo (HTTP ${res.httpStatus}).` };
     } catch (error) {
         console.error('ISDS Test Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Ověření reálné datové schránky proti ISDS (FindDataBox). Nahrazuje odhadování
+// ISDS z IČO — vrací skutečnou schránku a její stav (doručitelnost).
+// query = { ic?, dbID?, firmName?, dbType? }
+ipcMain.handle('isds-find-databox', async (event, creds, query) => {
+    try {
+        const soapBody = isdsClient.buildFindDataBoxRequest(query || {});
+        const res = await isdsCall(creds, 'search', 'FindDataBox', soapBody);
+        const parsed = isdsClient.parseFindDataBoxResponse(res.text);
+        if (!parsed.status.ok && parsed.boxes.length === 0) {
+            return { success: false, error: parsed.status.message || `Vyhledání selhalo (HTTP ${res.httpStatus}).` };
+        }
+        return {
+            success: true,
+            boxes: parsed.boxes.map(b => ({
+                ...b,
+                deliverable: isdsClient.isDeliverableState(b.dbState)
+            }))
+        };
+    } catch (error) {
+        console.error('ISDS FindDataBox Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Odeslání datové zprávy (CreateMessage).
+// message = { dbIDRecipient, annotation, files: [{ name, mimeType, base64 }] }
+ipcMain.handle('isds-send-message', async (event, creds, message) => {
+    try {
+        if (!message || !message.dbIDRecipient) {
+            return { success: false, error: 'Chybí ID schránky příjemce.' };
+        }
+        const soapBody = isdsClient.buildCreateMessageRequest(message);
+        const res = await isdsCall(creds, 'messages', 'CreateMessage', soapBody);
+        const parsed = isdsClient.parseCreateMessageResponse(res.text);
+        if (parsed.status.ok && parsed.dmID) {
+            return { success: true, dmID: parsed.dmID, message: parsed.status.message || 'Odesláno' };
+        }
+        return { success: false, error: parsed.status.message || `Odeslání selhalo (HTTP ${res.httpStatus}).` };
+    } catch (error) {
+        console.error('ISDS Send Error:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Doručenka / stav zprávy (GetDeliveryInfo).
+ipcMain.handle('isds-get-delivery-info', async (event, creds, dmID) => {
+    try {
+        const soapBody = isdsClient.buildGetDeliveryInfoRequest(dmID);
+        const res = await isdsCall(creds, 'info', 'GetDeliveryInfo', soapBody);
+        const parsed = isdsClient.parseGetDeliveryInfoResponse(res.text);
+        if (parsed.status.ok) {
+            return { success: true, dmID: parsed.dmID, events: parsed.events };
+        }
+        return { success: false, error: parsed.status.message || `Nelze získat doručenku (HTTP ${res.httpStatus}).` };
+    } catch (error) {
+        console.error('ISDS DeliveryInfo Error:', error);
         return { success: false, error: error.message };
     }
 });
