@@ -183,6 +183,33 @@
         toast('👋 Vítejte v LexisEditoru!\n\n1) Pás Domů = formátování textu.\n2) Vložit = tabulky, obrázky, ZFO/PDF, datum.\n3) Revize = sledování změn a finální audit.\n4) LexisLink (Nápověda) = ovládání z mobilu.\n\nTip: Adresář kontaktů otevřete tlačítkem „Adresář".');
     });
 
+    // ================= VODOZNAK — obrázek (#46) =================
+    // Dřív bylo tlačítko 🖼️ mrtvé (volalo #wm-image-input, který neexistoval).
+    def('applyImageWatermark', function (input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const wrapper = document.getElementById('editor-wrapper');
+            if (!wrapper) return;
+            let wmLayer = document.getElementById('watermark-layer');
+            if (!wmLayer) {
+                wmLayer = document.createElement('div');
+                wmLayer.id = 'watermark-layer';
+                wmLayer.style = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden;';
+                wrapper.insertBefore(wmLayer, wrapper.firstChild);
+            }
+            // data-atributy umožní budoucí export vodoznaku do PDF/DOCX.
+            wmLayer.setAttribute('data-watermark-type', 'image');
+            wmLayer.setAttribute('data-watermark-src', e.target.result);
+            wmLayer.innerHTML = `<img src="${e.target.result}" alt="vodoznak" style="max-width:60%; max-height:60%; opacity:0.15; transform: rotate(-30deg); user-select:none;">`;
+            toast('🖼️ Obrázkový vodoznak byl nastaven.');
+        };
+        reader.readAsDataURL(file);
+        // Umožní vybrat stejný soubor znovu.
+        input.value = '';
+    });
+
     // ================= NASTAVENÍ (#34) =================
 
     // Obnova továrních šablon přes nativní IPC (reset-templates).

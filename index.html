@@ -384,7 +384,8 @@
                                 <option value="SOUKROMÉ">SOUKROMÉ</option>
                             </select>
                             <input type="color" id="watermark-color" value="#e2e8f0" onchange="applyWatermark()" style="width:24px; height:24px; border:none; padding:0; background:transparent; cursor:pointer;" title="Barva vodoznaku">
-                            <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()">🖼️</button>
+                            <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()" title="Obrázkový vodoznak (logo)">🖼️</button>
+                            <input type="file" id="wm-image-input" accept="image/*" style="display:none" onchange="applyImageWatermark(this)">
                         </div>
                     </div>
                     <div class="btn-icon" onclick="customAlert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>

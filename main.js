@@ -282,7 +282,7 @@ ipcMain.handle('reset-templates', () => {
     }
 });
 
-ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtml, footerHtml) => {
+ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtml, footerHtml, watermarkHtml) => {
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Exportovat Bundle (DOCX + PDF)',
@@ -329,7 +329,8 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtm
                     </style>
                 </head>
                 <body>
-                    <div id="editor-wrapper" style="border:none; box-shadow:none; width:auto; min-height:auto; display:flex; flex-direction:column;">
+                    <div id="editor-wrapper" style="position:relative; border:none; box-shadow:none; width:auto; min-height:auto; display:flex; flex-direction:column;">
+                        ${watermarkHtml ? `<div class="page-watermark" style="position:absolute; inset:0; z-index:0; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden;">${watermarkHtml}</div>` : ''}
                         ${headerHtml ? `<div class="page-header" id="header-area" style="padding: 10mm 40mm 5mm 40mm !important; min-height: auto;">${headerHtml}</div>` : ''}
                         <div class="ql-container ql-snow" style="border:none; flex-grow:1;">
                             <div class="ql-editor">${htmlContent}</div>

@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAppVersion: () => ipcRenderer.invoke('get-version'),
     onUpdateMessage: (callback) => ipcRenderer.on('update-message', (_event, value) => callback(value)),
     installUpdate: () => ipcRenderer.send('install-update'),
-    exportBundle: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('export-bundle', html, css, headerHtml, footerHtml),
+    exportBundle: (html, css, headerHtml, footerHtml, watermarkHtml) => ipcRenderer.invoke('export-bundle', html, css, headerHtml, footerHtml, watermarkHtml),
     saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
     getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
     savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
