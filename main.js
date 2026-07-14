@@ -467,7 +467,12 @@ ipcMain.handle('test-isds-connection', async (event, creds) => {
 // --- POST CONNECTION TEST (Dopis Online) ---
 ipcMain.handle('test-post-connection', async (event, creds) => {
     try {
-        const url = 'https://online2.postservis.cz/pds/xml/getsenders';
+        // Testovací vs. produkční prostředí PostServisu (Dopis Online).
+        // Test: online.test.postservis.cz, produkce: online2.postservis.cz.
+        const host = (creds && (creds.env === 'test' || creds.environment === 'test'))
+            ? 'https://online.test.postservis.cz'
+            : 'https://online2.postservis.cz';
+        const url = `${host}/pds/xml/getsenders`;
         const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
             
         const response = await fetch(url, {
