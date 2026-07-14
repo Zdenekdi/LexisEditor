@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -653,6 +653,50 @@ ipcMain.handle('render-pdf-base64', async (event, htmlContent, cssContent, heade
         return { success: false, error: e.message };
     } finally {
         if (!printWindow.isDestroyed()) printWindow.destroy();
+    }
+});
+
+// --- KALENDÁŘ (lhůty do Apple/Google/Outlook) ---
+// Otevře externí URL (Google/Outlook „přidat do kalendáře") v prohlížeči.
+ipcMain.handle('open-external-url', async (event, url) => {
+    try {
+        if (typeof url !== 'string' || !/^https:\/\//i.test(url)) {
+            return { success: false, error: 'Neplatná URL.' };
+        }
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Uloží .ics do dočasného souboru a otevře ho v systémovém kalendáři
+// (na Macu/Windows se událost přidá do výchozího kalendáře).
+ipcMain.handle('calendar-open-ics', async (event, icsContent, name) => {
+    try {
+        const safe = String(name || 'lhuta').replace(/[^\w\-. ]+/g, '_') + '.ics';
+        const filePath = path.join(app.getPath('temp'), safe);
+        fs.writeFileSync(filePath, icsContent, 'utf-8');
+        await shell.openPath(filePath);
+        return { success: true, path: filePath };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Uloží .ics na místo dle volby uživatele (pro import do libovolného kalendáře).
+ipcMain.handle('calendar-save-ics', async (event, icsContent, name) => {
+    try {
+        const { filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Uložit událost do kalendáře (.ics)',
+            defaultPath: (String(name || 'lhuta').replace(/[^\w\-. ]+/g, '_')) + '.ics',
+            filters: [{ name: 'Kalendář', extensions: ['ics'] }]
+        });
+        if (!filePath) return { success: false, canceled: true };
+        fs.writeFileSync(filePath, icsContent, 'utf-8');
+        return { success: true, path: filePath };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
 });
 

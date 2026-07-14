@@ -274,4 +274,98 @@
         // Auto-obnova při změně fronty.
         if (api().onIsdsOutboxChanged) api().onIsdsOutboxChanged(() => load());
     };
+
+    // ---------------- Kalendář lhůt (Apple / Google / Outlook) ----------------
+
+    // event = { title, date (Date|'YYYY-MM-DD'), description?, reminderDays? }
+    window.showCalendarPicker = function (event) {
+        const cal = window.LexisCalendar;
+        if (!cal) { toast('Kalendářní modul není načten.'); return; }
+        const t = cal.calendarTargets(event);
+        const name = (event.title || 'lhuta').replace(/[^\w\-. ]+/g, '_');
+        const { overlay, card } = makeOverlay(`
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h2 style="margin:0; font-size:16px; color:#0f172a;">📅 Přidat lhůtu do kalendáře</h2>
+                <button id="cal-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+            </div>
+            <div style="font-size:12px; color:#334155; margin-bottom:14px;"><b>${esc(event.title || 'Lhůta')}</b><br>${esc(cal.toIsoDate(event.date))}</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button class="cal-btn" data-a="apple" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">  Apple / systémový kalendář (otevřít .ics)</button>
+                <button class="cal-btn" data-a="google" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📆 Přidat do Google kalendáře</button>
+                <button class="cal-btn" data-a="outlook" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📧 Přidat do Outlook kalendáře</button>
+                <button class="cal-btn" data-a="save" style="padding:10px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px; text-align:left; color:#475569;">💾 Uložit soubor .ics (pro libovolný kalendář)</button>
+            </div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:12px;">Data zůstávají u vás — odkaz jen předvyplní událost ve vašem kalendáři.</div>`, 460);
+        card.querySelector('#cal-close').onclick = () => closeOverlay(overlay);
+        card.querySelectorAll('.cal-btn').forEach(btn => btn.onclick = async () => {
+            const a = btn.getAttribute('data-a');
+            try {
+                if (a === 'apple') await api().calendarOpenIcs(t.ics, name);
+                else if (a === 'google') await api().openExternalUrl(t.google);
+                else if (a === 'outlook') await api().openExternalUrl(t.outlookOffice);
+                else if (a === 'save') { await api().calendarSaveIcs(t.ics, name); }
+                if (a !== 'save') closeOverlay(overlay);
+            } catch (e) { toast('Nepodařilo se otevřít kalendář: ' + e.message); }
+        });
+    };
+
+    // Dialog pro ruční vytvoření lhůty (název + datum doručení + počet dní).
+    window.openDeadlineDialog = function (preset) {
+        const p = preset || {};
+        const cal = window.LexisCalendar;
+        const today = (cal ? cal.toIsoDate(new Date()) : '');
+        const { overlay, card } = makeOverlay(`
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h2 style="margin:0; font-size:16px; color:#0f172a;">⏳ Nová lhůta</h2>
+                <button id="dl-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+            </div>
+            <label style="font-size:12px; font-weight:700; color:#334155;">Název lhůty</label>
+            <input id="dl-title" value="${esc(p.title || '')}" placeholder="např. Odvolání – spis 12 C 34/2026" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:12px; font-weight:700; color:#334155;">Datum doručení</label>
+                    <input id="dl-date" type="date" value="${esc(p.deliveredAt || today)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                </div>
+                <div style="width:110px;">
+                    <label style="font-size:12px; font-weight:700; color:#334155;">Dní</label>
+                    <input id="dl-days" type="number" value="${esc(p.days != null ? p.days : 15)}" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                </div>
+                <div style="width:110px;">
+                    <label style="font-size:12px; font-weight:700; color:#334155;">Připomenout (dní)</label>
+                    <input id="dl-remind" type="number" value="3" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                </div>
+            </div>
+            <div id="dl-preview" style="font-size:12px; color:#16a34a; min-height:16px; margin-bottom:12px;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button id="dl-cancel" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">Zrušit</button>
+                <button id="dl-next" style="padding:9px 16px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Přidat do kalendáře →</button>
+            </div>`, 520);
+        function computeAndShow() {
+            if (!cal) return null;
+            const d = card.querySelector('#dl-date').value;
+            const days = card.querySelector('#dl-days').value;
+            if (!d) return null;
+            const deadline = cal.computeDeadline(d, days);
+            card.querySelector('#dl-preview').textContent = 'Konec lhůty: ' + cal.toIsoDate(deadline);
+            return deadline;
+        }
+        card.querySelector('#dl-date').oninput = computeAndShow;
+        card.querySelector('#dl-days').oninput = computeAndShow;
+        computeAndShow();
+        card.querySelector('#dl-close').onclick = () => closeOverlay(overlay);
+        card.querySelector('#dl-cancel').onclick = () => closeOverlay(overlay);
+        card.querySelector('#dl-next').onclick = () => {
+            const deadline = computeAndShow();
+            if (!deadline) { toast('Zadejte datum doručení.'); return; }
+            const title = card.querySelector('#dl-title').value.trim() || 'Lhůta';
+            const remind = card.querySelector('#dl-remind').value;
+            closeOverlay(overlay);
+            window.showCalendarPicker({
+                title: 'Lhůta: ' + title,
+                date: deadline,
+                description: (p.description || '') + (p.deliveredAt || card.querySelector('#dl-date').value ? `\nDoručeno: ${card.querySelector('#dl-date').value}` : ''),
+                reminderDays: remind
+            });
+        };
+    };
 })();
