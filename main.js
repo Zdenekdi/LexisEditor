@@ -10,6 +10,7 @@ const forge = require('node-forge');
 const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
 const isdsClient = require('./js/core/isds-client.js');
+const { IsdsOutbox } = require('./js/core/isds-outbox.js');
 
 // Sdílené volání ISDS webové služby. creds = { login, pass, env, host?, basePath? }.
 // service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
@@ -433,6 +434,99 @@ ipcMain.handle('get-isds-config', async () => {
         console.error('Chyba při načítání ISDS konfigurace:', e);
     }
     return { hasConfig: false };
+});
+
+// --- ISDS OUTBOX (odesílací fronta datových zpráv) ---
+let _isdsOutbox = null;
+function getOutbox() {
+    if (!_isdsOutbox) {
+        _isdsOutbox = new IsdsOutbox({ filePath: path.join(app.getPath('userData'), 'isds_outbox.json') });
+    }
+    return _isdsOutbox;
+}
+
+// Interní načtení ISDS údajů (login/heslo/prostředí) z uložené konfigurace.
+function readIsdsCreds() {
+    if (!fs.existsSync(isdsConfigPath)) return null;
+    try {
+        const raw = JSON.parse(fs.readFileSync(isdsConfigPath, 'utf-8'));
+        const password = safeStorage.decryptString(Buffer.from(raw.password, 'base64'));
+        return { login: raw.login, pass: password, env: raw.environment || 'production' };
+    } catch (e) {
+        console.error('ISDS: nelze načíst údaje:', e.message);
+        return null;
+    }
+}
+
+// Odešle jednu položku fronty přes CreateMessage.
+async function outboxSendOne(item) {
+    const creds = readIsdsCreds();
+    if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
+    const soapBody = isdsClient.buildCreateMessageRequest({
+        dbIDRecipient: item.recipient.dbID,
+        annotation: item.subject,
+        files: item.files
+    });
+    const res = await isdsCall(creds, 'messages', 'CreateMessage', soapBody);
+    const parsed = isdsClient.parseCreateMessageResponse(res.text);
+    if (parsed.status.ok && parsed.dmID) return { success: true, dmID: parsed.dmID };
+    return { success: false, error: parsed.status.message || `Odeslání selhalo (HTTP ${res.httpStatus}).` };
+}
+
+let _outboxTick = false;
+async function runOutbox() {
+    if (_outboxTick) return;
+    _outboxTick = true;
+    try {
+        // Opakuj, dokud jsou položky pending (process se po chybě zastaví kvůli backoffu).
+        for (let i = 0; i < 100; i++) {
+            const r = await getOutbox().process(outboxSendOne);
+            if (getOutbox().getByStatus('pending').length === 0 || r.processed === 0) break;
+            await new Promise(res => setTimeout(res, 1500)); // jemný backoff mezi koly
+        }
+    } finally {
+        _outboxTick = false;
+    }
+    if (mainWindow) mainWindow.webContents.send('isds-outbox-changed');
+}
+
+// Hromadné zařazení do fronty (i více příjemců pro stejný dokument).
+// recipients = [{ dbID, name? }], payload = { subject, files:[{name,mimeType,base64}] }
+ipcMain.handle('isds-outbox-enqueue', async (event, recipients, payload) => {
+    try {
+        const items = getOutbox().enqueueBatch(recipients, payload);
+        runOutbox(); // nečekáme — běží na pozadí
+        return { success: true, enqueued: items.length, items };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('isds-outbox-list', async () => {
+    try { return { success: true, items: getOutbox().getAll() }; }
+    catch (e) { return { success: false, error: e.message, items: [] }; }
+});
+
+ipcMain.handle('isds-outbox-retry', async (event, id) => {
+    try { getOutbox().retry(id); runOutbox(); return { success: true }; }
+    catch (e) { return { success: false, error: e.message }; }
+});
+
+// Dotáhne stavy doručení hromadně (GetMessageStateChanges) a aktualizuje frontu.
+ipcMain.handle('isds-outbox-refresh-status', async (event, fromTime) => {
+    try {
+        const creds = readIsdsCreds();
+        if (!creds || !creds.login) return { success: false, error: 'Chybí přihlašovací údaje k datové schránce.' };
+        const from = fromTime || new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+        const to = new Date().toISOString();
+        const soapBody = isdsClient.buildGetMessageStateChangesRequest(from, to);
+        const res = await isdsCall(creds, 'info', 'GetMessageStateChanges', soapBody);
+        const parsed = isdsClient.parseGetMessageStateChangesResponse(res.text);
+        const updated = getOutbox().applyStateChanges(parsed.changes);
+        return { success: true, updated, items: getOutbox().getAll() };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 });
 
 // --- DOPIS ONLINE BRIDGE (Česká pošta) ---
