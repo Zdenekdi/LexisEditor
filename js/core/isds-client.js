@@ -246,6 +246,85 @@ function parseGetSignedDeliveryInfoResponse(xml) {
     return { status, dmID: pickTag(xml, 'dmID'), signedData: signedData ? signedData.replace(/\s+/g, '') : null, events };
 }
 
+// ---------- Příchozí zprávy ----------
+// POZOR na fikci doručení: výpis a stažení OBÁLKY doručení NEspouští. Stažení
+// OBSAHU (MessageDownload) se považuje za doručení přihlášením oprávněné osoby.
+
+// GetListOfReceivedMessages — seznam přijatých obálek (bez spuštění doručení).
+function buildGetListOfReceivedMessagesRequest(fromTime, toTime, opts) {
+    const o = opts || {};
+    const parts = [];
+    if (fromTime) parts.push(`<p:dmFromTime>${escapeXml(fromTime)}</p:dmFromTime>`);
+    if (toTime) parts.push(`<p:dmToTime>${escapeXml(toTime)}</p:dmToTime>`);
+    parts.push(`<p:dmStatusFilter>${escapeXml(o.statusFilter != null ? o.statusFilter : -1)}</p:dmStatusFilter>`);
+    parts.push(`<p:dmOffset>${escapeXml(o.offset != null ? o.offset : 1)}</p:dmOffset>`);
+    parts.push(`<p:dmLimit>${escapeXml(o.limit != null ? o.limit : 1000)}</p:dmLimit>`);
+    return soapEnvelope(`<p:GetListOfReceivedMessages>${parts.join('')}</p:GetListOfReceivedMessages>`);
+}
+
+// Parsuje seznam zpráv (přijatých i odeslaných) na obálky.
+function parseMessageListResponse(xml) {
+    const status = parseStatus(xml);
+    const messages = pickAll(xml, 'dmRecord').map(inner => {
+        const st = pickTag(inner, 'dmMessageStatus');
+        return {
+            dmID: pickTag(inner, 'dmID'),
+            annotation: pickTag(inner, 'dmAnnotation'),
+            sender: pickTag(inner, 'dmSender'),
+            senderId: pickTag(inner, 'dbIDSender'),
+            recipient: pickTag(inner, 'dmRecipient'),
+            recipientId: pickTag(inner, 'dbIDRecipient'),
+            deliveryTime: pickTag(inner, 'dmDeliveryTime'),
+            acceptanceTime: pickTag(inner, 'dmAcceptanceTime'),
+            status: st,
+            statusLabel: messageStatusLabel(st),
+            delivered: isDelivered(st)
+        };
+    }).filter(m => m.dmID);
+    return { status, messages };
+}
+
+// MessageEnvelopeDownload — jen obálka (NEspouští doručení).
+function buildMessageEnvelopeDownloadRequest(dmID) {
+    return soapEnvelope(`<p:MessageEnvelopeDownload><p:dmID>${escapeXml(dmID)}</p:dmID></p:MessageEnvelopeDownload>`);
+}
+
+// MessageDownload — plné stažení OBSAHU. POZOR: spouští doručení přihlášením.
+function buildMessageDownloadRequest(dmID) {
+    return soapEnvelope(`<p:MessageDownload><p:dmID>${escapeXml(dmID)}</p:dmID></p:MessageDownload>`);
+}
+
+// Parsuje staženou zprávu: obálka + přílohy (base64).
+function parseMessageDownloadResponse(xml) {
+    const status = parseStatus(xml);
+    const envelope = {
+        dmID: pickTag(xml, 'dmID'),
+        annotation: pickTag(xml, 'dmAnnotation'),
+        sender: pickTag(xml, 'dmSender'),
+        senderId: pickTag(xml, 'dbIDSender'),
+        deliveryTime: pickTag(xml, 'dmDeliveryTime'),
+        acceptanceTime: pickTag(xml, 'dmAcceptanceTime')
+    };
+    // dmFileDescr a dmMimeType jsou ATRIBUTY tagu <dmFile>, obsah je v <dmEncodedContent>.
+    const files = [];
+    const fileRe = /<(?:[\w-]+:)?dmFile\b([^>]*)>([\s\S]*?)<\/(?:[\w-]+:)?dmFile>/ig;
+    let fm;
+    while ((fm = fileRe.exec(xml)) !== null) {
+        const attrs = fm[1] || '';
+        const inner = fm[2] || '';
+        const descr = (attrs.match(/dmFileDescr="([^"]*)"/) || [])[1];
+        const mime = (attrs.match(/dmMimeType="([^"]*)"/) || [])[1] || 'application/octet-stream';
+        const b64 = (pickTag(inner, 'dmEncodedContent') || '').replace(/\s+/g, '');
+        if (descr || b64) files.push({ name: descr || 'priloha', mimeType: mime, base64: b64 });
+    }
+    return { status, envelope, files };
+}
+
+// MarkMessageAsDownloaded — potvrdí stažení zprávy.
+function buildMarkMessageAsDownloadedRequest(dmID) {
+    return soapEnvelope(`<p:MarkMessageAsDownloaded><p:dmID>${escapeXml(dmID)}</p:dmID></p:MarkMessageAsDownloaded>`);
+}
+
 // ---------- GetOwnerInfoFromLogin (test přihlášení) ----------
 
 function buildGetOwnerInfoRequest() {
@@ -290,5 +369,11 @@ module.exports = {
     buildGetMessageStateChangesRequest,
     parseGetMessageStateChangesResponse,
     buildGetSignedDeliveryInfoRequest,
-    parseGetSignedDeliveryInfoResponse
+    parseGetSignedDeliveryInfoResponse,
+    buildGetListOfReceivedMessagesRequest,
+    parseMessageListResponse,
+    buildMessageEnvelopeDownloadRequest,
+    buildMessageDownloadRequest,
+    parseMessageDownloadResponse,
+    buildMarkMessageAsDownloadedRequest
 };
