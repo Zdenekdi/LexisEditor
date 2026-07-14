@@ -797,26 +797,6 @@ class LexisUI {
         }
     }
 
-    insertSignBlock() {
-        let range = this.core.quill.getSelection();
-        if (!range) { this.core.quill.focus(); range = this.core.quill.getSelection(); }
-        if (!range) range = { index: this.core.quill.getLength() };
-
-        const text = this.core.quill.getText();
-        let partyA = "Objednatel";
-        let partyB = "Zhotovitel";
-        if (text.includes("Prodávající") || text.includes("Kupující")) {
-            partyA = "Prodávající"; partyB = "Kupující";
-        } else if (text.includes("Pronajímatel") || text.includes("Nájemce")) {
-            partyA = "Pronajímatel"; partyB = "Nájemce";
-        }
-
-        const block = `\n\nV ........................ dne ...............     V ........................ dne ...............\n\n\n..............................................     ..............................................\n             ${partyA.padEnd(20)}                                   ${partyB.padEnd(20)}\n`;
-        this.core.quill.insertText(range.index, block);
-        this.core.quill.removeFormat(range.index, block.length);
-        this.core.quill.setSelection(range.index + block.length); 
-    }
-
     insertClause(type) {
         const clauses = {
             'arbitration': "\n\nSmluvní strany se dohodly, že veškeré spory budou rozhodovány v rozhodčím řízení před Rozhodčím soudem při HK ČR a AK ČR.\n",
@@ -923,31 +903,6 @@ class LexisUI {
         this.core.quill.insertText(index, fixText);
         this.currentAuditResults.splice(resultIndex, 1);
         this.renderAuditResults(this.currentAuditResults);
-    }
-
-    startMailMerge() {
-        this._campaignStep = 1;
-        this._campaignRecords = [];
-        this._campaignPreviewIdx = 0;
-        this._campaignAction = 'pdf';
-        const overlay = document.getElementById('campaign-overlay');
-        if (overlay) {
-            overlay.style.display = 'flex';
-            this.renderCampaignStep(1);
-        }
-    }
-
-    linkCaseLaw() {
-        const text = this.core.quill.getText();
-        const regex = /\b\d+\s+(Cdo|Tdo|Nd|As|Afs|Azs|Ads|Aos)\s+\d+\/\d{4}\b/gi;
-        let m;
-        let found = 0;
-        while ((m = regex.exec(text)) !== null) {
-            const url = `https://www.google.com/search?q=${encodeURIComponent('"' + m[0] + '"')}`;
-            this.core.quill.formatText(m.index, m[0].length, { 'link': url, 'color': '#2563eb', 'bold': true });
-            found++;
-        }
-        this.customAlert(`Zalinkováno ${found} spisových značek.`);
     }
 
     applyPaper(size) {
@@ -1733,13 +1688,17 @@ class LexisUI {
             fileNumber = 'Spis. zn. / Č. j. nevyplněno';
         }
         
-        // 2. Try to extract Sender or Court name
-        const courtRegex = /(?:okresní|krajský|vrchní|ústavní|nejvyšší)\s+soud\s+(?:v|ve|brně|praze|ostravě|plzni|olomouci|hradci|[a-zá-žěščřžýáíéóúůďťň]+)/i;
-        const courtMatch = courtRegex.exec(this.currentPdfText);
-        let recipient = courtMatch ? courtMatch[0].trim() : 'Příslušný soud / Orgán';
-        
-        // Capitalize first letters nicely
-        recipient = recipient.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+        // 2. Extract court — sdílená detekce (window.LexisReply), s regex fallbackem.
+        let recipient = 'Příslušný soud / Orgán';
+        const detectedCourt = (window.LexisReply && window.LexisReply.courtInfo)
+            ? window.LexisReply.courtInfo(this.currentPdfText) : null;
+        if (detectedCourt && detectedCourt.nazev) {
+            recipient = detectedCourt.nazev;
+        } else {
+            const courtRegex = /(?:okresní|krajský|vrchní|ústavní|nejvyšší)\s+soud\s+(?:v|ve|brně|praze|ostravě|plzni|olomouci|hradci|[a-zá-žěščřžýáíéóúůďťň]+)/i;
+            const courtMatch = courtRegex.exec(this.currentPdfText);
+            if (courtMatch) recipient = courtMatch[0].trim().replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+        }
 
         // 3. Try to extract deadline
         const deadlineRegex = /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-žěščřžýáíéóúůďťň]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/i;
@@ -3582,8 +3541,17 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 if (titleInput) titleInput.value = this.currentDocumentTitle;
                 
                 // 3. Draft formal response brief HTML
+                // Skutečný soud se dohledá z podkladů (detekce + registr), ne natvrdo Brno.
+                const detText = [doc.summary, doc.caseNumber, doc.plaintiff, doc.defendant].filter(Boolean).join(' ');
+                const court = (window.LexisReply && window.LexisReply.courtInfo) ? window.LexisReply.courtInfo(detText) : null;
+                const courtHtml = court
+                    ? `<b>${window.escapeHTML(court.nazev)}</b>`
+                        + (court.adresa ? `<br>${window.escapeHTML(court.adresa)}` : '')
+                        + ((court.psc || court.mesto) ? `<br>${window.escapeHTML([court.psc, court.mesto].filter(Boolean).join(' '))}` : '')
+                    : `<b>[Adresát – doplňte příslušný soud]</b>`;
+                const mistoPodani = (court && court.mesto) ? court.mesto : '[místo]';
                 const generatedHtml = `
-                    <p style="text-align: right; font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Okresní soud v Brně</b><br>Polní 994/39<br>608 00 Brno</p>
+                    <p style="text-align: right; font-family: 'Times New Roman', serif; font-size: 12pt;">${courtHtml}</p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>K sp. zn.:</b> ${doc.caseNumber}</p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Žalobce:</b> ${doc.plaintiff}</p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><b>Žalovaný:</b> ${doc.defendant}</p>
@@ -3600,7 +3568,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt; text-align: justify;"><i>[Doporučení AI: Zvolte v pravém panelu Agenta 'Stylista' nebo 'Oponent' pro zformulování konkrétních námitek k žalobním tvrzením.]</i></p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
-                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;">V Brně dne ${new Date().toLocaleDateString('cs-CZ')}</p>
+                    <p style="font-family: 'Times New Roman', serif; font-size: 12pt;">V ${mistoPodani} dne ${new Date().toLocaleDateString('cs-CZ')}</p>
                     <p style="font-family: 'Times New Roman', serif; font-size: 12pt;"><br></p>
                     <p style="text-align: right; font-family: 'Times New Roman', serif; font-size: 12pt;">...........................................<br><b>${doc.defendant}</b><br>právně zastoupen advokátem</p>
                 `;
@@ -4235,395 +4203,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         this.renderDeadlines();
     }
 
-    async openISDS() {
-        this.checkEnterpriseFeature("Přístup k Datovým schránkám (ISDS)", async () => {
-            const overlay = document.createElement('div');
-            overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);";
-            
-            const modal = document.createElement('div');
-            modal.style = "background:#fff;border-radius:16px;width:950px;height:650px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);font-family:'Inter',sans-serif;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e2e8f0;";
-            
-            const headerHtml = `
-                <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 18px 24px; color: white; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 28px;">📮</span>
-                        <div>
-                            <div style="font-weight: 800; font-size: 18px; letter-spacing: -0.5px;">Správce Datových schránek (ISDS)</div>
-                            <div style="font-size: 11px; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;">Komunikační uzel advokátní kanceláře</div>
-                        </div>
-                    </div>
-                    <button id="isds-close" style="background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#94a3b8'">✕</button>
-                </div>
-            `;
-            
-            const bodyContainer = document.createElement('div');
-            bodyContainer.style = "flex: 1; display: flex; min-height: 0; background: #f8fafc;";
-            
-            modal.innerHTML = headerHtml;
-            modal.appendChild(bodyContainer);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-            
-            document.getElementById('isds-close').onclick = () => document.body.removeChild(overlay);
-            
-            let isdsConfig = { hasConfig: false };
-            if (window.electronAPI && window.electronAPI.getIsdsConfig) {
-                isdsConfig = await window.electronAPI.getIsdsConfig();
-            }
-            
-            const renderLogin = () => {
-                bodyContainer.innerHTML = `
-                    <div style="margin: auto; width: 400px; padding: 30px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: 'Inter', sans-serif;">
-                        <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin-top: 0; margin-bottom: 6px; text-align: center;">Bezpečné přihlášení do ISDS</h3>
-                        <p style="font-size: 12px; color: #64748b; margin-bottom: 20px; text-align: center; line-height: 1.4;">Vaše přihlašovací údaje jsou šifrovány pomocí systémového úložiště klíčů (Keychain/DPAPI) a nikdy neopouštějí váš počítač.</p>
-                        
-                        <div style="margin-bottom: 12px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Uživatelské jméno (Login)</label>
-                            <input id="isds-login-input" type="text" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" placeholder="Zadejte přihlašovací ID">
-                        </div>
-                        <div style="margin-bottom: 16px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Heslo</label>
-                            <input id="isds-pass-input" type="password" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;" placeholder="Zadejte heslo">
-                        </div>
-                        <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
-                            <input id="isds-test-env" type="checkbox" style="cursor: pointer;">
-                            <label for="isds-test-env" style="font-size: 12px; color: #475569; cursor: pointer; user-select: none;">Použít testovací prostředí (ISDS Sandbox)</label>
-                        </div>
-                        
-                        <button id="isds-connect-btn" style="width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; transition: background 0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">Připojit se</button>
-                        
-                        <div style="margin-top: 15px; text-align: center;">
-                            <button id="isds-demo-btn" style="background: none; border: none; color: #7c3aed; cursor: pointer; font-size: 12px; font-weight: 600;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Vyzkoušet v Demo režimu (Simulátor)</button>
-                        </div>
-                    </div>
-                `;
-                
-                document.getElementById('isds-connect-btn').onclick = async () => {
-                    const login = document.getElementById('isds-login-input').value.trim();
-                    const pass = document.getElementById('isds-pass-input').value;
-                    const testEnv = document.getElementById('isds-test-env').checked;
-                    
-                    if (!login || !pass) {
-                        return this.customAlert("Prosím, vyplňte přihlašovací údaje.");
-                    }
-                    
-                    document.getElementById('isds-connect-btn').innerText = "Ověřuji...";
-                    document.getElementById('isds-connect-btn').disabled = true;
-                    
-                    let testResult = { success: false, error: 'Připojení k ISDS není v tomto režimu podporováno.' };
-                    if (window.electronAPI && window.electronAPI.testIsdsConnection) {
-                        testResult = await window.electronAPI.testIsdsConnection({
-                            login,
-                            pass,
-                            env: testEnv ? 'test' : 'production'
-                        });
-                    }
-                    
-                    if (testResult.success) {
-                        if (window.electronAPI && window.electronAPI.saveIsdsConfig) {
-                            await window.electronAPI.saveIsdsConfig({
-                                login,
-                                password: pass,
-                                environment: testEnv ? 'test' : 'production'
-                            });
-                        }
-                        this.customAlert(`✅ Úspěšně připojeno! Vítejte zpět, ${testResult.owner || login}.`);
-                        renderInbox(false);
-                    } else {
-                        this.customAlert(`❌ Chyba připojení: ${testResult.error || 'Neznámá chyba'}\n\nSpouštím demo simulátor pro otestování.`);
-                        renderInbox(true);
-                    }
-                };
-                
-                document.getElementById('isds-demo-btn').onclick = () => renderInbox(true);
-            };
-            
-            const renderInbox = (isDemo = false) => {
-                bodyContainer.innerHTML = `
-                    <div style="width: 350px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; min-height: 0;">
-                        <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
-                            <div style="font-weight: 700; font-size: 13px; color: #1e293b;">Doručená pošta ${isDemo ? '(Simulátor)' : ''}</div>
-                            <span style="font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: ${isDemo ? '#f3e8ff' : '#dcfce7'}; color: ${isDemo ? '#7c3aed' : '#15803d'};">${isDemo ? 'DEMO' : 'AKTIVNÍ'}</span>
-                        </div>
-                        <div id="isds-msg-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-                        </div>
-                        <div style="padding: 12px; border-top: 1px solid #e2e8f0; text-align: center;">
-                            <button id="isds-logout" style="background: none; border: none; color: #dc2626; font-size: 12px; font-weight: 600; cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Odhlásit schránku</button>
-                        </div>
-                    </div>
-                    
-                    <div id="isds-detail-pane" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 24px; justify-content: center; align-items: center; color: #94a3b8;">
-                        <span style="font-size: 48px; display: block; margin-bottom: 15px;">📨</span>
-                        <div style="font-weight: 600; font-size: 14px;">Vyberte zprávu k zobrazení detailů</div>
-                        <div style="font-size: 12px; margin-top: 4px;">Zde se zobrazí kompletní obálka a přílohy k importu.</div>
-                    </div>
-                `;
-                
-                document.getElementById('isds-logout').onclick = async () => {
-                    if (window.electronAPI && window.electronAPI.saveIsdsConfig) {
-                        await window.electronAPI.saveIsdsConfig({ login: '', password: '', environment: 'production' });
-                    }
-                    renderLogin();
-                };
-                
-                const messages = [
-                    {
-                        id: "isds_msg_001",
-                        senderName: "Městský soud v Praze",
-                        senderId: "k82ayvy",
-                        subject: "Usnesení o nařízení jednání sp. zn. 15 Co 123/2026",
-                        receivedDate: "15. 05. 2026",
-                        deadlineDays: 7,
-                        body: `<h3>Městský soud v Praze</h3>
-                               <p>Spisová značka: <b>15 Co 123/2026</b></p>
-                               <p><b>USNESENÍ:</b></p>
-                               <p>Soud nařizuje v právní věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč ústní jednání na den <b>10. června 2026 v 9:00 hod.</b> (místnost č. 204, 2. patro).</p>
-                               <p><b>Výzva:</b> Žalovaný se vyzývá, aby se ve lhůtě 7 dnů od doručení vyjádřil, zda souhlasí s rozhodnutím bez nařízení jednání.</p>`,
-                        attachments: [
-                            { name: "Usneseni_narizeni_jednani.html", type: "html", content: `<h2>USNESENÍ MĚSTSKÉHO SOUDU V PRAZE</h2><p>Městský soud v Praze rozhodl samosoudcem Mgr. Janem Novákem ve věci žalobce <b>Alfa s.r.o.</b> proti žalovanému <b>Beta a.s.</b> o zaplacení částky 250 000 Kč s příslušenstvím takto:</p><p>Soud nařizuje ústní jednání na 10. června 2026 v 9:00 hod.</p>` },
-                            { name: "Dukazni_listiny.pdf", type: "pdf", size: "1.2 MB" }
-                        ]
-                    },
-                    {
-                        id: "isds_msg_002",
-                        senderName: "Ministerstvo spravedlnosti ČR",
-                        senderId: "kq4aaw8",
-                        subject: "Výzva k doložení osvědčení o pojištění advokáta",
-                        receivedDate: "14. 05. 2026",
-                        deadlineDays: 14,
-                        body: `<h3>Ministerstvo spravedlnosti ČR</h3>
-                               <p>Odbor insolvenční a soudních znalců.</p>
-                               <p><b>Výzva:</b> Vyzýváme Vás k předložení potvrzení o uzavřeném pojištění odpovědnosti za škodu způsobenou výkonem činnosti advokáta na pojistnou sumu minimálně 3.000.000,- Kč.</p>
-                               <p>Lhůta pro doručení: <b>14 dnů</b>.</p>`,
-                        attachments: [
-                            { name: "Vyzva_pojisteni_2026.html", type: "html", content: `<h2>VÝZVA MINISTERSTVA SPRAVEDLNOSTI</h2><p>Vyzýváme advokáta k doložení platného osvědčení o pojištění profesní odpovědnosti dle zákona o advokacii č. 85/1996 Sb.</p>` }
-                        ]
-                    },
-                    {
-                        id: "isds_msg_003",
-                        senderName: "Finanční úřad pro Prahu 1",
-                        senderId: "482al8k",
-                        subject: "Rozhodnutí o vyměření daňové povinnosti",
-                        receivedDate: "10. 05. 2026",
-                        deadlineDays: 0,
-                        body: `<h3>Finanční úřad pro Prahu 1</h3>
-                               <p><b>Rozhodnutí:</b> Na základě podaného daňového přiznání k dani z příjmů právnických osob Vám vyměřujeme daňovou povinnost ve výši 45.300,- Kč.</p>
-                               <p>Splatnost do: <b>31. května 2026</b>.</p>`,
-                        attachments: [
-                            { name: "Vymereni_dane.html", type: "html", content: `<h2>ROZHODNUTÍ O VYMĚŘENÍ DANĚ</h2><p>Finanční úřad pro Prahu 1 vyměřuje daň z příjmu ve výši 45 300 Kč. Splatnost je stanovena do konce běžného měsíce.</p>` }
-                        ]
-                    }
-                ];
-                
-                const listContainer = document.getElementById('isds-msg-list');
-                listContainer.innerHTML = messages.map(msg => {
-                    const dueHtml = msg.deadlineDays > 0 
-                        ? `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5;">Lhůta ${msg.deadlineDays} dní</span>`
-                        : `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #f1f5f9; color: #64748b;">Bez lhůty</span>`;
-                        
-                    return `
-                        <div class="isds-row" id="row-${msg.id}" style="padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.2s;" onclick="window.selectISDSMsg('${msg.id}')">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <div style="font-weight: 700; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${msg.senderName}</div>
-                                <span style="font-size: 10px; color: #94a3b8;">${msg.receivedDate}</span>
-                            </div>
-                            <div style="font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${msg.subject}</div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${msg.senderId}</span>
-                                ${dueHtml}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                
-                messages.forEach(msg => {
-                    const el = document.getElementById(`row-${msg.id}`);
-                    if (el) {
-                        el.onmouseover = () => {
-                            if (!el.classList.contains('active-msg')) {
-                                el.style.background = '#f8fafc';
-                                el.style.borderColor = '#cbd5e1';
-                            }
-                        };
-                        el.onmouseout = () => {
-                            if (!el.classList.contains('active-msg')) {
-                                el.style.background = 'white';
-                                el.style.borderColor = '#e2e8f0';
-                            }
-                        };
-                    }
-                });
-                
-                window.selectISDSMsg = (msgId) => {
-                    const msg = messages.find(m => m.id === msgId);
-                    if (!msg) return;
-                    
-                    messages.forEach(m => {
-                        const row = document.getElementById(`row-${m.id}`);
-                        if (row) {
-                            row.classList.remove('active-msg');
-                            row.style.background = 'white';
-                            row.style.borderColor = '#e2e8f0';
-                        }
-                    });
-                    
-                    const activeRow = document.getElementById(`row-${msgId}`);
-                    if (activeRow) {
-                        activeRow.classList.add('active-msg');
-                        activeRow.style.background = 'rgba(37, 99, 235, 0.05)';
-                        activeRow.style.borderColor = '#2563eb';
-                    }
-                    
-                    const detailPane = document.getElementById('isds-detail-pane');
-                    if (!detailPane) return;
-                    
-                    const attsHtml = msg.attachments.map(att => {
-                        const importBtn = att.type === 'html' 
-                            ? `<button onclick="window.importISDSAtt('${msgId}', '${att.name}')" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; border: 1px solid #c084fc; background: #faf5ff; color: #7c3aed; cursor: pointer; transition: all 0.2s;">📄 Importovat</button>`
-                            : `<span style="font-size: 11px; color: #94a3b8; font-style: italic;">Pouze ke stažení</span>`;
-                            
-                        return `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 18px;">${att.type === 'html' ? '📄' : '📎'}</span>
-                                    <div>
-                                        <div style="font-size: 12px; font-weight: 600; color: #334155;">${att.name}</div>
-                                        <div style="font-size: 10px; color: #94a3b8;">${att.type.toUpperCase()} ${att.size || ''}</div>
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 6px;">
-                                    ${importBtn}
-                                    <button onclick="window.downloadISDSAtt('${att.name}')" style="padding: 4px 10px; font-size: 11px; font-weight: 700; border-radius: 4px; border: 1px solid #cbd5e1; background: white; color: #475569; cursor: pointer;">💾 Stáhnout</button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                    
-                    detailPane.style.justifyContent = 'flex-start';
-                    detailPane.style.alignItems = 'stretch';
-                    detailPane.style.color = 'inherit';
-                    
-                    detailPane.innerHTML = `
-                        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px; flex: 1; overflow-y: auto;">
-                            <div>
-                                <span style="font-size: 9px; font-weight: 800; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">Podrobnosti o zprávě</span>
-                                <h2 style="font-size: 16px; font-weight: 800; color: #1e293b; margin: 8px 0 4px; line-height: 1.3;">${msg.subject}</h2>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: #64748b; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
-                                    <div><strong>Odesílatel:</strong> ${msg.senderName}</div>
-                                    <div><strong>Datová schránka ID:</strong> <span style="font-family: monospace;">${msg.senderId}</span></div>
-                                    <div><strong>Datum doručení:</strong> ${msg.receivedDate}</div>
-                                    <div><strong>Zpracování lhůty:</strong> ${msg.deadlineDays > 0 ? `Lhůta do ${msg.receivedDate} (${msg.deadlineDays} dní)` : 'Není sledována'}</div>
-                                </div>
-                            </div>
-                            
-                            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; background: #fafafb; font-size: 13px; line-height: 1.5; color: #334155; max-height: 150px; overflow-y: auto;">
-                                ${msg.body}
-                            </div>
-                            
-                            <div>
-                                <h4 style="font-size: 12px; font-weight: 700; color: #475569; margin: 0 0 10px;">Přílohy k podání (${msg.attachments.length})</h4>
-                                <div style="display: flex; flex-direction: column; gap: 8px;">
-                                    ${attsHtml}
-                                </div>
-                            </div>
-                            
-                            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #f1f5f9; padding-top: 15px; margin-top: auto;">
-                                <button onclick="window.replyISDSMsg('${msg.id}')" style="padding: 10px 18px; border-radius: 6px; border: none; background: #16a34a; color: white; font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">✍️ Rychlá odpověď odesílateli</button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    window.importISDSAtt = (mId, attName) => {
-                        const m = messages.find(x => x.id === mId);
-                        const att = m.attachments.find(a => a.name === attName);
-                        if (att && att.content) {
-                            this.importISDSAttachment(att.content);
-                            document.body.removeChild(overlay);
-                        }
-                    };
-                    
-                    window.downloadISDSAtt = (attName) => {
-                        this.customAlert(`📥 Soubor <b>${attName}</b> byl úspěšně stažen a uložen do složky Stažené soubory (Downloads).`);
-                    };
-                    
-                    window.replyISDSMsg = async (mId) => {
-                        const m = messages.find(x => x.id === mId);
-                        if (m) {
-                            const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
-                            const html = `
-                                <h2>REAKCE NA USNESENÍ SOUDU / VÝZVU</h2>
-                                <p><b>Městskému soudu v Praze</b><br>Datová schránka ID: <b>${m.senderId}</b></p>
-                                <p>K spisové značce: <b>15 Co 123/2026</b></p>
-                                <p><br></p>
-                                <p>K výzvě soudu ze dne ${m.receivedDate} ve věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč sděluje žalovaný prostřednictvím svého právního zástupce následující:</p>
-                                <p>[Sem doplňte text Vašeho vyjádření]</p>
-                                <p><br></p>
-                                <p>${savedName}, advokát</p>
-                            `;
-                            
-                            const due = new Date();
-                            due.setDate(due.getDate() + m.deadlineDays);
-                            const dueDateStr = due.toISOString().split('T')[0];
-                            
-                            // Initialize fresh document state and metadata
-                            this.currentDocumentId = 'doc_' + Date.now();
-                            this.currentDocumentTitle = `Odpověď: ${m.subject}`;
-                            this.currentDocumentCj = '15 Co 123/2026';
-                            this.currentDocumentDeadline = {
-                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
-                                dueDate: dueDateStr
-                            };
-                            
-                            this.core.setContent(html);
-                            this.setDocumentStatus('draft', true);
-                            
-                            // Track in activeDeadlines
-                            this.activeDeadlines.push({
-                                id: 'dl_' + Date.now(),
-                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
-                                dueDate: dueDateStr
-                            });
-                            this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
-                            this.renderDeadlines();
-                            this.updateDeadlineBadge();
-                            this.updateDocTitleDOM();
-                            this.saveActiveDocumentState();
-                            this.updateDocumentOutline();
-                            
-                            // Transition view from start screen to editor
-                            const startScreen = document.getElementById('start-screen');
-                            const appContainer = document.getElementById('app-container');
-                            if (startScreen && appContainer) {
-                                startScreen.style.display = 'none';
-                                appContainer.style.display = 'flex';
-                            }
-                            
-                            document.body.removeChild(overlay);
-                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. 15 Co 123/2026, aktivováno sledování lhůty a načteno do editoru.`);
-                        }
-                    };
-                };
-            };
-            
-            if (isdsConfig.hasConfig) {
-                renderInbox(false);
-            } else {
-                renderLogin();
-            }
-        });
-    }
-
-    importISDSAttachment(content) {
-        try {
-            const range = this.core.quill.getSelection(true);
-            this.core.safePasteHTML(range.index, content);
-            this.customAlert("✅ <b>Příloha byla úspěšně importována!</b><br><br>Textový obsah přílohy byl vložen přímo na pozici vašeho kurzoru.");
-        } catch (e) {
-            console.error("Chyba při importu přílohy z ISDS:", e);
-            this.customAlert("Nebylo možné vložit obsah přílohy do editoru.");
-        }
-    }
-
     async signDigital() {
         this.checkEnterpriseFeature("Zaručený elektronický podpis PDF", async () => {
             const overlay = document.createElement('div');
@@ -4889,36 +4468,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             this.core.safePasteHTML(index, bookmarkHtml);
             this.saveActiveDocumentState();
         });
-    }
-
-    editHeader() {
-        const header = document.getElementById('header-area');
-        if (header) {
-            header.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            header.focus();
-            
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(header);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-    }
-
-    editFooter() {
-        const footer = document.getElementById('footer-area');
-        if (footer) {
-            footer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            footer.focus();
-            
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(footer);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
     }
 
     insertPageNumber() {
@@ -5432,7 +4981,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             'insertSectionSign': 'Vložit speciální znak paragrafu (§).',
             'lookupCaseLaw': 'Vyhledat judikáty k vybranému tématu.',
             'autoLinkLaws': 'Automaticky převést odkazy na zákony na hypertextové odkazy.',
-            'openISDS': 'Odeslat dokument přímo přes integrovanou datovou schránku.',
             'openPostDialog': 'Odeslat dokument jako fyzický dopis přes službu České pošty (Dopis Online).',
             'signDigital': 'Digitálně podepsat dokument zaručeným podpisem.',
             'logTime': 'Zapsat čas strávený na tomto dokumentu do výkazu.',
@@ -5558,16 +5106,10 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         if (!text) return;
         
         let detectedCourt = null;
-        const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
         
-        if (window.COURT_PATTERNS) {
-            for (const court of window.COURT_PATTERNS) {
-                const regex = new RegExp(court.pattern, 'i');
-                if (regex.test(normalizedText)) {
-                    detectedCourt = court;
-                    break;
-                }
-            }
+        // Detekce soudu — jeden zdroj (window.LexisCourt.detect z js/core/court-data.js).
+        if (window.LexisCourt && window.LexisCourt.detect) {
+            detectedCourt = window.LexisCourt.detect(text);
         }
         
         // Match spisová značka (case file number)
@@ -6049,124 +5591,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         });
     }
 
-    renderCampaignStep(step) {
-        this._campaignStep = step;
-        const body = document.getElementById('campaign-body');
-        const footerInfo = document.getElementById('campaign-footer-info');
-        const btnBack = document.getElementById('campaign-btn-back');
-        const btnNext = document.getElementById('campaign-btn-next');
-        if (!body) return;
-
-        // Update stepper UI
-        for (let i = 1; i <= 4; i++) {
-            const stepEl = document.getElementById(`cstep-${i}`);
-            const lineEl = document.getElementById(`cline-${i}`);
-            if (stepEl) {
-                stepEl.classList.toggle('active', i === step);
-                stepEl.classList.toggle('done', i < step);
-                const numEl = stepEl.querySelector('.campaign-step-num');
-                if (numEl && i < step) numEl.textContent = '✓';
-                else if (numEl) numEl.textContent = String(i);
-            }
-            if (lineEl) lineEl.classList.toggle('done', i < step);
-        }
-
-        if (footerInfo) footerInfo.textContent = `Krok ${step} ze 4`;
-        if (btnBack) btnBack.style.display = step > 1 ? 'inline-flex' : 'none';
-        if (btnNext) {
-            if (step < 4) {
-                btnNext.textContent = 'Další →';
-                btnNext.className = 'campaign-btn campaign-btn-next';
-                btnNext.onclick = () => this.campaignNext();
-            } else {
-                btnNext.textContent = '🚀 Spustit kampaň';
-                btnNext.className = 'campaign-btn campaign-btn-run';
-                btnNext.onclick = () => this.runCampaignBatch();
-            }
-        }
-
-        // Render step content
-        if (step === 1) {
-            const text = this.core.getText();
-            const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
-            const hasVars = varMatches.length > 0;
-
-            body.innerHTML = `
-                <div class="${hasVars ? 'campaign-info-box' : 'campaign-warn-box'}">
-                    ${hasVars
-                        ? `✅ <b>Nalezeno ${varMatches.length} proměnných</b> v dokumentu. V dalším kroku importujete adresáty a hodnoty pro tyto proměnné.`
-                        : `⚠️ <b>Žádné proměnné nenalezeny.</b> Přidejte do dokumentu proměnné ve formátu <code>{{JménoProměnné}}</code>, nebo kampaň pošle stejný dokument všem adresátům.`
-                    }
-                </div>
-                <p style="font-size:13px; color:#334155; margin-bottom:12px;">Proměnné jsou označeny dvojitými složenými závorkami, např. <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">{{Jméno}}</code>, <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px;">{{IČO}}</code>.</p>
-                <div class="campaign-vars-grid">
-                    ${varMatches.map(v => `<div class="campaign-var-chip">{{${v}}}</div>`).join('')}
-                    ${varMatches.length === 0 ? '<div style="font-size:12px;color:#94a3b8;">Žádné proměnné.</div>' : ''}
-                </div>
-            `;
-        } else if (step === 2) {
-            const text = this.core.getText();
-            const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
-            const exampleHeaders = varMatches.length > 0 ? varMatches.join(',') : 'Jméno,IČO,Adresa';
-            const exampleRow = varMatches.length > 0
-                ? varMatches.map((v, i) => ['Jan Novák', '12345678', 'Praha 1'][i] || 'Hodnota').join(',')
-                : 'Jan Novák,12345678,Praha 1';
-
-            const csvVal = this._campaignCsvText || `${exampleHeaders}\n${exampleRow}\nMarie Svobodová,87654321,Brno`;
-
-            body.innerHTML = `
-                <p style="font-size:13px; color:#334155; margin-bottom:12px;">Vložte CSV data s adresáty. První řádek = záhlaví sloupců (musí odpovídat proměnným v dokumentu).</p>
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <button onclick="document.getElementById('campaign-csv-input').click()" style="padding:7px 14px; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:12px; font-weight:600; cursor:pointer;">📂 Načíst ze souboru (.csv)</button>
-                    <span style="font-size:11px; color:#94a3b8; align-self:center;">nebo napište/vložte ručně:</span>
-                </div>
-                <textarea class="campaign-csv-area" id="campaign-csv-ta" oninput="lexisUI._updateCampaignRecordsPreview()">${csvVal}</textarea>
-                <div id="campaign-table-preview" style="margin-top:8px;"></div>
-            `;
-            // Render existing records
-            this._updateCampaignRecordsPreview();
-        } else if (step === 3) {
-            const records = this._campaignRecords;
-            if (records.length === 0) {
-                body.innerHTML = '<div class="campaign-warn-box">⚠️ Žádní adresáti. Vraťte se zpět a importujte data.</div>';
-                return;
-            }
-            const idx = Math.min(this._campaignPreviewIdx, records.length - 1);
-            const docHtml = this.core.getContent();
-            const filled = this.exportCampaignRecord(records[idx], docHtml);
-
-            body.innerHTML = `
-                <div class="campaign-preview-nav">
-                    <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(-1)">←</button>
-                    <div class="campaign-preview-counter">Adresát ${idx + 1} z ${records.length}: <b>${records[idx][Object.keys(records[idx])[0]] || ''}</b></div>
-                    <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(1)">→</button>
-                </div>
-                <div class="campaign-preview-doc">${filled}</div>
-            `;
-        } else if (step === 4) {
-            const count = this._campaignRecords.length;
-            body.innerHTML = `
-                <p style="font-size:13px; color:#334155; margin-bottom:16px;">Vyberte akci pro <b>${count} adresátů</b>:</p>
-                <div class="campaign-action-grid">
-                    <div class="campaign-action-card ${this._campaignAction === 'pdf' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('pdf')">
-                        <div class="campaign-action-icon">📄</div>
-                        <div class="campaign-action-title">Export PDF</div>
-                        <div class="campaign-action-desc">Uložit každý dokument jako samostatný HTML soubor ke stažení (${count} souborů)</div>
-                    </div>
-                    <div class="campaign-action-card ${this._campaignAction === 'download' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('download')">
-                        <div class="campaign-action-icon">📦</div>
-                        <div class="campaign-action-title">Stáhnout vše</div>
-                        <div class="campaign-action-desc">Stáhnout všechny dokumenty najednou jako HTML soubory</div>
-                    </div>
-                </div>
-                <div class="campaign-progress-bar" id="campaign-prog-bar" style="display:none;">
-                    <div class="campaign-progress-fill" id="campaign-prog-fill" style="width:0%"></div>
-                </div>
-                <div id="campaign-run-status" style="font-size:12px; color:#64748b; margin-top:8px;"></div>
-            `;
-        }
-    }
-
     _setCampaignAction(action) {
         this._campaignAction = action;
         document.querySelectorAll('.campaign-action-card').forEach(card => card.classList.remove('selected'));
@@ -6225,76 +5649,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         };
         reader.readAsText(file, 'utf-8');
         input.value = '';
-    }
-
-    campaignNext() {
-        const step = this._campaignStep;
-
-        if (step === 2) {
-            // Parse records before moving
-            const ta = document.getElementById('campaign-csv-ta');
-            if (ta) {
-                this._campaignCsvText = ta.value;
-                this._campaignRecords = this.parseCsvToRecords(ta.value);
-            }
-            if (this._campaignRecords.length === 0) {
-                this.customAlert('⚠️ Zadejte alespoň jednoho adresáta.');
-                return;
-            }
-        }
-
-        if (step < 4) this.renderCampaignStep(step + 1);
-    }
-
-    campaignBack() {
-        if (this._campaignStep > 1) this.renderCampaignStep(this._campaignStep - 1);
-    }
-
-    async runCampaignBatch() {
-        const records = this._campaignRecords;
-        if (records.length === 0) {
-            this.customAlert('Nejsou žádní adresáti.');
-            return;
-        }
-
-        const progBar = document.getElementById('campaign-prog-bar');
-        const progFill = document.getElementById('campaign-prog-fill');
-        const status = document.getElementById('campaign-run-status');
-        const btnNext = document.getElementById('campaign-btn-next');
-        if (progBar) progBar.style.display = 'block';
-        if (btnNext) btnNext.disabled = true;
-
-        const templateHtml = this.core.getContent();
-
-        for (let i = 0; i < records.length; i++) {
-            const record = records[i];
-            const firstName = record[Object.keys(record)[0]] || `Adresát_${i + 1}`;
-            const filled = this.exportCampaignRecord(record, templateHtml)
-                .replace(/<span class="filled-var">/g, '').replace(/<\/span>/g, '');
-
-            // Create downloadable HTML
-            const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${firstName}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
-            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `dokument_${firstName.replace(/[^a-z0-9_]/gi, '_')}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-
-            // Update progress
-            const pct = Math.round(((i + 1) / records.length) * 100);
-            if (progFill) progFill.style.width = `${pct}%`;
-            if (status) status.textContent = `Generuji ${i + 1} / ${records.length} — ${firstName}...`;
-
-            // Small delay to avoid browser blocking multiple downloads
-            await new Promise(r => setTimeout(r, 300));
-        }
-
-        if (status) status.innerHTML = `✅ <b>Hotovo!</b> Vygenerováno ${records.length} dokumentů.`;
-        if (btnNext) btnNext.disabled = false;
     }
 
     // ==========================================

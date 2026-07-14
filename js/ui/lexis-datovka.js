@@ -60,14 +60,9 @@
         };
     }
 
-    // Detekuje soud zmíněný v textu dokumentu (stejná logika jako v editoru).
+    // Detekuje soud zmíněný v textu — jeden zdroj (window.LexisCourt.detect).
     function detectCourtInText(text) {
-        if (!text || !Array.isArray(window.COURT_PATTERNS)) return null;
-        const norm = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        for (const court of window.COURT_PATTERNS) {
-            try { if (new RegExp(court.pattern, 'i').test(norm)) return court; } catch (e) {}
-        }
-        return null;
+        return (window.LexisCourt && window.LexisCourt.detect) ? window.LexisCourt.detect(text) : null;
     }
 
     function closeOverlay(el) {

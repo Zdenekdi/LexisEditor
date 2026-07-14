@@ -19,14 +19,9 @@
         return ed ? ed.innerText : '';
     }
 
-    // Detekce soudu (stejná logika jako v editoru).
+    // Detekce soudu — jeden zdroj (window.LexisCourt.detect z js/core/court-data.js).
     function detectCourt(text) {
-        if (!text || !Array.isArray(window.COURT_PATTERNS)) return null;
-        const norm = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-        for (const c of window.COURT_PATTERNS) {
-            try { if (new RegExp(c.pattern, 'i').test(norm)) return c; } catch (e) {}
-        }
-        return null;
+        return (window.LexisCourt && window.LexisCourt.detect) ? window.LexisCourt.detect(text) : null;
     }
 
     function firstMatch(text, regexes) {
@@ -46,13 +41,22 @@
             /(?:na[šs]e\s+|va[šs]e\s+)?sp(?:\.|is(?:\.|ov[áa]))?\s*zn(?:\.|a[čc]ka)?\s*[:.]?\s*([0-9]+\s*[A-Za-zÀ-ž]{1,6}\s*[0-9]+\s*\/\s*[0-9]{2,4})/i,
             /\b([0-9]+\s+[A-Za-zÀ-ž]{1,5}\s+[0-9]+\s*\/\s*[0-9]{2,4})\b/
         ]);
-        // Číslo jednací — „č.j.", „č. j.", „čj", „Č.j.", „číslo jednací",
-        // volitelně s „Naše/Vaše". Accentovaná forma je bezpečná; ASCII „c.j."
-        // vyžaduje tečku, aby nechytalo prózu typu „Věc je…".
+        // Číslo jednací — MUSÍ mu předcházet označení: „č.j.", „č. j.", „čj",
+        // „Č.j." nebo text „číslo jednací" (volitelně s „Naše/Vaše"). Bez tohoto
+        // označení se č.j. nebere (holé číslo v textu není č.j.).
+        //
+        // Hodnota č.j. má strukturu — buď soudní spisová značka (7 T 12/2026),
+        // nebo složený úřední tvar s písmeny/pomlčkami/lomítky, např.
+        // „MV-12345-2/OAM-2026" nebo „KRPB-12345/TČ-2026". Proto se hodnota
+        // matchuje jako token (ne „zbytek řádku"), aby nechytala okolní prózu.
+        const CJ = '('
+            + '(?:[A-Za-zÀ-ž]{2,6}\\s+)?[0-9]+\\s+[A-Za-zÀ-ž]{1,6}\\s+[0-9]+\\s*\\/\\s*[0-9]{2,4}(?:\\s*-\\s*[0-9]+)?'  // (KSBR) 8 As 15/2025-73
+            + '|[A-Za-zÀ-ž0-9]+(?:[\\-\\/][A-Za-zÀ-ž0-9]+)+'                                                            // MV-12345-2/OAM-2026
+            + ')';
         const cj = firstMatch(text, [
-            /(?:na[šs]e\s+|va[šs]e\s+)?[čČ]\.?\s*j\.?\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/i,
-            /(?:na[šs]e\s+|va[šs]e\s+)?[cC]\s*\.\s*j\.?\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/,
-            /[čcČC][íi]slo\s+jednac[íi]\s*[:.]?\s*([A-Za-z0-9][^\n]{1,58})/i
+            new RegExp('(?:na[šs]e\\s+|va[šs]e\\s+)?[čČ]\\.?\\s*j\\.?\\s*[:.]?\\s*' + CJ, 'i'),
+            new RegExp('(?:na[šs]e\\s+|va[šs]e\\s+)?[cC]\\s*\\.\\s*j\\.?\\s*[:.]?\\s*' + CJ, ''),
+            new RegExp('[čcČC][íi]slo\\s+jednac[íi]\\s*[:.]?\\s*' + CJ, 'i')
         ]);
         const ico = firstMatch(text, [/I[ČC]O?\s*[:.]?\s*([0-9]{8})\b/i, /\b([0-9]{8})\b/]);
         const vec = firstMatch(text, [/V[ěe]c\s*[:.]?\s+([^\n]{3,120})/i]);
@@ -141,4 +145,21 @@
             toast('↩️ Odpověď vytvořena — doplňte text a odešlete datovkou.');
         };
     };
+
+    // Dohledá skutečný soud (název + adresu) z textu: detekce → registr soudů.
+    // Vrací null, když se soud nepodaří určit — volající pak NESMÍ hádat adresu.
+    function courtInfo(text) {
+        const c = detectCourt(text);
+        if (!c) return null;
+        try {
+            if (window.LexisCourtISDS && window.LexisCourtISDS.findCourtInRegistry) {
+                const reg = window.LexisCourtISDS.findCourtInRegistry(c.nazev);
+                if (reg) return reg;
+            }
+        } catch (e) {}
+        return { nazev: c.nazev };
+    }
+
+    // Veřejné API — jeden zdroj pravdy pro tvorbu odpovědí (extrakce, hlavička, soud).
+    window.LexisReply = { detectCourt, extract, buildReplyHtml, courtInfo, docText };
 })();

@@ -438,7 +438,6 @@
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="openISDS()"><div class="icon-sq">📮</div>Datová schránka</div>
                     <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Dopis Online</div>
                     <div class="btn-icon" onclick="signDigital()"><div class="icon-sq">🔑</div>E-podpis</div>
                     <div class="btn-icon" onclick="startMailMerge()" style="background: rgba(37,99,235,0.08); border: 1px solid #bfdbfe;"><div class="icon-sq">📨</div>Kampaň</div>
@@ -1364,13 +1363,11 @@
         window.toggleTrackChanges = () => lexisUI.toggleTrackChanges();
         window.anonymize = () => lexisUI.anonymize();
         window.makePlaceholder = () => lexisUI.makePlaceholder();
-        window.insertSignBlock = () => lexisUI.insertSignBlock();
         window.insertClause = (type) => lexisUI.insertClause(type);
         window.runFinalAudit = () => lexisUI.runFinalAudit();
         window.showFeeCalc = () => lexisUI.showFeeCalc();
         window.showInterestCalc = () => lexisUI.showInterestCalc();
         window.startMailMerge = () => lexisUI.startMailMerge();
-        window.linkCaseLaw = () => lexisUI.linkCaseLaw();
         window.applyPaper = (size) => lexisUI.applyPaper(size);
         window.applyOrientation = (mode) => lexisUI.applyOrientation(mode);
         window.applyZoom = (val) => lexisUI.applyZoom(val);
@@ -1387,7 +1384,6 @@
         window.filterRecentDocs = (status) => lexisUI.filterRecentDocs(status);
         window.openRecentDocument = (id) => lexisUI.openRecentDocument(id);
         window.deleteRecentDocument = (id) => lexisUI.deleteRecentDocument(id);
-        window.openISDS = () => lexisUI.openISDS();
         window.signDigital = () => lexisUI.signDigital();
         
         window.insertFootnote = () => lexisUI.insertFootnote();

@@ -54,6 +54,7 @@
         const isCompany = (String(k.typ || '').toLowerCase().includes('pravnic')) || (!!k.ic && !k.typ);
         const parts = [];
         if (k.ic) parts.push('IČO: ' + esc(k.ic));
+        if (k.dic) parts.push('DIČ: ' + esc(k.dic));
         const addr = [k.adresa, [k.psc, k.mesto].filter(Boolean).join(' ')].filter(Boolean).join(', ');
         if (addr) parts.push((isCompany ? 'se sídlem ' : 'bytem ') + esc(addr));
         if (k.isds) parts.push('datová schránka: ' + esc(k.isds));

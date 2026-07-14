@@ -481,8 +481,22 @@ const COURT_PATTERNS = [
   }
 ];
 
+// Jediný zdroj detekce soudu z textu (dřív byla tato smyčka zkopírovaná
+// v lexis-reply.js, lexis-datovka.js i lexis-ui.js). Vrací záznam z COURT_PATTERNS.
+function detectCourt(text) {
+    if (!text || !Array.isArray(COURT_PATTERNS)) return null;
+    const norm = String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    for (const c of COURT_PATTERNS) {
+        try { if (new RegExp(c.pattern, 'i').test(norm)) return c; } catch (e) {}
+    }
+    return null;
+}
+
+const LexisCourt = { detect: detectCourt, COURT_PATTERNS };
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { COURT_PATTERNS };
+    module.exports = { COURT_PATTERNS, detectCourt, LexisCourt };
 } else {
     window.COURT_PATTERNS = COURT_PATTERNS;
+    window.LexisCourt = LexisCourt;
 }
