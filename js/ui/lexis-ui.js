@@ -6498,25 +6498,17 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     }
 
     async insertContactToDoc(id) {
-        const all = await this._getContacts().getAll();
-        const contact = all.find(c => c.id === id);
-        if (!contact) return;
-        
-        let html = `<b>${this._esc(contact.jmeno || '')}</b>`;
-        if (contact.adresa) html += `<br>${this._esc(contact.adresa)}`;
-        if (contact.mesto || contact.psc) html += `<br>${this._esc(contact.psc || '')} ${this._esc(contact.mesto || '')}`.trim();
-        if (contact.ic) html += `<br>IČO: ${this._esc(contact.ic)}`;
-        
-        // Zkusíme vložit do Quill editoru na pozici kurzoru
-        let range = this.core.quill.getSelection();
-        let index = range ? range.index : this.core.quill.getLength();
-        
-        // Zabalíme do odstavce
-        this.core.safePasteHTML(index, `<p>${html}</p><p><br></p>`);
-        this.core.quill.setSelection(index + 2); // orientační posun kurzoru
-        
-        this.closeContacts();
-        this.customAlert(`✅ <b>Údaje vloženy!</b><br><br>Údaje kontaktu <b>${this._esc(contact.jmeno)}</b> byly vloženy do dokumentu.`);
+        // Jeden zdroj pravdy: formátování i vkládání řeší LexisParties (stejný
+        // výstup jako tlačítko „Vložit stranu" — vč. IČO a datové schránky).
+        if (window.LexisParties && window.LexisParties.insertContactById) {
+            const ok = await window.LexisParties.insertContactById(id);
+            this.closeContacts();
+            this.customAlert(ok
+                ? '✅ <b>Údaje vloženy!</b><br><br>Identifikace kontaktu byla vložena do dokumentu.'
+                : 'Kontakt se nepodařilo vložit.');
+            return;
+        }
+        this.customAlert('Vkládání stran není dostupné (modul LexisParties není načten).');
     }
 
     async onContactsCsvPicked(input) {

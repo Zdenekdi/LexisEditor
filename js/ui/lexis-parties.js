@@ -16,15 +16,27 @@
     const ROLES = ['— bez popisku —', 'Adresát', 'Žalobce', 'Žalovaný', 'Navrhovatel', 'Odpůrce',
         'Prodávající', 'Kupující', 'Zmocnitel', 'Zmocněnec', 'Věřitel', 'Dlužník', 'Účastník'];
 
-    // Vloží HTML do editoru na pozici kurzoru.
+    // Vloží HTML do editoru na pozici kurzoru (jeden zdroj pravdy pro vkládání stran).
     function insertHtml(html) {
         const core = window.lexisCore;
         const quill = core && core.quill;
         if (!quill) { toast('Editor není připraven.'); return false; }
         const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-        quill.clipboard.dangerouslyPasteHTML(range.index, html, 'user');
+        if (core.safePasteHTML) core.safePasteHTML(range.index, html);
+        else quill.clipboard.dangerouslyPasteHTML(range.index, html, 'user');
         quill.setSelection(range.index + 1, 0);
         return true;
+    }
+
+    // Načte kontakt z adresáře a vloží ho (používá i tlačítko „Vložit" v Adresáři).
+    async function insertContactById(id, role) {
+        try {
+            if (!window.LexisContacts || !window.lexisCore || !window.lexisCore.storage) return false;
+            const all = await new window.LexisContacts(window.lexisCore.storage).getAll();
+            const k = (all || []).find(c => String(c.id) === String(id));
+            if (!k) return false;
+            return insertHtml(formatContact(k, role));
+        } catch (e) { return false; }
     }
 
     function rolePrefix(role) {
@@ -142,4 +154,7 @@
         setTab('contacts');
         searchEl.focus();
     };
+
+    // Veřejné API — jeden zdroj pravdy pro formátování a vkládání stran.
+    window.LexisParties = { formatCourt, formatContact, insertHtml, insertContactById };
 })();
