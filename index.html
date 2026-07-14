@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LexisEditor</title>
     
-    <!-- Libraries -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- Libraries (lokálně přibalené — aplikace běží i offline, bez CDN) -->
+    <link href="css/vendor/quill.snow.css" rel="stylesheet">
+    <script src="js/vendor/quill.js"></script>
     <script>
-        // Dočasný hack pro starší CDN knihovny v prostředí Electronu
+        // Pojistka pro knihovny s CommonJS exportem v prostředí Electronu.
         window.temp_module = window.module;
         window.module = undefined;
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff-match-patch/1.0.5/index.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="js/vendor/diff-match-patch.js"></script>
+    <script src="js/vendor/mammoth.browser.min.js"></script>
+    <script src="js/vendor/purify.min.js"></script>
     <script>
         if (window.temp_module !== undefined) {
             window.module = window.temp_module;
