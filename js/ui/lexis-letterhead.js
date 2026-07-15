@@ -55,23 +55,31 @@
 
         const logo = safeLogo(p.logo);
         const logoHtml = logo
-            ? `<img src="${logo}" alt="logo" style="max-height:52px; max-width:150px; object-fit:contain;">`
+            ? `<img src="${logo}" alt="logo" style="max-height:52px; max-width:150px; vertical-align:middle;">`
             : '';
 
-        return `
-<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; font-family:'Times New Roman', serif; border-bottom:1px solid #cbd5e1; padding-bottom:6px;">
-    <div style="display:flex; gap:12px; align-items:center;">
-        ${logoHtml}
-        <div style="line-height:1.25;">
+        // Tabulkové rozvržení (ne flexbox) — spolehlivě přežije i export do Wordu (DOCX).
+        // Levá buňka: logo + identita, pravá buňka: kontakt zarovnaný vpravo.
+        const identity = `
             <div style="font-weight:700; font-size:13pt; color:#111;">${esc(mainName)}</div>
             ${subName ? `<div style="font-size:10pt; color:#222;">${esc(subName)}</div>` : ''}
-            <div style="font-size:8.5pt; color:#555;">${roleBits.map(esc).join(' · ')}</div>
-        </div>
-    </div>
-    <div style="text-align:right; font-size:8.5pt; color:#333; line-height:1.45;">
-        ${contact.map(l => `<div>${esc(l)}</div>`).join('')}
-    </div>
-</div>`.trim();
+            <div style="font-size:8.5pt; color:#555;">${roleBits.map(esc).join(' · ')}</div>`;
+        const leftCell = logoHtml
+            ? `<table style="border-collapse:collapse;"><tr>
+                   <td style="vertical-align:middle; padding-right:12px;">${logoHtml}</td>
+                   <td style="vertical-align:middle;">${identity}</td>
+               </tr></table>`
+            : identity;
+
+        return `
+<table style="width:100%; border-collapse:collapse; font-family:'Times New Roman', serif; border-bottom:1px solid #cbd5e1;">
+    <tr>
+        <td style="vertical-align:top; padding-bottom:6px;">${leftCell}</td>
+        <td style="vertical-align:top; text-align:right; font-size:8.5pt; color:#333; line-height:1.45; padding-bottom:6px;">
+            ${contact.map(l => `<div>${esc(l)}</div>`).join('')}
+        </td>
+    </tr>
+</table>`.trim();
     }
 
     // Patička: název AK / web + místo pro číslování stran (necháváme původní pravý blok).

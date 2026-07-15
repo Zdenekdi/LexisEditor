@@ -49,7 +49,13 @@ function httpsPostWithCert(url, headers, body, tls) {
 // service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
 async function isdsCall(creds, service, operation, soapBody) {
     const env = (creds && creds.env === 'production') ? 'production' : 'test';
-    const useCert = !!(creds && (creds.certPfx || (creds.certPem && creds.keyPem)));
+    // Certifikát může přijít jako buffer (certPfx) nebo cesta k .p12 (certPath) — druhé
+    // umožňuje ověřit spojení rovnou z formuláře, ještě před uložením konfigurace.
+    let certPfx = creds && creds.certPfx;
+    if (!certPfx && creds && creds.certPath) {
+        try { certPfx = fs.readFileSync(creds.certPath); } catch (e) { /* padneme na Basic auth */ }
+    }
+    const useCert = !!(certPfx || (creds && creds.certPem && creds.keyPem));
     const override = (creds && (creds.host || creds.basePath)) ? { host: creds.host, basePath: creds.basePath } : null;
     const url = isdsClient.buildEndpoint(env, service, override, useCert);
 
@@ -63,8 +69,8 @@ async function isdsCall(creds, service, operation, soapBody) {
     }
 
     if (useCert) {
-        const tls = creds.certPfx
-            ? { pfx: creds.certPfx, passphrase: creds.certPass || undefined }
+        const tls = certPfx
+            ? { pfx: certPfx, passphrase: creds.certPass || undefined }
             : { cert: creds.certPem, key: creds.keyPem, passphrase: creds.certPass || undefined };
         return httpsPostWithCert(url, headers, soapBody, tls);
     }
@@ -503,6 +509,67 @@ ipcMain.handle('get-isds-config', async () => {
         console.error('Chyba při načítání ISDS konfigurace:', e);
     }
     return { hasConfig: false };
+});
+
+// --- ZÁLOHA / OBNOVA ŠIFROVACÍHO KLÍČE ---
+// Klíč k datům (DB, RAG, audit) leží MIMO datovou složku (~/.lexislocal/lexis.key),
+// aby se nesynchronizoval s daty. Důsledek: ztráta klíče = ztráta dat. Proto musí
+// jít klíč zálohovat a obnovit. Cesta odpovídá secure_crypto v LexisLocal (LEXIS_KEY_DIR).
+const LEXIS_KEY_DIR = process.env.LEXIS_KEY_DIR || path.join(os.homedir(), '.lexislocal');
+const LEXIS_KEY_PATH = path.join(LEXIS_KEY_DIR, 'lexis.key');
+
+function keyFingerprint() {
+    try {
+        const hex = fs.readFileSync(LEXIS_KEY_PATH, 'utf8').trim();
+        return crypto.createHash('sha256').update(Buffer.from(hex, 'hex')).digest('hex').slice(0, 16);
+    } catch (e) { return null; }
+}
+
+ipcMain.handle('key-status', async () => {
+    const exists = fs.existsSync(LEXIS_KEY_PATH);
+    return { exists, path: LEXIS_KEY_PATH, fingerprint: exists ? keyFingerprint() : null };
+});
+
+ipcMain.handle('key-backup', async () => {
+    try {
+        if (!fs.existsSync(LEXIS_KEY_PATH)) return { success: false, error: 'Klíč zatím neexistuje (spusťte nejdřív LexisLocal).' };
+        const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Zálohovat šifrovací klíč',
+            defaultPath: 'lexis-klic-zaloha.key',
+            filters: [{ name: 'Šifrovací klíč', extensions: ['key'] }]
+        });
+        if (canceled || !filePath) return { success: false, canceled: true };
+        fs.copyFileSync(LEXIS_KEY_PATH, filePath);
+        try { fs.chmodSync(filePath, 0o600); } catch (e) {}
+        return { success: true, path: filePath };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('key-restore', async () => {
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            title: 'Obnovit šifrovací klíč ze zálohy',
+            filters: [{ name: 'Šifrovací klíč', extensions: ['key'] }],
+            properties: ['openFile']
+        });
+        if (canceled || !filePaths || filePaths.length === 0) return { success: false, canceled: true };
+        const hex = fs.readFileSync(filePaths[0], 'utf8').trim();
+        if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+            return { success: false, error: 'Soubor neobsahuje platný 256bitový klíč.' };
+        }
+        fs.mkdirSync(LEXIS_KEY_DIR, { recursive: true });
+        // Zazálohovat stávající klíč (kdyby šlo o omyl), pak přepsat.
+        if (fs.existsSync(LEXIS_KEY_PATH)) {
+            try { fs.copyFileSync(LEXIS_KEY_PATH, LEXIS_KEY_PATH + '.prev'); } catch (e) {}
+        }
+        fs.writeFileSync(LEXIS_KEY_PATH, hex, { encoding: 'utf8', mode: 0o600 });
+        try { fs.chmodSync(LEXIS_KEY_PATH, 0o600); } catch (e) {}
+        return { success: true, fingerprint: keyFingerprint() };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 });
 
 // --- ISDS OUTBOX (odesílací fronta datových zpráv) ---

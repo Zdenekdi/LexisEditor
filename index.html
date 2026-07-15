@@ -777,6 +777,9 @@
                     <div class="btn-icon" onclick="insertLetterhead()"><div class="icon-sq">📄</div>Vložit hlavičku</div>
                     <div class="btn-icon" onclick="createReplyFromDocument()"><div class="icon-sq">↩️</div>Odpovědět</div>
                     <div class="btn-icon" onclick="openDatovkaDialog()"><div class="icon-sq">📨</div>Datovky</div>
+                    <div class="btn-icon" onclick="openIsdsSettings()"><div class="icon-sq">⚙️</div>Nastavení DS</div>
+                    <div class="btn-icon" onclick="openKeyBackup()"><div class="icon-sq">🔐</div>Záloha klíče</div>
+                    <div class="btn-icon" onclick="openFeedback()"><div class="icon-sq">🐞</div>Nahlásit chybu</div>
                 </div>
                 <div class="group-label" data-i18n="group_connectivity">Konektivita</div>
                 <div class="tool-group">
@@ -1145,6 +1148,9 @@
                 ➤
             </button>
         </div>
+        <div style="padding: 0 15px 10px; font-size: 10px; color: #94a3b8; line-height: 1.4;">
+            ⚠️ Výstupy AI jsou orientační pomůcka, <b>ne právní rada</b>. Před použitím vždy ověřte fakta, citace i lhůty.
+        </div>
 
         <!-- Action Buttons (Conditional) -->
         <div id="ai-actions" style="padding: 0 15px 15px 15px; display: none; gap: 8px; flex-wrap: wrap;">
@@ -1210,6 +1216,9 @@
     <script src="js/ui/lexis-reply.js"></script>
     <script src="js/ui/lexis-parties.js"></script>
     <script src="js/ui/lexis-letterhead.js"></script>
+    <script src="js/ui/lexis-isds-settings.js"></script>
+    <script src="js/ui/lexis-keybackup.js"></script>
+    <script src="js/ui/lexis-feedback.js"></script>
 
     <script>
         // --- SDK INITIALIZATION & BRIDGE ---
