@@ -17,6 +17,7 @@ class LexisUI {
         this.currentPdfText = '';
         this.activeDeadlines = [];
         this.deadlineScanTimer = null;
+        this.letterheadProfile = null; // hlavičkový papír advokáta (načte se v init)
         
         // Metadata fields for document memory
         this.currentDocumentId = 'doc_active';
@@ -53,6 +54,7 @@ class LexisUI {
         this.loadCustomQATItems();
         this.loadLockSettings();
         this.loadLicense();
+        this.loadLetterheadProfile(); // hlavičkový papír advokáta (viz lexis-letterhead.js)
         this.loadAISettings();
         this.loadFeatureSettings();
         this.updateVersionDisplay();
@@ -614,14 +616,63 @@ class LexisUI {
     }
 
 
+    // Načte profil advokáta (hlavičkový papír) do cache pro synchronní použití.
+    async readLawyerProfile() {
+        const g = async (k) => (await this.core.storage.get('settings', k)) || '';
+        const auto = await this.core.storage.get('settings', 'lawyer-letterhead-auto');
+        return {
+            title: await g('lawyer-title'),
+            name: await g('lawyer-name'),
+            firm: await g('lawyer-firm'),
+            license: await g('lawyer-license'),
+            address: await g('lawyer-address'),
+            ico: await g('lawyer-ico'),
+            dic: await g('lawyer-dic'),
+            tel: await g('lawyer-tel'),
+            email: await g('lawyer-email'),
+            web: await g('lawyer-web'),
+            isds: await g('lawyer-isds'),
+            logo: await g('lawyer-logo'),
+            signature: await g('lawyer-signature'),
+            auto: auto !== false // výchozí = automaticky vkládat
+        };
+    }
+
+    async loadLetterheadProfile() {
+        try { this.letterheadProfile = await this.readLawyerProfile(); }
+        catch (e) { this.letterheadProfile = null; }
+    }
+
+    // Vloží hlavičku advokáta do záhlaví aktuálního dokumentu (jednorázově, na kliknutí).
+    async insertLetterhead() {
+        await this.loadLetterheadProfile();
+        const p = this.letterheadProfile;
+        if (!window.LexisLetterhead || !window.LexisLetterhead.hasContent(p)) {
+            this.showProfileModal();
+            return;
+        }
+        const headerArea = document.getElementById('header-area');
+        const footerArea = document.getElementById('footer-area');
+        if (headerArea) headerArea.innerHTML = window.LexisLetterhead.buildHeaderHtml(p);
+        if (footerArea) footerArea.innerHTML = window.LexisLetterhead.buildFooterHtml(p);
+        this.saveActiveDocumentState && this.saveActiveDocumentState();
+        this.customAlert('✅ Hlavička byla vložena do záhlaví dokumentu.');
+    }
+
     resetHeaderFooterDOM() {
         const headerArea = document.getElementById('header-area');
         const footerArea = document.getElementById('footer-area');
+        const p = this.letterheadProfile;
+        const useLetterhead = p && p.auto !== false && window.LexisLetterhead && window.LexisLetterhead.hasContent(p);
         if (headerArea) {
-            headerArea.innerHTML = `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
+            headerArea.innerHTML = useLetterhead
+                ? window.LexisLetterhead.buildHeaderHtml(p)
+                : `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
         }
         if (footerArea) {
-            footerArea.innerHTML = `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
+            footerArea.innerHTML = useLetterhead
+                ? window.LexisLetterhead.buildFooterHtml(p)
+                : `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
         }
     }
 
@@ -4304,38 +4355,62 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     showProfileModal() {
         this.checkEnterpriseFeature("Profil právníka", async () => {
-            const savedName = await this.core.storage.get('settings', 'lawyer-name') || "";
-            const savedFirm = await this.core.storage.get('settings', 'lawyer-firm') || "";
-            const savedLicense = await this.core.storage.get('settings', 'lawyer-license') || "";
-            const savedSignature = await this.core.storage.get('settings', 'lawyer-signature') || "";
+            const g = async (k) => (await this.core.storage.get('settings', k)) || "";
+            const s = {
+                title: await g('lawyer-title'), name: await g('lawyer-name'), firm: await g('lawyer-firm'),
+                license: await g('lawyer-license'), address: await g('lawyer-address'), ico: await g('lawyer-ico'),
+                dic: await g('lawyer-dic'), tel: await g('lawyer-tel'), email: await g('lawyer-email'),
+                web: await g('lawyer-web'), isds: await g('lawyer-isds'), logo: await g('lawyer-logo'),
+                signature: await g('lawyer-signature')
+            };
+            const autoRaw = await this.core.storage.get('settings', 'lawyer-letterhead-auto');
+            const autoOn = autoRaw !== false;
+            const esc = (v) => String(v == null ? '' : v).replace(/"/g, '&quot;');
 
             const overlay = document.createElement('div');
             overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);";
             const modal = document.createElement('div');
-            modal.style = "background:#fff;padding:28px;border-radius:16px;width:380px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif; border: 1px solid #e2e8f0;";
+            modal.style = "background:#fff;padding:26px;border-radius:16px;width:520px;max-height:90vh;overflow:auto;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif; border: 1px solid #e2e8f0;";
+            const fld = (id, label, val, ph) => `
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">${label}</label>
+                    <input type="text" id="${id}" value="${esc(val)}" placeholder="${ph || ''}" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
+                </div>`;
             modal.innerHTML = `
-                <h3 style="margin:0 0 8px 0;font-size:18px;color:#1e293b;font-weight:700; display:flex; align-items:center; gap:8px;">👤 Profil právníka</h3>
-                <p style="margin:0 0 20px 0; font-size:12px; color:#64748b;">Nastavení osobních údajů pro automatické vkládání podpisů a hlaviček.</p>
-                
-                <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:24px;">
-                    <div>
-                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Jméno a příjmení:</label>
-                        <input type="text" id="prof-name" value="${savedName}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
+                <h3 style="margin:0 0 6px 0;font-size:18px;color:#1e293b;font-weight:700; display:flex; align-items:center; gap:8px;">👤 Profil advokáta / hlavičkový papír</h3>
+                <p style="margin:0 0 18px 0; font-size:12px; color:#64748b;">Údaje se automaticky použijí jako hlavička (a podpis) na nových dokumentech.</p>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+                    ${fld('prof-title', 'Titul', s.title, 'Mgr. / JUDr.')}
+                    ${fld('prof-name', 'Jméno a příjmení', s.name, '')}
+                    <div style="grid-column:1 / -1;">${fld('prof-firm', 'Název advokátní kanceláře', s.firm, 'nepovinné').trim()}</div>
+                    ${fld('prof-license', 'Ev. č. ČAK', s.license, '')}
+                    ${fld('prof-ico', 'IČO', s.ico, '')}
+                    ${fld('prof-dic', 'DIČ', s.dic, 'nepovinné')}
+                    ${fld('prof-isds', 'ID datové schránky', s.isds, '')}
+                    <div style="grid-column:1 / -1;">${fld('prof-address', 'Sídlo (adresa)', s.address, 'ulice, PSČ město').trim()}</div>
+                    ${fld('prof-tel', 'Telefon', s.tel, '')}
+                    ${fld('prof-email', 'E-mail', s.email, '')}
+                    ${fld('prof-web', 'Web', s.web, '')}
+                    ${fld('prof-sig', 'Podpisový vzor (text)', s.signature, '')}
+                </div>
+
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+                    <div id="prof-logo-preview" style="width:60px;height:44px;border:1px dashed #cbd5e1;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;">
+                        ${window.LexisLetterhead && window.LexisLetterhead.safeLogo(s.logo) ? `<img src="${window.LexisLetterhead.safeLogo(s.logo)}" style="max-width:100%;max-height:100%;object-fit:contain;">` : '<span style="font-size:10px;color:#94a3b8;">logo</span>'}
                     </div>
                     <div>
-                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Název kanceláře:</label>
-                        <input type="text" id="prof-firm" value="${savedFirm}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Evidenční číslo ČAK:</label>
-                        <input type="text" id="prof-license" value="${savedLicense}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
-                    </div>
-                    <div>
-                        <label style="display:block; font-size:11px; font-weight:600; color:#475569; margin-bottom:4px;">Podpisový vzor (text):</label>
-                        <input type="text" id="prof-sig" value="${savedSignature}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px; font-family:'Great Vibes', 'Brush Script MT', cursive; outline:none; box-sizing:border-box;">
+                        <button id="prof-logo-btn" style="padding:8px 12px;background:#f1f5f9;color:#334155;font-weight:600;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer;font-size:12px;">Nahrát logo…</button>
+                        <button id="prof-logo-clear" style="padding:8px 10px;background:#fff;color:#64748b;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:12px;">Odebrat</button>
+                        <input type="file" id="prof-logo-file" accept="image/*" style="display:none;">
                     </div>
                 </div>
-                
+
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#334155; margin-bottom:20px; cursor:pointer;">
+                    <input type="checkbox" id="prof-auto" ${autoOn ? 'checked' : ''}>
+                    Automaticky vkládat hlavičku do nových dokumentů
+                </label>
+
                 <div style="display:flex;justify-content:flex-end;gap:10px;">
                     <button id="prof-cancel" style="padding:10px 16px;background:#f1f5f9;color:#475569;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;">Zrušit</button>
                     <button id="prof-save" style="padding:10px 16px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;">Uložit profil</button>
@@ -4344,20 +4419,46 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
 
-            document.getElementById('prof-cancel').onclick = () => document.body.removeChild(overlay);
-            document.getElementById('prof-save').onclick = async () => {
-                const name = document.getElementById('prof-name').value.trim();
-                const firm = document.getElementById('prof-firm').value.trim();
-                const license = document.getElementById('prof-license').value.trim();
-                const signature = document.getElementById('prof-sig').value.trim();
+            let logoData = s.logo || '';
+            const preview = modal.querySelector('#prof-logo-preview');
+            modal.querySelector('#prof-logo-btn').onclick = () => modal.querySelector('#prof-logo-file').click();
+            modal.querySelector('#prof-logo-clear').onclick = () => { logoData = ''; preview.innerHTML = '<span style="font-size:10px;color:#94a3b8;">logo</span>'; };
+            modal.querySelector('#prof-logo-file').onchange = (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                if (file.size > 1.5 * 1024 * 1024) { this.customAlert('Logo je příliš velké (max 1,5 MB).'); return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    logoData = String(ev.target.result || '');
+                    if (window.LexisLetterhead && window.LexisLetterhead.safeLogo(logoData)) {
+                        preview.innerHTML = `<img src="${logoData}" style="max-width:100%;max-height:100%;object-fit:contain;">`;
+                    } else { logoData = ''; this.customAlert('Nepodporovaný formát obrázku.'); }
+                };
+                reader.readAsDataURL(file);
+            };
 
-                await this.core.storage.set('settings', { key: 'lawyer-name', value: name });
-                await this.core.storage.set('settings', { key: 'lawyer-firm', value: firm });
-                await this.core.storage.set('settings', { key: 'lawyer-license', value: license });
-                await this.core.storage.set('settings', { key: 'lawyer-signature', value: signature });
+            modal.querySelector('#prof-cancel').onclick = () => document.body.removeChild(overlay);
+            modal.querySelector('#prof-save').onclick = async () => {
+                const val = (id) => (modal.querySelector(id).value || '').trim();
+                const set = (k, v) => this.core.storage.set('settings', { key: k, value: v });
+                await set('lawyer-title', val('#prof-title'));
+                await set('lawyer-name', val('#prof-name'));
+                await set('lawyer-firm', val('#prof-firm'));
+                await set('lawyer-license', val('#prof-license'));
+                await set('lawyer-ico', val('#prof-ico'));
+                await set('lawyer-dic', val('#prof-dic'));
+                await set('lawyer-isds', val('#prof-isds'));
+                await set('lawyer-address', val('#prof-address'));
+                await set('lawyer-tel', val('#prof-tel'));
+                await set('lawyer-email', val('#prof-email'));
+                await set('lawyer-web', val('#prof-web'));
+                await set('lawyer-signature', val('#prof-sig'));
+                await set('lawyer-logo', logoData);
+                await set('lawyer-letterhead-auto', !!modal.querySelector('#prof-auto').checked);
 
+                await this.loadLetterheadProfile(); // obnov cache, ať se hlavička hned projeví
                 document.body.removeChild(overlay);
-                this.customAlert("✅ <b>Profil byl úspěšně uložen!</b><br><br>Vaše osobní údaje budou automaticky používány při generování dokumentů.");
+                this.customAlert('✅ <b>Profil uložen.</b><br><br>Hlavička se automaticky vloží do nových dokumentů. Do už otevřeného dokumentu ji vložíš tlačítkem Vložit hlavičku.');
             };
         });
     }
