@@ -4355,16 +4355,9 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
     showProfileModal() {
         this.checkEnterpriseFeature("Profil právníka", async () => {
-            const g = async (k) => (await this.core.storage.get('settings', k)) || "";
-            const s = {
-                title: await g('lawyer-title'), name: await g('lawyer-name'), firm: await g('lawyer-firm'),
-                license: await g('lawyer-license'), address: await g('lawyer-address'), ico: await g('lawyer-ico'),
-                dic: await g('lawyer-dic'), tel: await g('lawyer-tel'), email: await g('lawyer-email'),
-                web: await g('lawyer-web'), isds: await g('lawyer-isds'), logo: await g('lawyer-logo'),
-                signature: await g('lawyer-signature')
-            };
-            const autoRaw = await this.core.storage.get('settings', 'lawyer-letterhead-auto');
-            const autoOn = autoRaw !== false;
+            // Jeden zdroj čtení profilu (stejný jako pro hlavičku) — žádná duplicita.
+            const s = await this.readLawyerProfile();
+            const autoOn = s.auto !== false;
             const esc = (v) => String(v == null ? '' : v).replace(/"/g, '&quot;');
 
             const overlay = document.createElement('div');
