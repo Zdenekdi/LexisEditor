@@ -934,6 +934,52 @@ ipcMain.handle('import-pdf', async () => {
 });
 
 // --- ZFO IMPORT (Datové zprávy) ---
+// Rekurzivně posbírá řetězcové hodnoty listů z ASN.1 stromu (pro nalezení XML v CMS).
+function collectAsn1Strings(node, out) {
+    if (!node || typeof node !== 'object' || out.length > 5000) return;
+    if (typeof node.value === 'string') {
+        out.push(node.value);
+    } else if (Array.isArray(node.value)) {
+        for (const child of node.value) collectAsn1Strings(child, out);
+    }
+}
+
+// Vytáhne XML datové zprávy ze ZFO. ZFO je PKCS#7 / CMS (DER) — korektně ho
+// rozparsujeme přes node-forge a najdeme zapouzdřený obsah (eContent) s XML.
+// Když soubor není platný DER (netypický/nepodepsaný export), spadneme na heuristiku.
+// Vše je tolerantní k namespace prefixům (např. <p:dmMessage>).
+function extractZfoXml(zfoBuffer) {
+    const hasMsg = (s) => /<(?:[\w-]+:)?dmMessage[\s>]/.test(s) || /<\?xml/.test(s);
+    // 1) Korektní CMS/DER cesta.
+    try {
+        const der = forge.util.createBuffer(zfoBuffer.toString('binary'));
+        const asn1 = forge.asn1.fromDer(der);
+        const leaves = [];
+        collectAsn1Strings(asn1, leaves);
+        for (const raw of leaves) {
+            if (!raw || raw.length < 20) continue;
+            let utf8 = raw;
+            try { utf8 = forge.util.decodeUtf8(raw); } catch (e) {}
+            if (hasMsg(utf8)) return utf8;
+            if (hasMsg(raw)) return raw;
+        }
+    } catch (e) { /* není platný DER → heuristika níže */ }
+
+    // 2) Heuristika pro netypické/nepodepsané soubory.
+    const bin = zfoBuffer.toString('binary');
+    const m = bin.match(/<(?:[\w-]+:)?dmMessage[\s>][\s\S]*?<\/(?:[\w-]+:)?dmMessage>/);
+    if (m) return m[0];
+    const x = bin.indexOf('<?xml');
+    if (x !== -1) return bin.slice(x);
+    return '';
+}
+
+// Namespace-tolerantní hodnota elementu.
+function zfoTagValue(xml, tag) {
+    const m = xml.match(new RegExp('<(?:[\\w-]+:)?' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w-]+:)?' + tag + '>'));
+    return m ? m[1].trim() : '';
+}
+
 ipcMain.handle('import-zfo', async (event, filePath) => {
     try {
         let selectedPath = filePath;
@@ -949,61 +995,45 @@ ipcMain.handle('import-zfo', async (event, filePath) => {
         }
 
         const zfoBuffer = fs.readFileSync(selectedPath);
-        const zfoContent = zfoBuffer.toString('binary');
-        
-        // ZFO je PKCS#7 (CMS) kontejner. Pro jednoduchou extrakci obsahu (XML)
-        // se pokusíme najít začátek XML struktury.
-        // V produkční verzi by se mělo použít node-forge pro korektní CMS parsing.
-        
-        let xmlContent = '';
-        const startTag = '<dmMessage';
-        const endTag = '</dmMessage>';
-        const startIndex = zfoContent.indexOf(startTag);
-        const endIndex = zfoContent.indexOf(endTag);
-        
-        if (startIndex !== -1 && endIndex !== -1) {
-            xmlContent = zfoContent.substring(startIndex, endIndex + endTag.length);
-        } else {
-            // Zkusíme hledat obecnější <root> pokud dmMessage není hlavní
-            const altStart = '<?xml';
-            const altStartIndex = zfoContent.indexOf(altStart);
-            if (altStartIndex !== -1) {
-                xmlContent = zfoContent.substring(altStartIndex);
-            }
+
+        // Korektní extrakce XML z PKCS#7/CMS kontejneru přes node-forge (viz extractZfoXml).
+        const xmlContent = extractZfoXml(zfoBuffer);
+        if (!xmlContent) {
+            throw new Error('Nepodařilo se extrahovat obsah datové zprávy ze ZFO (neplatný nebo nepodporovaný formát).');
         }
 
-        if (!xmlContent) throw new Error('Nepodařilo se extrahovat XML obsah ze ZFO souboru.');
+        // Metadata (tolerantní k namespace prefixům).
+        const sender = zfoTagValue(xmlContent, 'dmSender');
+        const senderId = zfoTagValue(xmlContent, 'dbIDSender');
+        const subject = zfoTagValue(xmlContent, 'dmAnnotation');
 
-        // Extrakce základních metadat (jednoduchý regex pro demo/v3.5)
-        const senderMatch = xmlContent.match(/<dmSender>(.*?)<\/dmSender>/);
-        const senderIdMatch = xmlContent.match(/<dbIDSender>(.*?)<\/dbIDSender>/);
-        const subjectMatch = xmlContent.match(/<dmAnnotation>(.*?)<\/dmAnnotation>/);
-        
-        // Extrakce příloh (jednoduchá verze pro demo)
+        // Přílohy: dmFileDescr může být ELEMENT i ATRIBUT (reálný ISDS formát),
+        // dmEncodedContent je víceřádkový base64.
         const attachments = [];
-        const fileRegex = /<dmFile>([\s\S]*?)<\/dmFile>/g;
-        let fileMatch;
-        while ((fileMatch = fileRegex.exec(xmlContent)) !== null) {
-            const fileXml = fileMatch[1];
-            const nameMatch = fileXml.match(/<dmFileDescr>(.*?)<\/dmFileDescr>/);
-            // Base64 obsah přílohy bývá víceřádkový → [\s\S]*? (dřív .*? selhalo na zalomení).
-            const contentMatch = fileXml.match(/<dmEncodedContent>([\s\S]*?)<\/dmEncodedContent>/);
-            if (nameMatch && contentMatch) {
+        const fileRe = /<(?:[\w-]+:)?dmFile\b([^>]*)>([\s\S]*?)<\/(?:[\w-]+:)?dmFile>/g;
+        let fm;
+        while ((fm = fileRe.exec(xmlContent)) !== null) {
+            const attrs = fm[1] || '';
+            const inner = fm[2] || '';
+            const descrAttr = attrs.match(/dmFileDescr\s*=\s*"([^"]*)"/i);
+            const name = (descrAttr ? descrAttr[1] : zfoTagValue(inner, 'dmFileDescr')) || 'priloha';
+            const content = zfoTagValue(inner, 'dmEncodedContent');
+            if (content) {
                 attachments.push({
-                    name: nameMatch[1],
-                    content: contentMatch[1], // Base64
-                    type: nameMatch[1].toLowerCase().endsWith('.pdf') ? 'pdf' : 'other'
+                    name,
+                    content, // base64
+                    type: name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'other'
                 });
             }
         }
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             xml: xmlContent,
-            sender: senderMatch ? senderMatch[1] : 'Neznámý odesílatel',
-            senderId: senderIdMatch ? senderIdMatch[1] : '',
-            subject: subjectMatch ? subjectMatch[1] : 'Bez předmětu',
-            attachments: attachments
+            sender: sender || 'Neznámý odesílatel',
+            senderId: senderId || '',
+            subject: subject || 'Bez předmětu',
+            attachments
         };
     } catch (error) {
         console.error('ZFO Import Error:', error);
