@@ -51,7 +51,9 @@
         // matchuje jako token (ne „zbytek řádku"), aby nechytala okolní prózu.
         const CJ = '('
             + '(?:[A-Za-zÀ-ž]{2,6}\\s+)?[0-9]+\\s+[A-Za-zÀ-ž]{1,6}\\s+[0-9]+\\s*\\/\\s*[0-9]{2,4}(?:\\s*-\\s*[0-9]+)?'  // (KSBR) 8 As 15/2025-73
-            + '|[A-Za-zÀ-ž0-9]+(?:[\\-\\/][A-Za-zÀ-ž0-9]+)+'                                                            // MV-12345-2/OAM-2026
+            // Složený úřední tvar: segmenty jsou BUĎ jen písmena, NEBO jen číslice
+            // (odděleně - / ), aby rok na konci nenatáhl přilepené slovo (…2026Praha).
+            + '|(?:[A-Za-zÀ-ž]+|[0-9]+)(?:[\\-\\/](?:[A-Za-zÀ-ž]+|[0-9]+))+'                                          // MV-12345-2/OAM-2026
             + ')';
         const cj = firstMatch(text, [
             new RegExp('(?:na[šs]e\\s+|va[šs]e\\s+)?[čČ]\\.?\\s*j\\.?\\s*[:.]?\\s*' + CJ, 'i'),
