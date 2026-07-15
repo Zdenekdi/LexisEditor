@@ -32,6 +32,9 @@ class LexisUI {
             const context = decodeURIComponent(encContext);
             this.promptAddDeadline(days, context);
         };
+        window.saveDetectedDeadlineDate = (iso, encContext) => {
+            this.promptAddDeadlineDate(iso, decodeURIComponent(encContext));
+        };
         window.removeActiveDeadline = (id) => {
             this.removeActiveDeadline(id);
         };
@@ -65,7 +68,6 @@ class LexisUI {
         this.initActiveDocumentState();
         this.initRibbonTooltips();
     }
-
 
 
     bindEvents() {
@@ -177,7 +179,6 @@ class LexisUI {
         document.addEventListener('mousemove', () => this.resetIdleTimer());
         document.addEventListener('keydown', () => this.resetIdleTimer());
     }
-
 
     initIdleTimer() {
         this.lastHeartbeatTime = Date.now();
@@ -615,7 +616,6 @@ class LexisUI {
         });
     }
 
-
     // Načte profil advokáta (hlavičkový papír) do cache pro synchronní použití.
     async readLawyerProfile() {
         const g = async (k) => (await this.core.storage.get('settings', k)) || '';
@@ -1024,7 +1024,6 @@ class LexisUI {
         this.dialogs.showInterestCalc();
     }
 
-
     async initContextMenu() {
         const editorEl = document.querySelector('.ql-editor');
         const contextMenu = document.getElementById('editor-context-menu');
@@ -1302,7 +1301,6 @@ class LexisUI {
             this.customAlert("❌ <b>Chyba ukládání</b><br><br>Nepodařilo se uložit doložku do databáze IndexedDB.");
         }
     }
-
 
     triggerCloudSync() {
         const icon = document.getElementById('sync-icon');
@@ -2404,29 +2402,6 @@ class LexisUI {
         });
     }
 
-    exportToISDS() {
-        this.checkEnterpriseFeature("Export pro ISDS (.zfo)", async () => {
-            if (!window.electronAPI) {
-                this.customAlert("Tato funkce je dostupná pouze v desktopové aplikaci.");
-                return;
-            }
-            
-            this.showLoader("Generuji strukturovanou zprávu ISDS...", () => {
-                const text = this.core.getText();
-                const xmlData = `<?xml version="1.0" encoding="utf-8"?>
-<dmMessage>
-    <dmSender>Advokátní kancelář</dmSender>
-    <dmAnnotation>Exportovaná datová zpráva</dmAnnotation>
-    <dmEncodedContent>${btoa(encodeURIComponent(text.substring(0, 1000)))}</dmEncodedContent>
-</dmMessage>`;
-                
-                this.customPrompt("Zadejte název souboru pro uložení:", "isds_export.zfo", (filename) => {
-                    if (!filename) return;
-                    this.customAlert(`✅ <b>Export úspěšný!</b><br><br>Datový balíček <b>${filename}</b> byl úspěšně vygenerován a připraven k odeslání do ISDS.`);
-                });
-            });
-        });
-    }
 
     sendViaEmail() {
         const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
@@ -4133,14 +4108,38 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             }
         }
         
+        // Detekce KONKRÉTNÍHO data lhůty/termínu (předvolání, jednání, „nejpozději do…"),
+        // aby se do hlídače dostal i termín zadaný datem, ne jen počtem dní.
+        let fixed = null;
+        try {
+            if (window.LexisCalendar && window.LexisCalendar.findDeadlineDate) {
+                const f = window.LexisCalendar.findDeadlineDate(text);
+                if (f && f.date) {
+                    const iso = `${f.date.getFullYear()}-${String(f.date.getMonth() + 1).padStart(2, '0')}-${String(f.date.getDate()).padStart(2, '0')}`;
+                    fixed = { iso, context: f.context };
+                }
+            }
+        } catch (e) {}
+
         const detectedSection = document.getElementById('detected-deadlines-section');
         const detectedList = document.getElementById('detected-list');
-        
+
         if (!detectedList || !detectedSection) return;
-        
-        if (detected.length > 0) {
+
+        if (detected.length > 0 || fixed) {
             detectedSection.style.display = 'block';
-            detectedList.innerHTML = detected.map((d, index) => `
+            let html = '';
+            if (fixed) {
+                html += `
+                <div style="background: white; border: 1px solid #93c5fd; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #1e3a8a;">
+                    <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span>📅 Detekován termín: ${fixed.iso}</span>
+                        <button onclick="window.saveDetectedDeadlineDate('${fixed.iso}', '${encodeURIComponent(fixed.context)}')" style="background: #2563eb; color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; cursor: pointer;">➕ Uložit</button>
+                    </div>
+                    <div style="font-style: italic; color: #1d4ed8; max-height: 45px; overflow-y: auto; line-height: 1.3;">"${fixed.context.substring(0, 100)}${fixed.context.length > 100 ? '...' : ''}"</div>
+                </div>`;
+            }
+            html += detected.map((d) => `
                 <div style="background: white; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #78350f;">
                     <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                         <span>⚠️ Detekována lhůta: ${d.days} dní</span>
@@ -4149,6 +4148,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     <div style="font-style: italic; color: #92400e; max-height: 45px; overflow-y: auto; line-height: 1.3;">"${d.context.substring(0, 100)}${d.context.length > 100 ? '...' : ''}"</div>
                 </div>
             `).join('');
+            detectedList.innerHTML = html;
         } else {
             detectedSection.style.display = 'none';
         }
@@ -4194,6 +4194,33 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             }
             
             this.customAlert(`⏰ <b>Lhůta uložena!</b><br><br>Úkon <b>${title}</b> byl přidán do vašeho hlídače lhůt na datum <b>${newDl.dueDate}</b>.`);
+        });
+    }
+
+    // Uložení lhůty s KONKRÉTNÍM datem (např. předvolání, jednání) — na rozdíl od
+    // promptAddDeadline se datum nepočítá z počtu dní, ale bere se rovnou.
+    promptAddDeadlineDate(isoDate, context) {
+        this.customPrompt(`💡 <b>Uložit termín do hlídače</b><br><br>Zadejte název (např. <i>Předvolání – dostavit se</i>):`, `Termín ${isoDate}`, async (title) => {
+            if (!title) return;
+            const newDl = {
+                id: 'dl_' + Date.now(),
+                title: title,
+                days: null,
+                dueDate: isoDate,
+                context: context,
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+            this.activeDeadlines.push(newDl);
+            await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+            this.renderDeadlines();
+            const detectedSection = document.getElementById('detected-deadlines-section');
+            if (detectedSection) detectedSection.style.display = 'none';
+            try {
+                const conn = this.getLexisLocalConnection();
+                fetch(`${conn.baseUrl}/api/calendar/add`, { method: 'POST', headers: conn.headers, body: JSON.stringify(newDl) })
+                    .catch(() => console.log('LexisLocal je offline, ICS se nevygenerovalo.'));
+            } catch (e) {}
+            this.customAlert(`⏰ <b>Termín uložen!</b><br><br><b>${title}</b> byl přidán do hlídače na datum <b>${isoDate}</b>.`);
         });
     }
 
@@ -6508,7 +6535,6 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     // window.openContacts shortcut
     _openContactsShortcut() { this.openContacts(); }
 }
-
 
 
 window.LexisUI = LexisUI;

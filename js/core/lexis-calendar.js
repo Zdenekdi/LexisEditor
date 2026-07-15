@@ -89,6 +89,45 @@ function computeDeadline(deliveredAt, days) {
     return nextWorkingDay(addDays(deliveredAt, days));
 }
 
+// České měsíce (genitiv, jak se píší v datu „25. července 2026"), bez diakritiky.
+const CZ_MONTHS = {
+    ledna: 1, unora: 2, brezna: 3, dubna: 4, kvetna: 5, cervna: 6,
+    cervence: 7, srpna: 8, zari: 9, rijna: 10, listopadu: 11, prosince: 12
+};
+
+// Rozparsuje české datum: číselné „25. 7. 2026" / „25.7.2026" nebo slovní
+// „25. července 2026". Vrací Date, nebo null.
+function parseCzechDate(s) {
+    if (!s) return null;
+    let m = String(s).match(/\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b/);
+    if (m) {
+        const d = new Date(+m[3], +m[2] - 1, +m[1]);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    const norm = String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    m = norm.match(/\b(\d{1,2})\.?\s+([a-z]+)\s+(\d{4})\b/);
+    if (m && CZ_MONTHS[m[2]]) {
+        const d = new Date(+m[3], CZ_MONTHS[m[2]] - 1, +m[1]);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+}
+
+// Najde v textu KONKRÉTNÍ datum lhůty/termínu (předvolání, jednání, „nejpozději do…").
+// Bere jen datum u termínového spouštěče, aby nechytalo datum VYDÁNÍ dokumentu
+// („V Praze dne 15. července 2026"). Vrací { date, context } nebo null.
+function findDeadlineDate(text) {
+    if (!text) return null;
+    const trigger = /(dostav\w*|předvol\w*|nejpozd[ěe]ji|ke dni|do dne|v termínu|ve lh[ůu]t[ěe] do|se kon[áa]|naři[zř]uje\w*|jedn[áa]n[íi]|term[íi]n\w*)/i;
+    const lines = String(text).split(/[\n\r]+/);
+    for (const line of lines) {
+        if (!trigger.test(line)) continue;
+        const d = parseCzechDate(line);
+        if (d) return { date: d, context: line.trim().replace(/\s+/g, ' ') };
+    }
+    return null;
+}
+
 // Sestaví .ics (celodenní událost lhůty s připomenutím).
 // event = { uid?, title, date (Date|'YYYY-MM-DD'), description?, location?, reminderDays? }
 function buildDeadlineIcs(event) {
@@ -194,6 +233,8 @@ module.exports = {
     isWorkingDay,
     nextWorkingDay,
     easterSunday,
+    parseCzechDate,
+    findDeadlineDate,
     buildDeadlineIcs,
     googleCalendarUrl,
     outlookCalendarUrl,

@@ -75,6 +75,24 @@ describe('Výpočet lhůt (§ 57 o.s.ř.)', () => {
         expect(h.has('2026-12-24')).toBe(true);
         expect(h.has('2026-04-03')).toBe(true); // Velký pátek 2026
     });
+
+    test('parseCzechDate: číselné i slovní formáty', () => {
+        expect(key(cal.parseCzechDate('dne 25. 7. 2026'))).toBe('2026-07-25');
+        expect(key(cal.parseCzechDate('do 25.7.2026'))).toBe('2026-07-25');
+        expect(key(cal.parseCzechDate('dne 25. července 2026'))).toBe('2026-07-25');
+        expect(key(cal.parseCzechDate('nejpozději 1. ledna 2027'))).toBe('2027-01-01');
+        expect(cal.parseCzechDate('bez data')).toBeNull();
+    });
+
+    test('findDeadlineDate: bere termín u spouštěče, ne datum vydání', () => {
+        const doc = 'Č. j. KRPB-1/TČ-2026\nBrno 15. července 2026\nJste povinen se dostavit dne 25. července 2026 v 10:00.\nV Brně dne 15. července 2026';
+        const r = cal.findDeadlineDate(doc);
+        expect(key(r && r.date)).toBe('2026-07-25'); // předvolání, ne 15.7. vydání
+    });
+
+    test('findDeadlineDate: samotné datum vydání = null', () => {
+        expect(cal.findDeadlineDate('V Praze dne 15. července 2026\nMgr. Novák')).toBeNull();
+    });
 });
 
 describe('Hlavičkový papír', () => {
