@@ -1,6 +1,7 @@
 # Zamezení commitu systémových a generovaných souborů
 node_modules/
 dist/
+build/
 release-builds/
 .DS_Store
 *.log
@@ -9,6 +10,11 @@ release-builds/
 *.app
 .env
 isds.env
+
+# Build artefakty a dočasné soubory (nepatří do gitu)
+chunk-*.js
+*-temp.js
+temp_script.js
 
 # Historie editoru a lokální data
 lexis_history.json

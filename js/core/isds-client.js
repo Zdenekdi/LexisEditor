@@ -22,12 +22,17 @@ const ISDS_NS = 'http://isds.czechpoint.cz/v20';
 const ISDS_ENDPOINTS = {
     production: {
         host: 'https://ws1.mojedatovaschranka.cz',
-        basePath: '/DS'
+        basePath: '/DS',
+        // Přístup klientským certifikátem (login certificate: jméno+heslo+cert).
+        certHost: 'https://ws1c.mojedatovaschranka.cz',
+        certBasePath: '/cert/DS'
     },
     test: {
         // Testovací prostředí „czebox".
         host: 'https://ws1.czebox.cz',
-        basePath: '/DS'
+        basePath: '/DS',
+        certHost: 'https://ws1c.czebox.cz',
+        certBasePath: '/cert/DS'
     }
 };
 
@@ -40,10 +45,11 @@ const SERVICE_PATHS = {
 };
 
 // Sestaví plnou URL služby pro dané prostředí a skupinu operací.
-function buildEndpoint(env, service, override) {
+// useCert=true → cesta pro přístup klientským certifikátem (ws1c... /cert/DS).
+function buildEndpoint(env, service, override, useCert) {
     const cfg = ISDS_ENDPOINTS[env === 'production' ? 'production' : 'test'];
-    const host = (override && override.host) || cfg.host;
-    const basePath = (override && override.basePath) || cfg.basePath;
+    const host = (override && override.host) || (useCert ? cfg.certHost : cfg.host);
+    const basePath = (override && override.basePath) || (useCert ? cfg.certBasePath : cfg.basePath);
     const svc = SERVICE_PATHS[service] || service;
     return `${host}${basePath}/${svc}`;
 }

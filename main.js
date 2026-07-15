@@ -13,23 +13,69 @@ const isdsClient = require('./js/core/isds-client.js');
 const { IsdsOutbox } = require('./js/core/isds-outbox.js');
 const { IsdsInbox } = require('./js/core/isds-inbox.js');
 
-// Sdílené volání ISDS webové služby. creds = { login, pass, env, host?, basePath? }.
+// POST přes klientský certifikát (mTLS) — pro přihlášení certifikátem k ISDS.
+// tls = { pfx?, passphrase?, cert?, key? }.
+function httpsPostWithCert(url, headers, body, tls) {
+    const https = require('https');
+    return new Promise((resolve, reject) => {
+        const u = new URL(url);
+        const options = {
+            method: 'POST',
+            hostname: u.hostname,
+            port: u.port || 443,
+            path: u.pathname + u.search,
+            headers: Object.assign({ 'Content-Length': Buffer.byteLength(body) }, headers),
+            timeout: 30000
+        };
+        if (tls) Object.assign(options, tls); // pfx+passphrase nebo cert+key
+        const req = https.request(options, (res) => {
+            let data = '';
+            res.on('data', c => (data += c));
+            res.on('end', () => resolve({
+                httpStatus: res.statusCode,
+                ok: res.statusCode >= 200 && res.statusCode < 300,
+                text: data, url
+            }));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => req.destroy(new Error('ISDS: časový limit spojení vypršel.')));
+        req.write(body);
+        req.end();
+    });
+}
+
+// Sdílené volání ISDS webové služby.
+// creds = { login, pass, env, host?, basePath?, certPfx?, certPass?, certPem?, keyPem? }.
 // service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
 async function isdsCall(creds, service, operation, soapBody) {
     const env = (creds && creds.env === 'production') ? 'production' : 'test';
+    const useCert = !!(creds && (creds.certPfx || (creds.certPem && creds.keyPem)));
     const override = (creds && (creds.host || creds.basePath)) ? { host: creds.host, basePath: creds.basePath } : null;
-    const url = isdsClient.buildEndpoint(env, service, override);
-    const auth = Buffer.from(`${creds.login}:${creds.pass}`).toString('base64');
+    const url = isdsClient.buildEndpoint(env, service, override, useCert);
+
+    const headers = {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': isdsClient.soapAction(operation)
+    };
+    // Login certificate = jméno+heslo + klientský cert; jméno/heslo je i u běžného přístupu.
+    if (creds && creds.login) {
+        headers['Authorization'] = 'Basic ' + Buffer.from(`${creds.login}:${creds.pass || ''}`).toString('base64');
+    }
+
+    if (useCert) {
+        const tls = creds.certPfx
+            ? { pfx: creds.certPfx, passphrase: creds.certPass || undefined }
+            : { cert: creds.certPem, key: creds.keyPem, passphrase: creds.certPass || undefined };
+        return httpsPostWithCert(url, headers, soapBody, tls);
+    }
+
+    // Standardní cesta (jméno+heslo, bez certifikátu).
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/xml; charset=utf-8',
-                'SOAPAction': isdsClient.soapAction(operation),
-                'Authorization': `Basic ${auth}`
-            },
+            headers,
             body: soapBody,
             signal: controller.signal
         });
@@ -407,18 +453,35 @@ ipcMain.handle('save-isds-config', async (event, config) => {
     try {
         // Šifrování hesla pomocí systému (Windows DPAPI / Mac Keychain)
         ensureSafeStorage();
-        const encryptedPassword = safeStorage.encryptString(config.password);
+        const encryptedPassword = safeStorage.encryptString(config.password || '');
         const configToSave = {
             login: config.login,
             password: encryptedPassword.toString('base64'),
             environment: config.environment || 'production'
         };
+        // Volitelné přihlášení klientským certifikátem (.p12/.pfx). Heslo k certifikátu
+        // se šifruje stejně jako heslo k datovce; cesta k souboru se ukládá jako reference.
+        if (config.certPath) configToSave.certPath = config.certPath;
+        if (config.certPassphrase) {
+            configToSave.certPassphrase = safeStorage.encryptString(config.certPassphrase).toString('base64');
+        }
         fs.writeFileSync(isdsConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
         return { success: true };
     } catch (e) {
         console.error('Chyba při ukládání ISDS konfigurace:', e);
         return { success: false, error: e.message };
     }
+});
+
+// Výběr souboru klientského certifikátu (.p12/.pfx) pro přihlášení certifikátem.
+ipcMain.handle('pick-isds-cert', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: 'Vyberte klientský certifikát (.p12 / .pfx)',
+        filters: [{ name: 'Certifikát', extensions: ['p12', 'pfx'] }],
+        properties: ['openFile']
+    });
+    if (canceled || !filePaths || filePaths.length === 0) return { canceled: true };
+    return { canceled: false, path: filePaths[0] };
 });
 
 ipcMain.handle('get-isds-config', async () => {
@@ -431,6 +494,8 @@ ipcMain.handle('get-isds-config', async () => {
                 login: rawData.login,
                 password: decryptedPassword,
                 environment: rawData.environment,
+                certPath: rawData.certPath || '',
+                hasCert: !!rawData.certPath,
                 hasConfig: true
             };
         }
@@ -455,7 +520,19 @@ function readIsdsCreds() {
     try {
         const raw = JSON.parse(fs.readFileSync(isdsConfigPath, 'utf-8'));
         const password = safeStorage.decryptString(Buffer.from(raw.password, 'base64'));
-        return { login: raw.login, pass: password, env: raw.environment || 'production' };
+        const creds = { login: raw.login, pass: password, env: raw.environment || 'production' };
+        // Volitelný klientský certifikát (.p12/.pfx) pro přihlášení certifikátem.
+        if (raw.certPath && fs.existsSync(raw.certPath)) {
+            try {
+                creds.certPfx = fs.readFileSync(raw.certPath);
+                if (raw.certPassphrase) {
+                    creds.certPass = safeStorage.decryptString(Buffer.from(raw.certPassphrase, 'base64'));
+                }
+            } catch (certErr) {
+                console.error('ISDS: nelze načíst certifikát:', certErr.message);
+            }
+        }
+        return creds;
     } catch (e) {
         console.error('ISDS: nelze načíst údaje:', e.message);
         return null;
@@ -1382,6 +1459,14 @@ ipcMain.handle('lock-save-config', async (event, config) => {
         let existing = {};
         if (fs.existsSync(lockConfigPath)) {
             try { existing = JSON.parse(fs.readFileSync(lockConfigPath, 'utf-8')); } catch (e) {}
+        }
+        // Minimální délka hesla se vynucuje i v main procesu (ne jen v rendereru,
+        // který jde obejít). Prázdné heslo je OK jen když už nějaké existuje
+        // (uživatel jen mění jiná nastavení) nebo když se zámek zakládá bez hesla
+        // (např. jen Touch ID).
+        const MIN_LEN = 8;
+        if (config.password && String(config.password).length < MIN_LEN) {
+            return { success: false, error: `Heslo musí mít alespoň ${MIN_LEN} znaků.` };
         }
         const toSave = {
             enabled: !!config.enabled,

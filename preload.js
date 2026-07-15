@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportBundle: (html, css, headerHtml, footerHtml, watermarkHtml) => ipcRenderer.invoke('export-bundle', html, css, headerHtml, footerHtml, watermarkHtml),
     saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
     getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
+    pickIsdsCert: () => ipcRenderer.invoke('pick-isds-cert'),
     savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
     getPostConfig: () => ipcRenderer.invoke('get-post-config'),
     testIsdsConnection: (creds) => ipcRenderer.invoke('test-isds-connection', creds),
