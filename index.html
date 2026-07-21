@@ -1192,8 +1192,8 @@
         <div class="status-group" id="status-ai-group"><span>✨ AI: Aktivní</span></div>
         <div class="status-group" id="status-save-group"><span id="save-status">✓ Uloženo</span></div>
         <div class="status-group" id="status-sync-group">
-            <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()">
-                <span id="sync-icon">☁️</span> <span id="sync-text">Synchronizováno</span>
+            <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()" title="Data jsou uložena šifrovaně lokálně na tomto počítači">
+                <span id="sync-icon">💾</span> <span id="sync-text">Uloženo lokálně</span>
             </span>
         </div>
     </div>
@@ -1218,6 +1218,8 @@
     <script src="js/ui/lexis-isds-settings.js"></script>
     <script src="js/ui/lexis-keybackup.js"></script>
     <script src="js/ui/lexis-feedback.js"></script>
+    <script src="js/ui/lexis-find-replace.js"></script>
+    <script src="js/ui/lexis-forward-client.js"></script>
 
     <script>
         // --- SDK INITIALIZATION & BRIDGE ---
@@ -1611,7 +1613,6 @@
         window.editFooter = () => lexisUI.editFooter();
         window.insertPageNumber = () => lexisUI.insertPageNumber();
         window.setViewMode = (mode) => lexisUI.setViewMode(mode);
-        window.startMailMerge = () => lexisUI.startMailMerge();
         window.calculateFee = () => lexisUI.showFeeCalc();
         window.calculateTariff = () => lexisUI.showTariffCalc();
         window.calculateInterests = () => lexisUI.showInterestCalc();

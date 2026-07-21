@@ -1038,15 +1038,53 @@ function normalizeCourtName(name) {
         .trim();
 }
 
-// Join klíč: najde záznam v COURT_REGISTRY podle zkratky nebo (normalizovaného)
-// názvu z COURT_PATTERNS — dřív mezi oběma tabulkami žádná vazba nebyla.
+// ── Fuzzy fallback pro join, když přesná shoda selže ─────────────────────
+// COURT_PATTERNS (detekce z textu) používají 1. pád města ("Krajský soud
+// Brno", "Obvodní soud Praha 1"), zatímco registr má úřední tvar v 6. pádu
+// ("Krajský soud v Brně", "Obvodní soud pro Prahu 1"). Přesná normalizace
+// je nespojí. Rozložíme název na (typ soudu + čísla + slova) a porovnáme:
+//   • typ musí sedět přesně,
+//   • čísla přesně (Praha 1 ≠ Praha 10),
+//   • stejný počet slov a shodné 3písmenné kmeny (Brno↔Brně, Plzeň↔Plzni).
+// Když fuzzy dá víc kandidátů, vrátíme null (radši nic než špatný soud).
+const _COURT_TYPE_TOKENS = ['nejvyssi spravni', 'nejvyssi', 'ustavni', 'vrchni', 'krajsky', 'mestsky', 'obvodni', 'okresni'];
+function _courtParts(name) {
+    let n = normalizeCourtName(name).replace(/\bsoud\w*\b/g, ' ');
+    let type = '';
+    for (const t of _COURT_TYPE_TOKENS) { if (n.includes(t)) { type = t; n = n.replace(t, ' '); break; } }
+    n = n.replace(/\b(v|ve|pro|nad|pri)\b/g, ' ');
+    const nums = (n.match(/\d+/g) || []);
+    const words = n.replace(/[^a-z]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+    return { type, nums, words };
+}
+function _courtPartsMatch(a, b) {
+    if (!a.type || a.type !== b.type) return false;
+    if (a.nums.join(',') !== b.nums.join(',')) return false;
+    if (a.words.length !== b.words.length) return false;
+    const A = a.words.map(w => w.slice(0, 3)).sort();
+    const B = b.words.map(w => w.slice(0, 3)).sort();
+    return A.every((s, i) => B[i].startsWith(s) || s.startsWith(B[i]));
+}
+
+// Join klíč: najde záznam v COURT_REGISTRY podle zkratky nebo názvu ze
+// COURT_PATTERNS. Nejdřív přesná shoda (zkratka / normalizovaný název),
+// pak fuzzy fallback na pádové tvary. Přijímá i detekovaný objekt soudu
+// ({ nazev, kod }) — tehdy se joinuje podle .nazev.
 function findCourtInRegistry(nameOrCode) {
     if (!nameOrCode) return null;
-    const norm = normalizeCourtName(nameOrCode);
-    return COURT_REGISTRY.find(c =>
-        c.zkratka === nameOrCode ||
+    const name = (typeof nameOrCode === 'object') ? (nameOrCode.nazev || nameOrCode.zkratka || '') : nameOrCode;
+    if (!name) return null;
+    const norm = normalizeCourtName(name);
+    const exact = COURT_REGISTRY.find(c =>
+        c.zkratka === name ||
         normalizeCourtName(c.nazev) === norm
-    ) || null;
+    );
+    if (exact) return exact;
+    // Fallback: pádové tvary (1. pád z detekce vs 6. pád v registru).
+    const parts = _courtParts(name);
+    if (!parts.type) return null;
+    const fuzzy = COURT_REGISTRY.filter(c => _courtPartsMatch(parts, _courtParts(c.nazev)));
+    return fuzzy.length === 1 ? fuzzy[0] : null; // víc kandidátů → radši nic
 }
 
 // Bezpečné získání ISDS soudu. Vrací i příznaky valid/verified — volající

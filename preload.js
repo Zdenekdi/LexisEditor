@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onIsdsOutboxChanged: (callback) => ipcRenderer.on('isds-outbox-changed', () => callback()),
     renderPdfBase64: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('render-pdf-base64', html, css, headerHtml, footerHtml),
     openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
+    composeEmailAttach: (opts) => ipcRenderer.invoke('compose-email-attach', opts),
     calendarOpenIcs: (ics, name) => ipcRenderer.invoke('calendar-open-ics', ics, name),
     calendarSaveIcs: (ics, name) => ipcRenderer.invoke('calendar-save-ics', ics, name),
     isdsInboxRefresh: (mode, fromTime) => ipcRenderer.invoke('isds-inbox-refresh', mode, fromTime),

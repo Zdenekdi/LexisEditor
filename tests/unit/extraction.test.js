@@ -58,3 +58,46 @@ describe('Extrakce náležitostí — reálné formáty', () => {
         expect(extract('Zaplaťte 12345678 na účet do konce měsíce.').cj).toBe('');
     });
 });
+
+// Join detekce soudu (1. pád) → registr ISDS/adres (6. pád). Dřív selhával
+// u všech krajských soudů a Prahy, protože názvy se lišily pádem
+// („Krajský soud Brno" vs „Krajský soud v Brně").
+describe('Join soud → registr (ISDS lookup)', () => {
+    const registry = require('../../js/core/court-registry');
+    const { COURT_PATTERNS } = court;
+
+    test('všechny detekované soudy (kromě známé mezery) najdou ISDS v registru', () => {
+        const gaps = COURT_PATTERNS
+            .filter(p => { const r = registry.findCourtInRegistry(p.nazev); return !(r && r.isds); })
+            .map(p => p.nazev);
+        // Jediná akceptovaná mezera: Městský soud Brno (v registru chybí — fail-safe null).
+        expect(gaps).toEqual(['Městský soud Brno']);
+    });
+
+    test('pádové tvary se napojí na správný soud', () => {
+        expect(registry.findCourtInRegistry('Krajský soud Brno').nazev).toBe('Krajský soud v Brně');
+        expect(registry.findCourtInRegistry('Krajský soud Plzeň').nazev).toBe('Krajský soud v Plzni');
+        expect(registry.findCourtInRegistry('Vrchní soud Praha').nazev).toBe('Vrchní soud v Praze');
+    });
+
+    test('Praha 1 vs Praha 10 se nezamění (přesná shoda čísel)', () => {
+        expect(registry.findCourtInRegistry('Obvodní soud Praha 1').nazev).toBe('Obvodní soud pro Prahu 1');
+        expect(registry.findCourtInRegistry('Obvodní soud Praha 10').nazev).toBe('Obvodní soud pro Prahu 10');
+    });
+
+    test('podobné názvy se nezamění (Kladno ≠ Klatovy, Jičín ≠ Nový Jičín)', () => {
+        expect(registry.findCourtInRegistry('Okresní soud Kladno').nazev).toBe('Okresní soud Kladno');
+        expect(registry.findCourtInRegistry('Okresní soud Klatovy').nazev).toBe('Okresní soud Klatovy');
+        expect(registry.findCourtInRegistry('Okresní soud Jičín').nazev).toBe('Okresní soud Jičín');
+        expect(registry.findCourtInRegistry('Okresní soud Nový Jičín').nazev).toBe('Okresní soud Nový Jičín');
+    });
+
+    test('přijme i detekovaný objekt { nazev, kod }', () => {
+        const detected = COURT_PATTERNS.find(p => /Ostrava/.test(p.nazev));
+        expect(registry.findCourtInRegistry(detected).nazev).toContain('Ostrav');
+    });
+
+    test('neznámý soud → null (radši nic než špatná datovka)', () => {
+        expect(registry.findCourtInRegistry('Vymyšlený soud Kdesi')).toBeNull();
+    });
+});

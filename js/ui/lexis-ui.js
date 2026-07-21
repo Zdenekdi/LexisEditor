@@ -575,15 +575,32 @@ class LexisUI {
     }
 
     showFindReplace() {
-        this.customPrompt("Hledat text:", "", (find) => {
+        // Skutečné Najít/Nahradit (modul lexis-find-replace.js): zvýraznění nálezů,
+        // skok na další/předchozí, nahradit jeden/vše, rozlišení velikosti písmen a
+        // hlavně BEZ ztráty formátování (přes Quill API, ne přes setText).
+        if (window.LexisFindReplace && window.LexisFindReplace.open) {
+            window.LexisFindReplace.open(this.core.quill);
+            return;
+        }
+        // Bezpečný fallback (kdyby modul chyběl): nahrazení přes Quill API po
+        // úsecích, aby se NEZAHODILO formátování dokumentu jako dřív se setText().
+        this.customPrompt('Hledat text:', '', (find) => {
             if (!find) return;
-            this.customPrompt(`Nahradit "${find}" za:`, "", (replace) => {
+            this.customPrompt(`Nahradit "${find}" za:`, '', (replace) => {
                 if (replace === null) return;
-                
-                const text = this.core.quill.getText();
-                const newText = text.split(find).join(replace);
-                this.core.quill.setText(newText);
-                this.customAlert("Všechny výskyty byly nahrazeny.");
+                const q = this.core.quill;
+                let count = 0, from = 0;
+                while (true) {
+                    const i = q.getText().indexOf(find, from);
+                    if (i === -1) break;
+                    const fmt = q.getFormat(i, find.length);
+                    q.deleteText(i, find.length, 'user');
+                    if (replace) q.insertText(i, replace, fmt, 'user');
+                    from = i + (replace ? replace.length : 0);
+                    count++;
+                    if (count > 100000) break; // pojistka
+                }
+                this.customAlert(count ? `Nahrazeno: ${count}×` : 'Řetězec nebyl nalezen.');
             });
         });
     }
@@ -1302,120 +1319,27 @@ class LexisUI {
         }
     }
 
+    // Stav úložiště. LexisEditor je záměrně LOKÁLNÍ (datová suverenita) — data
+    // neopouštějí počítač advokáta. Vzdálená cloudová synchronizace NENÍ aktivní,
+    // a proto nic „nesynchronizujeme" a netvrdíme, že se data někam nahrála.
+    // (Dřív tato funkce jen náhodně předstírala úspěch/kolizi — matoucí a nebezpečné
+    // u aplikace, na jejíž zálohy se advokát spoléhá.)
     triggerCloudSync() {
         const icon = document.getElementById('sync-icon');
         const text = document.getElementById('sync-text');
         const status = document.getElementById('sync-status');
-        
-        if (!icon || !text || !status) return;
-        
-        // Start syncing animation
-        status.style.color = '#3b82f6';
-        text.innerText = 'Synchronizace...';
-        icon.innerText = '🔄';
-        icon.style.display = 'inline-block';
-        icon.animate([
-            { transform: 'rotate(0deg)' },
-            { transform: 'rotate(360deg)' }
-        ], {
-            duration: 1000,
-            iterations: Infinity
-        });
-        
-        setTimeout(() => {
-            // Stop animation
-            icon.getAnimations().forEach(anim => anim.cancel());
-            
-            // Randomly trigger conflict (25% chance) or mock successful sync
-            if (Math.random() < 0.25) {
-                this.showConflictResolutionDialog();
-                status.style.color = '#f59e0b';
-                text.innerText = 'Kolize verzí';
-                icon.innerText = '⚠️';
-            } else {
-                status.style.color = '#10b981';
-                text.innerText = 'Synchronizováno';
-                icon.innerText = '☁️';
-                this.customAlert('☁️ <b>Cloud-Sync dokončen</b><br><br>Místní databáze IndexedDB je plně synchronizovaná se vzdáleným cloudovým úložištěm.');
-            }
-        }, 1500);
+        if (icon) icon.innerText = '💾';
+        if (text) text.innerText = 'Uloženo lokálně';
+        if (status) status.style.color = '#10b981';
+        this.customAlert(
+            '💾 <b>Data jsou uložena lokálně</b><br><br>'
+            + 'LexisEditor ukládá dokumenty a databázi <b>šifrovaně přímo na tomto počítači</b> '
+            + '(datová suverenita — nic neodchází do cloudu). '
+            + 'Vzdálená cloudová synchronizace <b>zatím není aktivní</b>; '
+            + 'o zálohy se postarej lokálně (Time Machine / kopie složky) nebo přes zálohu klíče.'
+        );
     }
 
-    showConflictResolutionDialog() {
-        const overlay = document.createElement('div');
-        overlay.style.position = 'fixed';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.background = 'rgba(15, 23, 42, 0.4)';
-        overlay.style.backdropFilter = 'blur(8px)';
-        overlay.style.zIndex = '99999';
-        overlay.style.display = 'flex';
-        overlay.style.alignItems = 'center';
-        overlay.style.justifyContent = 'center';
-        overlay.id = 'conflict-modal';
-
-        const dialog = document.createElement('div');
-        dialog.style.background = 'rgba(255, 255, 255, 0.95)';
-        dialog.style.padding = '30px';
-        dialog.style.borderRadius = '16px';
-        dialog.style.maxWidth = '500px';
-        dialog.style.width = '90%';
-        dialog.style.boxShadow = '0 20px 40px rgba(0,0,0,0.15)';
-        dialog.style.fontFamily = "'Inter', sans-serif";
-        dialog.style.border = "1px solid rgba(255,255,255,0.4)";
-
-        dialog.innerHTML = `
-            <div style="font-size:36px; margin-bottom:15px; text-align:center;">⚠️</div>
-            <h3 style="margin-bottom:10px; font-weight:700; color:#0f172a; text-align:center;">Kolize verzí na Cloudu</h3>
-            <p style="font-size:13px; color:#475569; line-height:1.6; margin-bottom:20px; text-align:center;">
-                V cloudovém úložišti byl nalezen novější zápis stejného dokumentu od jiného uživatele z vaší kanceláře. Vyberte verzi, kterou chcete zachovat.
-            </p>
-            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-                <div style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:#f8fafc;" onclick="document.getElementById('opt-cloud').click()">
-                    <div>
-                        <span style="font-size:12px; font-weight:bold; display:block; color:#0f172a;">Verze z Cloudu (Doporučeno)</span>
-                        <span style="font-size:10px; color:#64748b;">Upravil: Mgr. Jan Novák (před 2 min)</span>
-                    </div>
-                    <input type="radio" name="conflict-opt" id="opt-cloud" checked style="cursor:pointer;">
-                </div>
-                <div style="padding:12px; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('opt-local').click()">
-                    <div>
-                        <span style="font-size:12px; font-weight:bold; display:block; color:#0f172a;">Vaše místní verze</span>
-                        <span style="font-size:10px; color:#64748b;">Upravil: Vy (před 5 min)</span>
-                    </div>
-                    <input type="radio" name="conflict-opt" id="opt-local" style="cursor:pointer;">
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; justify-content:flex-end;">
-                <button id="resolve-conflict-btn" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:12px; transition: background 0.2s;">Potvrdit výběr</button>
-            </div>
-        `;
-
-        overlay.appendChild(dialog);
-        document.body.appendChild(overlay);
-
-        document.getElementById('resolve-conflict-btn').onclick = () => {
-            const isCloud = document.getElementById('opt-cloud').checked;
-            document.body.removeChild(overlay);
-            
-            const icon = document.getElementById('sync-icon');
-            const text = document.getElementById('sync-text');
-            const status = document.getElementById('sync-status');
-            if (icon && text && status) {
-                status.style.color = '#10b981';
-                text.innerText = 'Synchronizováno';
-                icon.innerText = '☁️';
-            }
-            
-            if (isCloud) {
-                this.customAlert('☁️ <b>Verze stažena</b><br><br>Dokument byl úspěšně aktualizován na nejnovější cloudovou verzi z IndexedDB.');
-            } else {
-                this.customAlert('☁️ <b>Změny odeslány</b><br><br>Vaše lokální změny byly potvrzeny a zapsány do cloudového úložiště.');
-            }
-        };
-    }
     async checkEnterpriseFeature(featureName, callback) {
         const status = await this.core.secureVault.get('license_status') || 'Neaktivní';
         if (status === 'Enterprise') {
@@ -1718,21 +1642,24 @@ class LexisUI {
             return;
         }
 
-        // 1. Try to extract File Number (č. j. / sp. zn.)
-        const cjRegexes = [
-            /(?:č\s*\.\s*j\s*\.|číslo\s*jednací|sp\s*\.\s*zn\s*\.)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i,
-            /(?:spisová\s*značka|spis\.?\s*zn\.?)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i
-        ];
-        
+        // 1. Č.j. / spisová značka — SDÍLENÁ extrakce (window.LexisReply.extract),
+        //    aby obě cesty tvorby odpovědi extrahovaly stejně. Regex fallback jen
+        //    pro případ, že modul není načtený.
         let fileNumber = '';
-        for (const regex of cjRegexes) {
-            const match = regex.exec(this.currentPdfText);
-            if (match && match[1]) {
-                fileNumber = match[1].trim();
-                break;
+        if (window.LexisReply && window.LexisReply.extract) {
+            const ex = window.LexisReply.extract(this.currentPdfText);
+            fileNumber = ex.cj || ex.spzn || '';
+        }
+        if (!fileNumber) {
+            const cjRegexes = [
+                /(?:č\s*\.\s*j\s*\.|číslo\s*jednací|sp\s*\.\s*zn\s*\.)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i,
+                /(?:spisová\s*značka|spis\.?\s*zn\.?)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i
+            ];
+            for (const regex of cjRegexes) {
+                const match = regex.exec(this.currentPdfText);
+                if (match && match[1]) { fileNumber = match[1].trim(); break; }
             }
         }
-        
         if (!fileNumber) {
             fileNumber = 'Spis. zn. / Č. j. nevyplněno';
         }
@@ -2409,7 +2336,12 @@ class LexisUI {
         const documentText = this.core.getText() || "";
         const emailContent = documentText.length < 1500 ? documentText : (documentText.substring(0, 1500) + "\n\n...[Text zkrácen z důvodu limitu délky odkazu]...");
         const body = `${emailContent}\n\n---\nOdesláno z LexisEditoru`;
-        window.location.href = `mailto:kontakt@nexusstack.eu?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        // Bez pevného příjemce — advokát vyplní adresáta v poštovním klientu
+        // (dřív tu byla natvrdo cizí vývojářská adresa). V Electronu přes
+        // shell.openExternal (nové okno pošty), v prohlížeči fallback.
+        const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        if (window.electronAPI && window.electronAPI.openExternalUrl) window.electronAPI.openExternalUrl(url);
+        else window.location.href = url;
     }
 
     async saveAsTemplateDialog() {
@@ -2768,18 +2700,30 @@ class LexisUI {
             const type = modal.querySelector('#post-type').value === 'registered' ? 'doporučeně' : 'obyčejně';
             
             close();
-            this.showLoader("Přenáším dokument do Dopis Online...", () => {
-                this.customAlert(`✅ <b>Zásilka podána!</b><br><br>Dopis pro příjemce <b>${recip}</b> byl úspěšně vygenerován a předán České poště k vytištění a odeslání (${type}).`);
-            });
+            // POZOR: skutečné podání zásilky přes PostServis (Dopis Online) NENÍ zapojené —
+            // v main.js je jen uložení přihlašovacích údajů a test spojení, ne odeslání.
+            // Nikdy netvrdíme „Zásilka podána", když se k České poště nic nepředalo.
+            this.customAlert(
+                `✉️ <b>Automatické podání přes Dopis Online zatím není aktivní</b><br><br>`
+                + `Dopis pro příjemce <b>${this._esc ? this._esc(recip) : recip}</b> se přes Českou poštu <b>automaticky neodeslal</b> `
+                + `(napojení na PostServis není zapojené). Dokument máš připravený v editoru — odešli ho zatím jinou cestou `
+                + `(datová schránka, e-mail, nebo ho vytiskni a podej na poště, ${this._esc ? this._esc(type) : type}).`
+            );
         };
     }
 
     syncCloud(service) {
-        this.checkEnterpriseFeature(`Synchronizace s ${service}`, () => {
-            this.showLoader(`Připojuji se k ${service} a synchronizuji doložky a dokumenty...`, () => {
-                this.customAlert(`☁️ <b>Synchronizace úspěšná!</b><br><br>Vaše dokumenty a knihovna doložek byly bezpečně zálohovány a synchronizovány se službou <b>${service}</b>.`);
-            });
-        });
+        // POZOR: napojení na externí cloud (Dropbox/Drive/OneDrive/…) NENÍ implementováno.
+        // Dřív tato funkce jen předstírala úspěch („zálohováno a synchronizováno") — což je
+        // u nástroje, na jehož zálohy se advokát spoléhá, nebezpečné. Nikdy netvrdíme, že se
+        // data někam nahrála, když se nenahrála. LexisEditor je navíc záměrně lokální
+        // (datová suverenita) — data zůstávají šifrovaně na tomto počítači.
+        this.customAlert(
+            `☁️ <b>Synchronizace s ${this._esc ? this._esc(service) : service} zatím není aktivní</b><br><br>`
+            + 'Napojení na externí cloudové úložiště zatím není zapojené — <b>žádná data se nikam nenahrála</b>. '
+            + 'LexisEditor ukládá dokumenty i knihovnu doložek <b>šifrovaně lokálně</b> na tomto počítači. '
+            + 'Zálohu si zajisti lokálně (Time Machine / kopie složky) nebo přes „Záloha klíče".'
+        );
     }
 
     showHelpTip(topic) {
@@ -6491,23 +6435,21 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 const filled = this.exportCampaignRecord(record, templateHtml)
                     .replace(/<span class="filled-var">/g, '').replace(/<\/span>/g, '');
 
-                if (this._campaignAction === 'isds' && isds) {
-                    // Simulate ISDS send — in production would call electronAPI
-                    await new Promise(r => setTimeout(r, 400));
-                    // window.electronAPI?.sendIsdsMessage({ recipientId: isds, content: filled, subject: name })
-                    status = 'ok';
-                } else {
-                    // Download as HTML
-                    const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${this._esc(name)}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
-                    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = `dokument_${name.replace(/[^a-z0-9_]/gi,'_')}.html`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    await new Promise(r => setTimeout(r, 300));
-                    status = 'ok';
-                }
+                // Vždy vygenerujeme hmatatelný dokument (stažení HTML). U ISDS
+                // režimu ho NEODESÍLÁME automaticky: identifikátory schránek soudů
+                // nejsou ověřené (ISDS_DATA_VERIFIED=false) a automatické odeslání by
+                // mohlo doručit do cizí/neplatné schránky. Reálné (ověřené) hromadné
+                // odeslání dělá modul Datové schránky přes ověřenou frontu (outbox).
+                // Nikdy nehlásíme „odesláno", když jsme nic neodeslali.
+                const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${this._esc(name)}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
+                const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = `dokument_${name.replace(/[^a-z0-9_]/gi,'_')}.html`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                await new Promise(r => setTimeout(r, 200));
+                status = (this._campaignAction === 'isds' && isds) ? 'prepared' : 'ok';
             } catch (e) {
                 status = 'err';
                 console.error(`Chyba pro ${name}:`, e);
@@ -6517,8 +6459,12 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
             const statusBadge = document.getElementById(`batch-status-${i}`);
             if (statusBadge) {
-                statusBadge.className = `batch-status-badge batch-status-${status}`;
-                statusBadge.textContent = status === 'ok' ? '✅ Hotovo' : '❌ Chyba';
+                const badge = status === 'prepared' ? 'sending' : status;
+                statusBadge.className = `batch-status-badge batch-status-${badge}`;
+                statusBadge.textContent =
+                    status === 'err' ? '❌ Chyba' :
+                    status === 'prepared' ? '📤 Připraveno' :
+                    '✅ Staženo';
             }
 
             const pct = Math.round(((i + 1) / records.length) * 100);
@@ -6527,8 +6473,18 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
         }
 
         const ok = results.filter(r => r.status === 'ok').length;
+        const prepared = results.filter(r => r.status === 'prepared').length;
         const err = results.filter(r => r.status === 'err').length;
-        if (statusEl) statusEl.innerHTML = `✅ <b>Kampaň dokončena!</b> ${ok} úspěšně${err > 0 ? `, ${err} chyb` : ''}.`;
+        if (statusEl) {
+            if (prepared > 0) {
+                // Honest ISDS message: nic se neodeslalo, jen připravily dokumenty.
+                statusEl.innerHTML = `📤 <b>Připraveno ${prepared} dokumentů</b>${err > 0 ? `, ${err} chyb` : ''} (staženy). `
+                    + `Datové zprávy se <b>zatím neodeslaly</b> — hromadné odeslání s ověřením příjemce udělej v modulu `
+                    + `<b>Datové schránky → Odeslat</b> (tam se každá schránka ověří proti registru).`;
+            } else {
+                statusEl.innerHTML = `✅ <b>Kampaň dokončena!</b> ${ok} staženo${err > 0 ? `, ${err} chyb` : ''}.`;
+            }
+        }
         if (btnNext) btnNext.disabled = false;
     }
 

@@ -1128,3 +1128,132 @@ body.reading-mode #reading-mode-exit-btn { display: flex !important; }
     padding: 10px 14px; font-size: 12px; color: #475569;
     margin-bottom: 14px; display: flex; align-items: flex-start; gap: 8px;
 }
+
+/* ============================================================
+   UX vylepšení (v3.4.x) — ribbon afordance, kontrast, prázdný
+   stav, placeholdery, SVG ikony. Přidáno na konec kvůli kaskádě.
+   ============================================================ */
+
+/* --- #1 Ribbon: viditelná afordance scrollu (dřív skrytý scrollbar) --- */
+.tool-groups-container {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+    position: relative;
+    scroll-padding-right: 24px;
+}
+.tool-groups-container::-webkit-scrollbar { display: block !important; height: 7px; }
+.tool-groups-container::-webkit-scrollbar-track { background: transparent; }
+.tool-groups-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.tool-groups-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+/* Jemný pravý „fade", který signalizuje, že ribbon pokračuje za okraj. */
+.ribbon { position: relative; }
+.ribbon::after {
+    content: ''; position: absolute; top: 34px; right: 0; bottom: 0; width: 36px;
+    pointer-events: none; z-index: 5;
+    background: linear-gradient(to right, rgba(248,250,252,0), var(--ribbon-bg));
+}
+
+/* --- #2 SVG ikony (nahrazují emoji přes runtime mapu) --- */
+.icon-sq svg { width: 20px; height: 20px; stroke-width: 1.9; display: block; }
+.icon-sq.has-svg-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-title); }
+.card-icon svg { width: 42px; height: 42px; stroke-width: 1.6; }
+.card-icon.has-svg-icon { display: inline-flex; align-items: center; justify-content: center; }
+
+/* --- #3 Kontrast: tmavší šedé popisky (AA ≥ 4.5:1) --- */
+.group-label { color: #64748b; }
+.category-header { color: #64748b; }
+.panel-title { color: #475569; }
+.page-header, .page-footer { color: #64748b; }
+
+/* --- #4 Prázdný stav editoru: ghost text --- */
+.ql-editor.ql-blank::before {
+    content: "Začněte psát…  Tip: doložky a šablony vložíte z levého panelu KNIHOVNA.";
+    color: #64748b; font-style: italic; opacity: 0.85;
+    left: 25mm; right: 25mm; pointer-events: none; font-size: 12pt;
+}
+
+/* --- #4/#6 Hlavička a patička jako zřetelně editovatelná pole --- */
+.page-header, .page-footer { border: 1px dashed #e5e9f0; }
+.page-header:hover, .page-footer:hover { color: #475569; }
+
+/* ============================================================
+   Sjednocený pravý icon rail (nahrazuje 4 barevná boční ouška)
+   ============================================================ */
+/* Skrýt původní barevná ouška (ponechána v DOM kvůli JS). */
+.sidebar-side-tab, .reference-side-tab, .ai-side-tab, .comment-side-tab { display: none !important; }
+
+.lexis-rail {
+    position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+    z-index: 1000; display: flex; flex-direction: column; gap: 4px;
+    padding: 6px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-right: none;
+    border-radius: 14px 0 0 14px; box-shadow: -4px 0 18px rgba(15,23,42,0.08);
+}
+.dark-mode .lexis-rail { background: rgba(30,41,59,0.92); border-color: rgba(255,255,255,0.08); }
+
+.rail-btn {
+    position: relative; width: 44px; height: 44px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: 10px; cursor: pointer;
+    color: #475569; transition: background 0.15s, color 0.15s;
+}
+.dark-mode .rail-btn { color: #cbd5e1; }
+.rail-btn svg { width: 22px; height: 22px; }
+.rail-btn:hover { background: #f1f5f9; color: #1e293b; }
+.dark-mode .rail-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+/* Aktivní (otevřený) panel */
+.rail-btn.active { background: rgba(37,99,235,0.12); color: var(--word-blue); }
+.rail-btn.active::before {
+    content: ''; position: absolute; left: -6px; top: 9px; bottom: 9px; width: 3px;
+    border-radius: 3px; background: var(--word-blue);
+}
+
+/* Tooltip s názvem (vlevo od tlačítka) */
+.rail-btn::after {
+    content: attr(data-label); position: absolute; right: 54px; top: 50%;
+    transform: translateY(-50%) translateX(4px); white-space: nowrap;
+    background: #0f172a; color: #fff; font-size: 11px; font-weight: 600;
+    padding: 5px 9px; border-radius: 7px; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s, transform 0.15s; z-index: 1;
+    box-shadow: 0 6px 16px rgba(15,23,42,0.2);
+}
+.rail-btn:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+/* Skrýt rail v režimu čtení / na úvodní obrazovce */
+body.reading-mode .lexis-rail { display: none; }
+
+/* --- Inline SVG ikony v panelech (doložky, titulky sekcí) --- */
+.lx-inline-icon { display: inline-flex; align-items: center; vertical-align: -0.15em; margin-right: 8px; color: inherit; }
+.lx-inline-icon svg { width: 16px; height: 16px; stroke-width: 1.9; }
+.panel-title .lx-inline-icon svg { width: 15px; height: 15px; }
+
+/* --- #2 Přístupnost: viditelný focus stav klávesnicí --- */
+.btn-icon:focus-visible, .tab:focus-visible, .qa-btn:focus-visible,
+.clause-item:focus-visible, .rail-btn:focus-visible, .context-menu-item:focus-visible {
+    outline: 2px solid var(--word-blue); outline-offset: 2px; border-radius: 8px;
+}
+
+/* --- #5 Dark mode: popisky na tmavém pozadí musí být SVĚTLEJŠÍ (ne tmavší) --- */
+/* (page-header/footer zůstávají tmavé — dokument je i v dark mode bílý papír) */
+.dark-mode .group-label { color: #94a3b8; }
+.dark-mode .category-header { color: #94a3b8; }
+.dark-mode .panel-title { color: #cbd5e1; }
+.dark-mode .ql-editor.ql-blank::before { color: #64748b; }
+
+/* --- Výraznější sekundární texty v panelech (byly moc světlé) --- */
+.category-header { color: #475569; }
+.panel-title { color: #334155; }
+.dark-mode .category-header { color: #cbd5e1; }
+.dark-mode .panel-title { color: #e2e8f0; }
+/* Ztmavení inline-muted hintů (#94a3b8) v panelech — !important přebije inline style */
+.side-panels [style*="94a3b8"], .right-panels [style*="94a3b8"], #comment-sidebar [style*="94a3b8"] { color: #64748b !important; }
+.dark-mode .side-panels [style*="94a3b8"], .dark-mode .right-panels [style*="94a3b8"], .dark-mode #comment-sidebar [style*="94a3b8"] { color: #94a3b8 !important; }
+
+/* Dark mode: i muted hinty s inline #64748b musí být čitelné (byly ~3:1) */
+.dark-mode .side-panels [style*="64748b"], .dark-mode .right-panels [style*="64748b"], .dark-mode #comment-sidebar [style*="64748b"] { color: #94a3b8 !important; }
+
+/* Dark mode: boxy doložek měly napevno světlé pozadí (#f8fafc z inline <style>) → v dark nečitelné.
+   Vyšší specificita (.dark-mode .clause-item) přebije inline stylesheet pravidlo. */
+.dark-mode .clause-item { background: #0f172a; border-color: rgba(255,255,255,0.07); color: #e2e8f0; }
+.dark-mode .clause-item:hover { background: #1e293b; border-color: var(--word-blue); color: #ffffff; }

@@ -402,6 +402,7 @@
                         <div style="display:flex; flex-direction:column; gap:5px; flex-shrink:0; align-items:flex-end;">
                             ${!downloaded ? `<button class="ib-dl" data-id="${esc(it.dmID)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⬇️ Stáhnout</button>` : ''}
                             <button class="ib-deadline" data-id="${esc(it.dmID)}" style="border:none; background:${it.deadlineCreated ? '#e2e8f0' : '#16a34a'}; color:${it.deadlineCreated ? '#475569' : '#fff'}; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⏳ ${it.deadlineCreated ? 'Lhůta ✓' : 'Vytvořit lhůtu'}</button>
+                            <button class="ib-forward" data-id="${esc(it.dmID)}" title="Přiřadit klientovi a přeposlat e-mailem" style="border:1px solid #2563eb; background:#eff6ff; color:#2563eb; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">📨 Klientovi</button>
                         </div>
                     </div>
                 </div>`;
@@ -432,6 +433,12 @@
                     description: `Datová zpráva od ${it.sender || it.senderId || ''} (dmID ${it.dmID}).`
                 });
                 api().isdsInboxMarkDeadline(it.dmID);
+            });
+            listEl.querySelectorAll('.ib-forward').forEach(btn => btn.onclick = () => {
+                const it = (window._ibItems || []).find(x => String(x.dmID) === btn.getAttribute('data-id'));
+                if (!it) return;
+                if (window.LexisForward && window.LexisForward.open) window.LexisForward.open(it);
+                else toast('Modul přeposílání klientovi není načten.');
             });
         }
         async function load() {

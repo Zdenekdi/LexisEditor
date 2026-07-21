@@ -964,11 +964,53 @@ ipcMain.handle('render-pdf-base64', async (event, htmlContent, cssContent, heade
 // Otevře externí URL (Google/Outlook „přidat do kalendáře") v prohlížeči.
 ipcMain.handle('open-external-url', async (event, url) => {
     try {
-        if (typeof url !== 'string' || !/^https:\/\//i.test(url)) {
+        // Povolené jen bezpečné schéma: https (kalendář, odkazy) a mailto (otevření
+        // e-mailu v systémovém poštovním klientu). shell.openExternal u mailto otevře
+        // NOVÉ okno pošty s předvyplněnými poli — spolehlivěji než window.location,
+        // které v Electronu externí schéma běžně neotevře.
+        if (typeof url !== 'string' || !/^(https:\/\/|mailto:)/i.test(url)) {
             return { success: false, error: 'Neplatná URL.' };
         }
         await shell.openExternal(url);
         return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Otevře NOVÉ okno pošty s předvyplněnými poli A připojenou přílohou (mailto
+// přílohu neumí). macOS → Apple Mail (osascript), Windows → Outlook (PowerShell).
+// Okno se jen zobrazí, neodesílá. Při jakémkoli selhání vrátí success:false —
+// renderer pak spadne zpět na mailto. Vázané na Apple Mail / Outlook.
+ipcMain.handle('compose-email-attach', async (event, opts) => {
+    const o = opts || {};
+    if (!o.to) return { success: false, error: 'Chybí příjemce.' };
+    try {
+        const { execFile } = require('child_process');
+        const composeScript = require('./js/core/email-compose-script');
+        const run = (cmd, args) => new Promise((resolve, reject) => {
+            execFile(cmd, args, { timeout: 20000 }, (err, stdout, stderr) => {
+                if (err) reject(new Error((stderr || err.message || '').toString().trim()));
+                else resolve(stdout);
+            });
+        });
+        if (process.platform === 'darwin') {
+            const script = composeScript.buildAppleMailScript(o);
+            await run('osascript', ['-e', script]);
+            return { success: true, method: 'apple-mail' };
+        }
+        if (process.platform === 'win32') {
+            const ps = composeScript.buildOutlookPowershell(o);
+            const tmp = path.join(os.tmpdir(), `lexis_compose_${Date.now()}.ps1`);
+            fs.writeFileSync(tmp, '﻿' + ps, 'utf8'); // BOM kvůli diakritice
+            try {
+                await run('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmp]);
+            } finally {
+                try { fs.unlinkSync(tmp); } catch (e) { /* ignore */ }
+            }
+            return { success: true, method: 'outlook' };
+        }
+        return { success: false, error: 'unsupported-platform' };
     } catch (e) {
         return { success: false, error: e.message };
     }

@@ -80,7 +80,10 @@
             const url = 'mailto:' + encodeURIComponent(REPORT_EMAIL)
                 + '?subject=' + encodeURIComponent('LexisEditor — hlášení chyby (v' + appVersion() + ')')
                 + '&body=' + encodeURIComponent(report);
-            window.open(url, '_blank');
+            // V Electronu spolehlivě přes shell.openExternal (nové okno pošty),
+            // v prohlížeči fallback na window.open.
+            if (window.electronAPI && window.electronAPI.openExternalUrl) window.electronAPI.openExternalUrl(url);
+            else window.open(url, '_blank');
             setResult('✅ Otevírám e-mailový klient. Kdyby se neotevřel, použijte „Zkopírovat report".', true);
         };
     };
