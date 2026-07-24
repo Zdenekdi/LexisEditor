@@ -101,3 +101,71 @@ describe('Join soud → registr (ISDS lookup)', () => {
         expect(registry.findCourtInRegistry('Vymyšlený soud Kdesi')).toBeNull();
     });
 });
+
+// parseSpzn — strukturovaný rozklad spisové značky pro hlídání jednání.
+// Dřív měl sken jednání v lexis-ui.js vlastní regex; teď jeden zdroj pravdy.
+describe('LexisReply.parseSpzn (strukturovaná spisová značka)', () => {
+    const { parseSpzn } = window.LexisReply;
+
+    test('rozloží „12 C 34/2026" na senát/druh/číslo/ročník', () => {
+        expect(parseSpzn('12 C 34/2026')).toEqual({
+            cisloSenatu: 12, druhVeci: 'C', bcVec: 34, rocnik: 2026, fullText: '12 C 34/2026'
+        });
+    });
+
+    test('dvojmístný rok se normalizuje na čtyřmístný', () => {
+        expect(parseSpzn('7 T 12/26').rocnik).toBe(2026);
+    });
+
+    test('druh věci se převede na velká písmena', () => {
+        expect(parseSpzn('45 epr 789/2026').druhVeci).toBe('EPR');
+    });
+
+    test('nesmyslný vstup → null', () => {
+        expect(parseSpzn('bez značky')).toBeNull();
+        expect(parseSpzn('')).toBeNull();
+        expect(parseSpzn(null)).toBeNull();
+    });
+
+    test('napojení na extract: řetězec z extract() projde parseSpzn()', () => {
+        const s = extract('OKRESNÍ SOUD V OLOMOUCI\nSpisová značka: 23 C 120/2026').spzn;
+        expect(parseSpzn(s)).toMatchObject({ cisloSenatu: 23, druhVeci: 'C', bcVec: 120, rocnik: 2026 });
+    });
+});
+
+// Bezpečnostní pojistka: appka NESMÍ automaticky odeslat do neověřené datové
+// schránky. Vestavěné ISDS soudů nejsou ověřené (ISDS_DATA_VERIFIED=false), takže
+// verified musí být VŽDY false — volající pak musí vyžádat ruční potvrzení.
+describe('Bezpečnost ISDS soudů (getCourtIsds)', () => {
+    const registry = require('../../js/core/court-registry');
+
+    test('formát ISDS: 7 znaků [a-z0-9]', () => {
+        expect(registry.isValidIsdsFormat('5azzytb')).toBe(true);
+        expect(registry.isValidIsdsFormat('ABC1234')).toBe(false); // velká písmena
+        expect(registry.isValidIsdsFormat('abc12')).toBe(false);   // krátké
+        expect(registry.isValidIsdsFormat('abc-234')).toBe(false); // nepovolený znak
+        expect(registry.isValidIsdsFormat(null)).toBe(false);
+    });
+
+    test('ISDS_DATA_VERIFIED je false (data nejsou ověřená proti registru)', () => {
+        expect(registry.ISDS_DATA_VERIFIED).toBe(false);
+    });
+
+    test('známý soud vrátí ISDS, ale verified=false (nutné ruční ověření)', () => {
+        const r = registry.getCourtIsds('Krajský soud Brno');
+        expect(r.isds).toMatch(/^[a-z0-9]{7}$/);
+        expect(r.valid).toBe(true);
+        expect(r.verified).toBe(false); // klíčová pojistka: neodesílat automaticky
+    });
+
+    test('neznámý soud → žádná schránka, nic k odeslání', () => {
+        expect(registry.getCourtIsds('Vymyšlený soud')).toEqual({ isds: null, valid: false, verified: false });
+    });
+
+    test('verified nikdy není true, dokud ISDS_DATA_VERIFIED=false', () => {
+        const anyVerified = registry.COURT_REGISTRY
+            .filter(c => c.isds)
+            .some(c => registry.getCourtIsds(c).verified === true);
+        expect(anyVerified).toBe(false);
+    });
+});

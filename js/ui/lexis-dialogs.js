@@ -98,10 +98,7 @@ class LexisDialogs {
                 if (!amount) return;
                 const val = parseFloat(amount.replace(/\s/g, ''));
                 if (isNaN(val)) return this.customAlert("Zadána neplatná částka.");
-                let fee = 0;
-                if (val <= 20000) fee = 1000;
-                else if (val <= 40000000) fee = Math.ceil(val * 0.05);
-                else fee = 2000000 + Math.ceil((val - 40000000) * 0.01);
+                const fee = window.LexisLegalCalc.soudniPoplatek(val);
                 this.customAlert(`Soudní poplatek činí:\n\n${fee.toLocaleString('cs-CZ')} Kč`);
             });
         });
@@ -203,57 +200,28 @@ class LexisDialogs {
                 const acts = parseInt(actsInput.value) || 1;
                 const includeFlatrate = flatrateCheck.checked;
                 const includeVat = vatCheck.checked;
-                
-                // Calculate single act rate from tariff value (§ 7)
-                let singleRate = 0;
-                if (val <= 500) {
-                    singleRate = 300;
-                } else if (val <= 1000) {
-                    singleRate = 500;
-                } else if (val <= 5000) {
-                    singleRate = 1000;
-                } else if (val <= 10000) {
-                    singleRate = 1500;
-                } else if (val <= 200000) {
-                    const diff = val - 10000;
-                    const blocks = Math.ceil(diff / 1000);
-                    singleRate = 1500 + (blocks * 40);
-                } else if (val <= 10000000) {
-                    const diff = val - 200000;
-                    const blocks = Math.ceil(diff / 10000);
-                    singleRate = 9100 + (blocks * 40);
-                } else {
-                    const diff = val - 10000000;
-                    const blocks = Math.ceil(diff / 100000);
-                    singleRate = 48300 + (blocks * 40);
-                }
-                
-                const baseReward = singleRate * acts;
-                const flatrateTotal = includeFlatrate ? (300 * acts) : 0;
-                
-                outSingle.innerText = `${singleRate.toLocaleString('cs-CZ')} Kč`;
-                outBase.innerText = `${baseReward.toLocaleString('cs-CZ')} Kč`;
-                
+
+                // Jeden zdroj pravdy: § 7 tarif + paušál + DPH (js/core/lexis-legal-calc.js)
+                const r = window.LexisLegalCalc.advokatniTarif({ value: val, acts, flatrate: includeFlatrate, vat: includeVat });
+
+                outSingle.innerText = `${r.singleRate.toLocaleString('cs-CZ')} Kč`;
+                outBase.innerText = `${r.base.toLocaleString('cs-CZ')} Kč`;
+
                 if (includeFlatrate) {
                     outFlatrateRow.style.display = 'flex';
-                    outFlatrate.innerText = `${flatrateTotal.toLocaleString('cs-CZ')} Kč`;
+                    outFlatrate.innerText = `${r.flatrateTotal.toLocaleString('cs-CZ')} Kč`;
                 } else {
                     outFlatrateRow.style.display = 'none';
                 }
-                
-                let totalBeforeVat = baseReward + flatrateTotal;
-                let vatTotal = 0;
-                
+
                 if (includeVat) {
-                    vatTotal = Math.round(totalBeforeVat * 0.21);
                     outVatRow.style.display = 'flex';
-                    outVat.innerText = `${vatTotal.toLocaleString('cs-CZ')} Kč`;
+                    outVat.innerText = `${r.vat.toLocaleString('cs-CZ')} Kč`;
                 } else {
                     outVatRow.style.display = 'none';
                 }
-                
-                const finalTotal = totalBeforeVat + vatTotal;
-                outTotal.innerText = `${finalTotal.toLocaleString('cs-CZ')} Kč`;
+
+                outTotal.innerText = `${r.total.toLocaleString('cs-CZ')} Kč`;
             };
             
             valInput.oninput = (e) => {
@@ -285,31 +253,25 @@ class LexisDialogs {
                 const includeFlatrate = flatrateCheck.checked;
                 const includeVat = vatCheck.checked;
                 
-                let singleRate = 0;
-                if (val <= 500) singleRate = 300;
-                else if (val <= 1000) singleRate = 500;
-                else if (val <= 5000) singleRate = 1000;
-                else if (val <= 10000) singleRate = 1500;
-                else if (val <= 200000) singleRate = 1500 + (Math.ceil((val - 10000) / 1000) * 40);
-                else if (val <= 10000000) singleRate = 9100 + (Math.ceil((val - 200000) / 10000) * 40);
-                else singleRate = 48300 + (Math.ceil((val - 10000000) / 100000) * 40);
-                
-                const baseReward = singleRate * acts;
-                const flatrateTotal = includeFlatrate ? (300 * acts) : 0;
-                let totalBeforeVat = baseReward + flatrateTotal;
-                let vatTotal = includeVat ? Math.round(totalBeforeVat * 0.21) : 0;
-                const finalTotal = totalBeforeVat + vatTotal;
-                
+                // Jeden zdroj pravdy (dřív tu byla druhá kopie tarifní formule).
+                const r = window.LexisLegalCalc.advokatniTarif({ value: val, acts, flatrate: includeFlatrate, vat: includeVat });
+
+                // Řádky se skládají podmíněně; dřív tu byla chyba – escapované \${…}
+                // se vkládala jako doslovný text místo hodnot.
+                const flatrateLi = includeFlatrate
+                    ? `<li>Režijní paušál (${acts} &times; 300 Kč dle § 13): ${r.flatrateTotal.toLocaleString('cs-CZ')} Kč</li>` : '';
+                const vatLi = includeVat
+                    ? `<li>DPH (21 %): ${r.vat.toLocaleString('cs-CZ')} Kč</li>` : '';
                 let textToInsert = `
                     <p><b>Výpočet mimosmluvní odměny advokáta dle vyhlášky č. 177/1996 Sb. (Advokátní tarif):</b></p>
                     <ul>
                         <li>Tarifní hodnota: ${val.toLocaleString('cs-CZ')} Kč</li>
-                        <li>Sazba za jeden úkon (§ 7): ${singleRate.toLocaleString('cs-CZ')} Kč</li>
+                        <li>Sazba za jeden úkon (§ 7): ${r.singleRate.toLocaleString('cs-CZ')} Kč</li>
                         <li>Počet úkonů právní služby (§ 11): ${acts}</li>
-                        <li>Odměna celkem (bez režie): ${baseReward.toLocaleString('cs-CZ')} Kč</li>
-                        \${includeFlatrate ? \`<li>Režijní paušál (\${acts} &times; 300 Kč dle § 13): \${flatrateTotal.toLocaleString('cs-CZ')} Kč</li>\` : ''}
-                        \${includeVat ? \`<li>DPH (21 %): \${vatTotal.toLocaleString('cs-CZ')} Kč</li>\` : ''}
-                        <li><b>CELKEM K ÚHRADĚ: \${finalTotal.toLocaleString('cs-CZ')} Kč</b></li>
+                        <li>Odměna celkem (bez režie): ${r.base.toLocaleString('cs-CZ')} Kč</li>
+                        ${flatrateLi}
+                        ${vatLi}
+                        <li><b>CELKEM K ÚHRADĚ: ${r.total.toLocaleString('cs-CZ')} Kč</b></li>
                     </ul>
                 `.trim().replace(/ {2,}/g, '').replace(/\n/g, '');
                 
@@ -334,9 +296,8 @@ class LexisDialogs {
                 if (!amount) return;
                 const val = parseFloat(amount.replace(/\s/g, ''));
                 if (isNaN(val)) return this.customAlert("Zadána neplatná jistina.");
-                const repo = 5.25;
-                const rate = repo + 8;
-                this.customAlert(`Zákonný úrok z prodlení (sazba ${rate}% p.a.):\n\nRočně: ${(val * rate / 100).toLocaleString('cs-CZ')} Kč\nMěsíčně: ${(val * rate / 1200).toLocaleString('cs-CZ')} Kč`);
+                const u = window.LexisLegalCalc.urokZProdleni(val);
+                this.customAlert(`Zákonný úrok z prodlení (sazba ${u.rate}% p.a.):\n\nRočně: ${u.rocne.toLocaleString('cs-CZ')} Kč\nMěsíčně: ${u.mesicne.toLocaleString('cs-CZ')} Kč`);
             });
         });
     }
@@ -364,30 +325,22 @@ class LexisDialogs {
         }
     }
 
-    generatePA() {
+    async generatePA() {
         const nameInput = document.getElementById('pa-name');
         const typeSelect = document.getElementById('pa-type');
         if (!nameInput || !typeSelect) return;
-        
+
         const name = nameInput.value.trim() || "[JMÉNO ZMOCNITELE]";
         const type = typeSelect.value;
-        
-        const paText = type === 'procesní' ? `
-                <h1>PLNÁ MOC (PROCESNÍ)</h1>
-                <p>Já, níže podepsaný/á:</p>
-                <p><b>${name}</b>, nar. [DOPLNIT], trvale bytem [DOPLNIT]</p>
-                <p>tímto uděluji procesní plnou moc advokátní kanceláři [DOPLNIT] k tomu, aby mě zastupovala ve všech právních věcech, před soudy, orgány státní správy i samosprávy a vůči třetím osobám v plném rozsahu.</p>
-                <p>V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
-                <p>.......................................<br><b>${name}</b> (zmocnitel)</p>
-            `.replace(/ {2,}/g, '') : `
-                <h1>PLNÁ MOC (OBECNÁ)</h1>
-                <p>Já, níže podepsaný/á:</p>
-                <p><b>${name}</b>, nar. [DOPLNIT], trvale bytem [DOPLNIT]</p>
-                <p>tímto zmocňuji pana/paní [DOPLNIT], nar. [DOPLNIT], trvale bytem [DOPLNIT], aby mě zastupoval/a ve všech běžných záležitostech a činil/a mým jménem veškeré právní úkony.</p>
-                <p>V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
-                <p>.......................................<br><b>${name}</b> (zmocnitel)</p>
-            `.replace(/ {2,}/g, '');
-        
+
+        // Místo z profilu (6. pád, „Praze"/„Brně"); prázdné → default „Praze".
+        let place = '';
+        try { place = (this.ui && this.ui.readLawyerProfile) ? (await this.ui.readLawyerProfile()).city : ''; } catch (e) {}
+
+        // Jeden zdroj pravdy (js/core/lexis-legal-docs.js) — escapuje jméno,
+        // místo/datum jsou parametry (default „V Praze").
+        const paText = window.LexisLegalDocs.buildPowerOfAttorney({ name, type, place: place || undefined });
+
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
         

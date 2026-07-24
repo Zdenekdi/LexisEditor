@@ -9,8 +9,10 @@
 (function () {
     'use strict';
 
-    // Seznam polí profilu (klíče v úložišti settings mají prefix `lawyer-`).
-    const FIELDS = ['title', 'name', 'firm', 'license', 'address', 'ico', 'dic', 'tel', 'email', 'web', 'isds', 'logo', 'auto'];
+    // Seznam polí profilu (klíče v úložišti settings mají prefix `lawyer-` —
+    // ponechány kvůli zpětné kompatibilitě uložených profilů). `role` (funkce/
+    // profese) je obecné a volitelné; `license` (ev. č. ČAK) a `isds` jsou právní.
+    const FIELDS = ['title', 'name', 'firm', 'role', 'license', 'address', 'ico', 'dic', 'tel', 'email', 'web', 'isds', 'logo', 'auto'];
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -34,10 +36,15 @@
         if (!hasContent(p)) return '';
         const nameFull = [p.title, p.name].filter(Boolean).join(' ');
         const firm = p.firm || '';
-        const mainName = firm || nameFull || 'Advokátní kancelář';
+        const mainName = firm || nameFull || '';
         const subName = firm && nameFull ? nameFull : '';
 
-        const roleBits = ['advokát'];
+        // Role/profese je obecná a volitelná. Historicky se předpokládal „advokát" —
+        // ten zachováme jen u profilů s ev. č. ČAK (to má jen advokát). Obecný
+        // uživatel/firma může mít vlastní roli přes `role`, nebo žádnou.
+        const roleBits = [];
+        if (p.role) roleBits.push(p.role);
+        else if (p.license) roleBits.push('advokát');
         if (p.license) roleBits.push('ev. č. ČAK ' + p.license);
 
         const contact = [];
@@ -61,9 +68,9 @@
         // Tabulkové rozvržení (ne flexbox) — spolehlivě přežije i export do Wordu (DOCX).
         // Levá buňka: logo + identita, pravá buňka: kontakt zarovnaný vpravo.
         const identity = `
-            <div style="font-weight:700; font-size:13pt; color:#111;">${esc(mainName)}</div>
+            ${mainName ? `<div style="font-weight:700; font-size:13pt; color:#111;">${esc(mainName)}</div>` : ''}
             ${subName ? `<div style="font-size:10pt; color:#222;">${esc(subName)}</div>` : ''}
-            <div style="font-size:8.5pt; color:#555;">${roleBits.map(esc).join(' · ')}</div>`;
+            ${roleBits.length ? `<div style="font-size:8.5pt; color:#555;">${roleBits.map(esc).join(' · ')}</div>` : ''}`;
         const leftCell = logoHtml
             ? `<table style="border-collapse:collapse;"><tr>
                    <td style="vertical-align:middle; padding-right:12px;">${logoHtml}</td>

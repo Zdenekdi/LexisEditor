@@ -93,6 +93,26 @@ describe('Výpočet lhůt (§ 57 o.s.ř.)', () => {
     test('findDeadlineDate: samotné datum vydání = null', () => {
         expect(cal.findDeadlineDate('V Praze dne 15. července 2026\nMgr. Novák')).toBeNull();
     });
+
+    test('detectDeadlineDays: „lhůta 15 dní" i „do 30 dnů"', () => {
+        const a = cal.detectDeadlineDays('Odpověz ve lhůtě 15 dnů od doručení tohoto usnesení.');
+        expect(a).toHaveLength(1);
+        expect(a[0].days).toBe(15);
+
+        const b = cal.detectDeadlineDays('Vyjádření zašlete do 30 dnů, jinak bude rozhodnuto.');
+        expect(b[0].days).toBe(30);
+    });
+
+    test('detectDeadlineDays: pracovních dní', () => {
+        expect(cal.detectDeadlineDays('Lhůta činí 10 pracovních dní od převzetí.')[0].days).toBe(10);
+    });
+
+    test('detectDeadlineDays: bez duplicit a bez lhůty prázdné', () => {
+        // „lhůta ... do 15 dnů" chytnou oba regexy, ale se stejným days+context → 1×
+        expect(cal.detectDeadlineDays('Ve lhůtě do 15 dnů se vyjádřete.')).toHaveLength(1);
+        expect(cal.detectDeadlineDays('Text bez jakékoli lhůty a bez čísel dní.')).toEqual([]);
+        expect(cal.detectDeadlineDays('')).toEqual([]);
+    });
 });
 
 describe('Hlavičkový papír', () => {
@@ -118,5 +138,31 @@ describe('Hlavičkový papír', () => {
     test('nebezpečné logo (javascript:) se odmítne, data:image projde', () => {
         expect(LH.safeLogo('javascript:alert(1)')).toBe('');
         expect(LH.safeLogo('data:image/png;base64,AAAA')).toContain('data:image/png');
+    });
+
+    // Zobecnění: hlavička už není „advokátní" napevno — funguje pro firmu i jednotlivce.
+    test('obecný profil (bez ČAK) neobsahuje „advokát" ani „Advokátní kancelář"', () => {
+        const h = LH.buildHeaderHtml({ firm: 'Pekárna Novák s.r.o.', ico: '12345678', tel: '777111222' });
+        expect(h).toContain('Pekárna Novák s.r.o.');
+        expect(h).not.toContain('advokát');
+        expect(h).not.toContain('Advokátní kancelář');
+    });
+
+    test('advokátní profil (s ev. č. ČAK) zobrazí „advokát" i ČAK', () => {
+        const h = LH.buildHeaderHtml({ name: 'Jan Novák', license: '12345' });
+        expect(h).toContain('advokát');
+        expect(h).toContain('ev. č. ČAK 12345');
+    });
+
+    test('vlastní role (např. jednatel) má přednost před „advokát"', () => {
+        const h = LH.buildHeaderHtml({ firm: 'Firma s.r.o.', role: 'jednatel' });
+        expect(h).toContain('jednatel');
+        expect(h).not.toContain('advokát');
+    });
+
+    test('bez jména/firmy se nevykreslí prázdný název (jen kontakt)', () => {
+        const h = LH.buildHeaderHtml({ email: 'kdo@firma.cz' });
+        expect(h).toContain('kdo@firma.cz');
+        expect(h).not.toContain('font-weight:700; font-size:13pt'); // žádný prázdný bold název
     });
 });

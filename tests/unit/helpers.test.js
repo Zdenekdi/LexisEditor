@@ -82,13 +82,22 @@ describe('Helper Functions Unit Tests', () => {
       expect(window.electronAPI.saveAIConfig).toHaveBeenCalledWith({ apiKey: 'test-key' });
     });
 
-    test('should fallback to localStorage if electronAPI is not available', async () => {
+    test('bez electronAPI NEukládá tajemství do localStorage (jen do paměti relace)', async () => {
+      // Bezpečnostní zpevnění: base64 (btoa) není šifrování a bylo by čitelné z
+      // konzole/XSS, proto se citlivý klíč do localStorage zásadně nezapisuje.
+      // Trvale bezpečně ukládá jen desktopová verze (safeStorage). Dřív tento test
+      // očekával starou nebezpečnou variantu setItem(secure_apiKey, btoa(...)).
       const setItemSpy = jest.spyOn(Storage.prototype, 'setItem');
+      const removeItemSpy = jest.spyOn(Storage.prototype, 'removeItem');
 
       const result = await vault.save('apiKey', 'test-key');
       expect(result).toBe(true);
-      // 'test-key' base64 encoded is 'dGVzdC1rZXk='
-      expect(setItemSpy).toHaveBeenCalledWith('secure_apiKey', btoa('test-key'));
+      // do localStorage se klíč NEZAPISUJE
+      expect(setItemSpy).not.toHaveBeenCalledWith('secure_apiKey', expect.anything());
+      // starý nešifrovaný záznam se uklidí
+      expect(removeItemSpy).toHaveBeenCalledWith('secure_apiKey');
+      // v rámci relace je hodnota dostupná z paměti
+      expect(await vault.get('apiKey')).toBe('test-key');
     });
   });
 });

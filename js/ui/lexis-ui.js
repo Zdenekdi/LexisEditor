@@ -320,6 +320,11 @@ class LexisUI {
     async updateVersionDisplay() {
         if (window.electronAPI && window.electronAPI.getAppVersion) {
             const ver = await window.electronAPI.getAppVersion();
+            // Jeden zdroj pravdy = package.json (přes IPC get-version). Uložíme i do
+            // instance a na <body data-app-version>, aby verzi mohla synchronně použít
+            // i další místa (export bundle, nápověda, hlášení chyby) — bez natvrdo čísla.
+            this.appVersion = ver;
+            try { document.body.setAttribute('data-app-version', ver); } catch (e) {}
             const el = document.getElementById('dynamic-ver');
             if (el) el.innerText = ver;
             const elStart = document.getElementById('app-version-start');
@@ -633,7 +638,9 @@ class LexisUI {
         });
     }
 
-    // Načte profil advokáta (hlavičkový papír) do cache pro synchronní použití.
+    // Načte profil (hlavičkový papír) do cache pro synchronní použití. Úložné klíče
+    // mají historický prefix `lawyer-` (nepřejmenováváme kvůli existujícím profilům),
+    // ale význam je obecný — funguje pro firmu i jednotlivce, ne jen advokáta.
     async readLawyerProfile() {
         const g = async (k) => (await this.core.storage.get('settings', k)) || '';
         const auto = await this.core.storage.get('settings', 'lawyer-letterhead-auto');
@@ -641,6 +648,7 @@ class LexisUI {
             title: await g('lawyer-title'),
             name: await g('lawyer-name'),
             firm: await g('lawyer-firm'),
+            role: await g('lawyer-role'),
             license: await g('lawyer-license'),
             address: await g('lawyer-address'),
             ico: await g('lawyer-ico'),
@@ -648,6 +656,7 @@ class LexisUI {
             tel: await g('lawyer-tel'),
             email: await g('lawyer-email'),
             web: await g('lawyer-web'),
+            city: await g('lawyer-city'),
             isds: await g('lawyer-isds'),
             logo: await g('lawyer-logo'),
             signature: await g('lawyer-signature'),
@@ -681,15 +690,18 @@ class LexisUI {
         const footerArea = document.getElementById('footer-area');
         const p = this.letterheadProfile;
         const useLetterhead = p && p.auto !== false && window.LexisLetterhead && window.LexisLetterhead.hasContent(p);
+        // Neutrální výchozí hlavička/patička (bez advokátní/Lexis příchutě) — obecný
+        // profil si uživatel nastaví sám. Značka se bere z edice.
+        const brand = (window.Edition && window.Edition.brandName) || 'LexisEditor';
         if (headerArea) {
             headerArea.innerHTML = useLetterhead
                 ? window.LexisLetterhead.buildHeaderHtml(p)
-                : `<div>Advokátní kancelář Lexis</div><div style="text-align: right;">Spis: 2024/005/ZD</div>`;
+                : `<div style="color:#94a3b8;">${brand}</div><div></div>`;
         }
         if (footerArea) {
             footerArea.innerHTML = useLetterhead
                 ? window.LexisLetterhead.buildFooterHtml(p)
-                : `<div>www.lexiseditor.cz</div><div style="text-align: right;">Strana 1 z 1</div>`;
+                : `<div></div><div style="text-align: right;">Strana 1 z 1</div>`;
         }
     }
 
@@ -2460,7 +2472,7 @@ class LexisUI {
                 headerHtml: headerArea ? headerArea.innerHTML : '',
                 footerHtml: footerArea ? footerArea.innerHTML : '',
                 exportedAt: new Date().toISOString(),
-                version: '3.5.0',
+                version: this.appVersion || '',
                 footnotes: this.core.footnotes || []
             };
             
@@ -2482,7 +2494,12 @@ class LexisUI {
         this.customPrompt("Zadejte IČO subjektu (8 číslic):", "", async (ico) => {
             if (!ico) return;
             const cleanIco = ico.replace(/\s/g, '');
-            
+
+            // Předběžná kontrola IČO (kontrolní součet) — chytí překlep dřív než ARES.
+            if (window.LexisValidators && !window.LexisValidators.isValidIco(cleanIco)) {
+                return this.customAlert("❌ <b>Neplatné IČO</b><br><br>IČO musí mít 8 číslic a platný kontrolní součet. Zkontroluj překlep.");
+            }
+
             if (window.electronAPI && window.electronAPI.searchAres) {
                 this.showLoader("Lustruji subjekt v ARES...", async () => {
                     try {
@@ -2800,7 +2817,7 @@ Tímto způsobem funguje bezproblémové propojení s vaším stávajícím clou
             </div>`;
         } else if (topic === 'updates') {
             title = "🔄 Kontrola aktualizací";
-            text = `<b>Aktuální verze:</b> v3.5.0 (Stable Enterprise)<br><br>
+            text = `<b>Aktuální verze:</b> v${this.appVersion || '—'}<br><br>
 Provádím kontrolu lokálního úložiště a serverů...<br>
 <i>Vaše verze je aktuální. Žádné nové aktualizace nejsou k dispozici.</i>`;
         } else if (topic === 'about') {
@@ -3805,63 +3822,30 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
 
         const quill = this.core.quill;
         const html = quill.root.innerHTML;
-        
+
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
-        
-        // Comprehensive Czech legal citation patterns
-        const citationRegex = /(§\s*\d+[a-z]?(?:\s+(?:odst\.|odstavce)\s*\d+)?\s*(?:zákona\s+)?(?:č\.\s*)?(?:\d+\/\d+\s+Sb\.|[a-zá-žA-Z0-9.\s]{2,}))/gi;
-        const lawRegex = /(zákon(?:a|u)?\s+(?:č\.\s*)?\d+\/\d+\s*Sb\.)/gi;
-        
+
         let linkCount = 0;
-        
+
         const walkAndReplace = (parent) => {
             const children = Array.from(parent.childNodes);
             for (const child of children) {
                 if (child.nodeType === Node.TEXT_NODE) {
                     const text = child.nodeValue;
-                    
+
                     if (parent.tagName && parent.tagName.toLowerCase() === 'a') continue;
-                    
-                    let newHtml = text;
-                    let replaced = false;
-                    
-                    // Replace matching citations with clean links targeting Zákony pro lidi or Google
-                    newHtml = newHtml.replace(citationRegex, (match) => {
-                        // Check if we are matching valid target text
-                        const trimmed = match.trim();
-                        // Filter out common noise
-                        if (trimmed.length < 5) return match;
-                        
-                        const query = encodeURIComponent(trimmed);
-                        replaced = true;
-                        linkCount++;
-                        
-                        const url = this.legalLinkTarget === 'google'
-                            ? `https://www.google.com/search?q=${query}`
-                            : `https://www.zakonyprolidi.cz/hledani?q=${query}`;
 
-                        return `<a href="${url}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
-                    });
-                    
-                    newHtml = newHtml.replace(lawRegex, (match) => {
-                        if (match.includes('href=')) return match;
-                        const trimmed = match.trim();
-                        
-                        const query = encodeURIComponent(trimmed);
-                        replaced = true;
-                        linkCount++;
-                        
-                        const url = this.legalLinkTarget === 'google'
-                            ? `https://www.google.com/search?q=${query}`
-                            : `https://www.zakonyprolidi.cz/hledani?q=${query}`;
+                    // Jeden zdroj pravdy (js/core/lexis-legal-linker.js): detekce citací
+                    // + sestavení odkazu. UI si nechává jen procházení DOM.
+                    const res = (window.LexisLegalLinker && window.LexisLegalLinker.linkifyLegalCitations)
+                        ? window.LexisLegalLinker.linkifyLegalCitations(text, this.legalLinkTarget)
+                        : { html: text, count: 0, changed: false };
 
-                        return `<a href="${url}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
-                    });
-                    
-                    if (replaced && newHtml !== text) {
+                    if (res.changed) {
+                        linkCount += res.count;
                         const span = document.createElement('span');
-                        span.innerHTML = newHtml;
+                        span.innerHTML = res.html;
                         parent.replaceChild(span, child);
                     }
                 } else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -4024,34 +4008,11 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     scanTextForDeadlines(text, source) {
         if (!text) return;
         
-        // Czech legal deadline patterns
-        const regexes = [
-            // "lhůta/lhůtě/lhůtu/termín do/činí XX dnů/dní"
-            /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-ž]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi,
-            // "do XX dnů/dní" (contextual)
-            /\bdo\s+(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi
-        ];
-        
-        const detected = [];
-        const lines = text.split('\n');
-        
-        for (const line of lines) {
-            if (line.trim().length < 10) continue; // Skip too short lines
-            
-            for (const regex of regexes) {
-                let match;
-                regex.lastIndex = 0;
-                while ((match = regex.exec(line)) !== null) {
-                    const days = parseInt(match[1]);
-                    const context = line.trim().replace(/\s+/g, ' ');
-                    
-                    if (!detected.some(d => d.days === days && d.context === context)) {
-                        detected.push({ days, context });
-                    }
-                }
-            }
-        }
-        
+        // Detekce lhůt zadaných počtem dní — jeden zdroj pravdy (lexis-calendar.js).
+        const detected = (window.LexisCalendar && window.LexisCalendar.detectDeadlineDays)
+            ? window.LexisCalendar.detectDeadlineDays(text)
+            : [];
+
         // Detekce KONKRÉTNÍHO data lhůty/termínu (předvolání, jednání, „nejpozději do…"),
         // aby se do hlídače dostal i termín zadaný datem, ne jen počtem dní.
         let fixed = null;
@@ -4341,21 +4302,23 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                     <input type="text" id="${id}" value="${esc(val)}" placeholder="${ph || ''}" style="width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none; box-sizing:border-box;">
                 </div>`;
             modal.innerHTML = `
-                <h3 style="margin:0 0 6px 0;font-size:18px;color:#1e293b;font-weight:700; display:flex; align-items:center; gap:8px;">👤 Profil advokáta / hlavičkový papír</h3>
+                <h3 style="margin:0 0 6px 0;font-size:18px;color:#1e293b;font-weight:700; display:flex; align-items:center; gap:8px;">👤 Profil / hlavičkový papír</h3>
                 <p style="margin:0 0 18px 0; font-size:12px; color:#64748b;">Údaje se automaticky použijí jako hlavička (a podpis) na nových dokumentech.</p>
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
                     ${fld('prof-title', 'Titul', s.title, 'Mgr. / JUDr.')}
                     ${fld('prof-name', 'Jméno a příjmení', s.name, '')}
-                    <div style="grid-column:1 / -1;">${fld('prof-firm', 'Název advokátní kanceláře', s.firm, 'nepovinné').trim()}</div>
-                    ${fld('prof-license', 'Ev. č. ČAK', s.license, '')}
+                    <div style="grid-column:1 / -1;">${fld('prof-firm', 'Název firmy / kanceláře', s.firm, 'nepovinné').trim()}</div>
+                    ${fld('prof-role', 'Funkce / role', s.role, 'advokát / jednatel / …')}
+                    <div data-pack="legal">${fld('prof-license', 'Ev. č. ČAK', s.license, 'jen advokáti').trim()}</div>
                     ${fld('prof-ico', 'IČO', s.ico, '')}
                     ${fld('prof-dic', 'DIČ', s.dic, 'nepovinné')}
-                    ${fld('prof-isds', 'ID datové schránky', s.isds, '')}
+                    <div data-pack="legal">${fld('prof-isds', 'ID datové schránky', s.isds, '').trim()}</div>
                     <div style="grid-column:1 / -1;">${fld('prof-address', 'Sídlo (adresa)', s.address, 'ulice, PSČ město').trim()}</div>
                     ${fld('prof-tel', 'Telefon', s.tel, '')}
                     ${fld('prof-email', 'E-mail', s.email, '')}
                     ${fld('prof-web', 'Web', s.web, '')}
+                    ${fld('prof-city', 'Místo (pro „V … dne")', s.city, 'např. Praze, Brně, Ostravě')}
                     ${fld('prof-sig', 'Podpisový vzor (text)', s.signature, '')}
                 </div>
 
@@ -4382,6 +4345,8 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             `;
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
+            // Skryje právně specifická pole (ev. č. ČAK, datovka) v edicích bez balíčku legal.
+            if (window.Edition && window.Edition.apply) window.Edition.apply(modal);
 
             let logoData = s.logo || '';
             const preview = modal.querySelector('#prof-logo-preview');
@@ -4408,6 +4373,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 await set('lawyer-title', val('#prof-title'));
                 await set('lawyer-name', val('#prof-name'));
                 await set('lawyer-firm', val('#prof-firm'));
+                await set('lawyer-role', val('#prof-role'));
                 await set('lawyer-license', val('#prof-license'));
                 await set('lawyer-ico', val('#prof-ico'));
                 await set('lawyer-dic', val('#prof-dic'));
@@ -4416,6 +4382,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 await set('lawyer-tel', val('#prof-tel'));
                 await set('lawyer-email', val('#prof-email'));
                 await set('lawyer-web', val('#prof-web'));
+                await set('lawyer-city', val('#prof-city'));
                 await set('lawyer-signature', val('#prof-sig'));
                 await set('lawyer-logo', logoData);
                 await set('lawyer-letterhead-auto', !!modal.querySelector('#prof-auto').checked);
@@ -4544,28 +4511,43 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     }
 
     showDeadlineCalc() {
-        this.customPrompt("Zadejte počet dní lhůty (např. 15 nebo 30):", "15", (days) => {
-            if (!days) return;
-            const target = new Date();
-            target.setDate(target.getDate() + parseInt(days));
-            this.customAlert(`Lhůta končí dne:\n\n${target.toLocaleDateString('cs-CZ')}`);
+        // Používá jeden zdroj pravdy pro výpočet lhůt (js/core/lexis-calendar.js):
+        // posun posledního dne na nejbližší NÁSLEDUJÍCÍ pracovní den při víkendu/svátku
+        // (§ 57 odst. 2 o.s.ř.). Dřív tu byl naivní „datum + N dní", který mohl skončit
+        // v sobotu/neděli/svátek — právně špatně.
+        const cal = window.LexisCalendar;
+        this.customPrompt("Datum doručení (dd.mm.rrrr, prázdné = dnes):", "", (dateStr) => {
+            let base = new Date();
+            if (dateStr && dateStr.trim()) {
+                const parsed = (cal && cal.parseCzechDate) ? cal.parseCzechDate(dateStr) : null;
+                if (!parsed) return this.customAlert("Nerozpoznal jsem datum. Použij formát dd.mm.rrrr.");
+                base = parsed;
+            }
+            this.customPrompt("Počet dní lhůty (např. 15 nebo 30):", "15", (days) => {
+                if (!days) return;
+                const n = parseInt(days, 10);
+                if (!isFinite(n)) return this.customAlert("Neplatný počet dní.");
+                let end, raw;
+                if (cal && cal.computeDeadline) {
+                    raw = cal.addDays(base, n);
+                    end = cal.computeDeadline(base, n);
+                } else {
+                    end = new Date(base); end.setDate(end.getDate() + n); raw = end;
+                }
+                const shifted = end.getTime() !== raw.getTime();
+                const note = shifted
+                    ? "\n\n(Poslední den připadl na víkend nebo svátek — posunuto na nejbližší následující pracovní den dle § 57 o.s.ř.)"
+                    : "";
+                this.customAlert(`Lhůta končí dne:\n\n${end.toLocaleDateString('cs-CZ')}${note}`);
+            });
         });
     }
 
-    insertSignatureBlock() {
-        const sigBlockHtml = `
-            <div style="margin-top: 40px; font-family: 'Inter', sans-serif; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 13px; line-height: 1.5; color: #1e293b;">
-                <div>
-                    <p style="margin-bottom: 40px;">V Praze dne .............................</p>
-                    <p style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin: 0;">___________________________________<br><b>ZMOCNITEL</b><br>[Jméno zmocnitele]</p>
-                </div>
-                <div>
-                    <p style="margin-bottom: 40px;">V Praze dne .............................</p>
-                    <p style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin: 0;">___________________________________<br><b>ZMOCNĚNEC</b><br>[Jméno zmocněnce]</p>
-                </div>
-            </div>
-            <p><br></p>
-        `.replace(/ {2,}/g, '');
+    async insertSignatureBlock() {
+        // Jeden zdroj pravdy (js/core/lexis-legal-docs.js); místo z profilu (default „Praze").
+        let place = '';
+        try { place = (await this.readLawyerProfile()).city; } catch (e) {}
+        const sigBlockHtml = window.LexisLegalDocs.buildSignatureBlock({ place: place || undefined });
 
         const range = this.core.quill.getSelection(true);
         const index = range ? range.index : this.core.quill.getLength();
@@ -4574,18 +4556,25 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     }
 
     async insertMySignature() {
-        const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
-        const savedSignature = await this.core.storage.get('settings', 'lawyer-signature') || "[PODPIS]";
-        
+        const g = async (k) => (await this.core.storage.get('settings', k)) || '';
+        const savedName = (await g('lawyer-name')) || "[JMÉNO]";
+        const savedSignature = (await g('lawyer-signature')) || "[PODPIS]";
+        // Role je obecná: z profilu, jinak „advokát" jen když má ev. č. ČAK, jinak nic.
+        const role = (await g('lawyer-role')) || ((await g('lawyer-license')) ? 'advokát' : '');
+        const roleHtml = role
+            ? `<br><span style="font-size: 11px; color: #64748b;">${window.escapeHTML ? window.escapeHTML(role) : role}</span>`
+            : '';
+        const place = (await g('lawyer-city')) || 'Praze';
+        const placeEsc = window.escapeHTML ? window.escapeHTML(place) : place;
+
         const mySigHtml = `
             <div style="margin-top: 30px; font-family: 'Inter', sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5;">
-                <p style="margin-bottom: 30px;">V Praze dne ${new Date().toLocaleDateString('cs-CZ')}</p>
+                <p style="margin-bottom: 30px;">V ${placeEsc} dne ${new Date().toLocaleDateString('cs-CZ')}</p>
                 <div style="font-family: 'Great Vibes', 'Brush Script MT', cursive; font-size: 26px; color: #2563eb; margin-bottom: 5px; transform: rotate(-3deg); padding-left: 20px;">
                     ${savedSignature}
                 </div>
                 <div style="border-top: 1px solid #e2e8f0; width: 220px; padding-top: 5px;">
-                    <strong>${savedName}</strong><br>
-                    <span style="font-size: 11px; color: #64748b;">advokát</span>
+                    <strong>${savedName}</strong>${roleHtml}
                 </div>
             </div>
             <p><br></p>
@@ -5177,28 +5166,13 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             detectedCourt = window.LexisCourt.detect(text);
         }
         
-        // Match spisová značka (case file number)
-        const spznRegex = /\b(\d+)\s*([A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ]{1,5})\s*(\d+)\s*\/\s*(\d{2,4})\b/g;
-        let match;
+        // Spisová značka — jeden zdroj pravdy: sdílená extrakce (LexisReply.extract)
+        // + strukturovaný parser (LexisReply.parseSpzn). Dřív tu byl vlastní regex,
+        // který se mohl rozejít s hlavní extrakcí náležitostí.
         let detectedSpzn = null;
-        while ((match = spznRegex.exec(text)) !== null) {
-            let rocnik = parseInt(match[4]);
-            if (match[4].length === 2) {
-                const currentYearLastTwo = new Date().getFullYear() % 100;
-                if (rocnik <= currentYearLastTwo) {
-                    rocnik = 2000 + rocnik;
-                } else {
-                    rocnik = 1900 + rocnik;
-                }
-            }
-            detectedSpzn = {
-                cisloSenatu: parseInt(match[1]),
-                druhVeci: match[2].toUpperCase(),
-                bcVec: parseInt(match[3]),
-                rocnik: rocnik,
-                fullText: `${match[1]} ${match[2]} ${match[3]}/${rocnik}`
-            };
-            break; // We take the first one found
+        if (window.LexisReply && window.LexisReply.extract && window.LexisReply.parseSpzn) {
+            const spznStr = window.LexisReply.extract(text).spzn;
+            detectedSpzn = window.LexisReply.parseSpzn(spznStr);
         }
         
         const hearingsSection = document.getElementById('court-hearings-section');

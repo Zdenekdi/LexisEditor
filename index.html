@@ -223,7 +223,7 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="exportToDocx()"><div class="icon-sq">💾</div>DOCX</div>
                     <div class="btn-icon" onclick="exportToBundle()"><div class="icon-sq" style="color:#2563eb;">📦</div>Bundle</div>
-                    <div class="btn-icon" onclick="startMailMerge()"><div class="icon-sq">📑</div>Hromadné gen.</div>
+                    <div class="btn-icon" data-pack="business" onclick="startMailMerge()"><div class="icon-sq">📑</div>Hromadné gen.</div>
                 </div>
                 <div class="group-label">Export & Automatizace</div>
             </div>
@@ -296,7 +296,7 @@
             </div>
             <div class="tool-group" style="background: rgba(37,99,235,0.05); border: 1px dashed rgba(37,99,235,0.2); border-radius: 8px; margin-left: 5px; padding: 2px 6px;">
                 <div class="icons">
-                    <div class="btn-icon" onclick="logTime()"><div class="icon-sq">⏱️</div>Vykázat práci</div>
+                    <div class="btn-icon" data-pack="business" onclick="logTime()"><div class="icon-sq">⏱️</div>Vykázat práci</div>
                 </div>
                 <div class="group-label" style="color: var(--word-blue); font-weight: 600;">Time-tracking</div>
             </div>
@@ -306,7 +306,7 @@
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="openPdfViewer()"><div class="icon-sq">📄</div>Prohlížeč PDF</div>
-                    <div class="btn-icon" onclick="importZfo()"><div class="icon-sq">📦</div>Import ZFO</div>
+                    <div class="btn-icon" data-pack="legal" onclick="importZfo()"><div class="icon-sq">📦</div>Import ZFO</div>
                 </div>
                 <div class="group-label">Dokumenty</div>
             </div>
@@ -316,14 +316,14 @@
                     <div class="btn-icon" onclick="insertCurrentDate()"><div class="icon-sq">📆</div>Dnešní datum</div>
                     <div class="btn-icon" onclick="insertTitlePage()"><div class="icon-sq">🗂️</div>Titulní str.</div>
                     <div class="btn-icon" onclick="insertFootnote()"><div class="icon-sq"><sup>1</sup></div>Poznámka</div>
-                    <div class="btn-icon" onclick="lexisUI.convertCitationsToLinks()"><div class="icon-sq">🔗</div>Legal Linker</div>
+                    <div class="btn-icon" data-pack="legal" onclick="lexisUI.convertCitationsToLinks()"><div class="icon-sq">🔗</div>Legal Linker</div>
                     <div class="btn-icon" onclick="lexisUI.anonymizeDocument()" style="background:rgba(22,163,74,0.1);"><div class="icon-sq">🛡️</div>GDPR Shield</div>
                 </div>
                 <div class="group-label">Stránky & Obsah</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertClause('pravni_moc')"><div class="icon-sq">🖋️</div>Právní moc</div>
+                    <div class="btn-icon" data-pack="legal" onclick="insertClause('pravni_moc')"><div class="icon-sq">🖋️</div>Právní moc</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">🧍</div>Fyzická osoba</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">🏢</div>Podnikatel</div>
                     <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏭</div>Firma</div>
@@ -398,9 +398,9 @@
         <div id="tab-legal" class="tool-groups-container">
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="calculateFee()"><div class="icon-sq">🏷️</div>Poplatek</div>
-                    <div class="btn-icon" onclick="calculateTariff()"><div class="icon-sq">⚖️</div>Odměna</div>
-                    <div class="btn-icon" onclick="openDeadlineCalc()"><div class="icon-sq">⏳</div>Lhůtník</div>
+                    <div class="btn-icon" data-pack="legal" onclick="calculateFee()"><div class="icon-sq">🏷️</div>Poplatek</div>
+                    <div class="btn-icon" data-pack="legal" onclick="calculateTariff()"><div class="icon-sq">⚖️</div>Odměna</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openDeadlineCalc()"><div class="icon-sq">⏳</div>Lhůtník</div>
                     <div class="btn-icon" onclick="calculateInterests()"><div class="icon-sq">💹</div>Úroky</div>
                 </div>
                 <div class="group-label">Soudy & Výpočty</div>
@@ -410,29 +410,29 @@
                     <div class="btn-icon" onclick="insertSignatureBlock()"><div class="icon-sq">✒️</div>Blok podpisů</div>
                     <div class="btn-icon" onclick="insertMySignature()"><div class="icon-sq">✍️</div>Můj podpis</div>
                     <div class="btn-icon" onclick="anonymizeSelection()"><div class="icon-sq">🛡️</div>Anonym</div>
-                    <div class="btn-icon" onclick="checkHierarchy()"><div class="icon-sq">📏</div>Kontrola</div>
-                    <div class="btn-icon" onclick="checkTerminology()"><div class="icon-sq">🔠</div>Pojmy</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="checkHierarchy()"><div class="icon-sq">📏</div>Kontrola</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="checkTerminology()"><div class="icon-sq">🔠</div>Pojmy</div>
                 </div>
                 <div class="group-label">Validace & Bezpečí</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="insertArticle()"><div class="icon-sq">📑</div>Článek</div>
-                    <div class="btn-icon" onclick="insertParagraph()"><div class="icon-sq">❡</div>Paragraf</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="insertArticle()"><div class="icon-sq">📑</div>Článek</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="insertParagraph()"><div class="icon-sq">❡</div>Paragraf</div>
                 </div>
                 <div class="group-label">Právní číslování</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
                     <div class="btn-icon" onclick="insertCitation()"><div class="icon-sq">💬</div>Citace</div>
-                    <div class="btn-icon" onclick="insertSectionSign()"><div class="icon-sq">⚖️</div>Znak §</div>
+                    <div class="btn-icon" data-pack="legal" onclick="insertSectionSign()"><div class="icon-sq">⚖️</div>Znak §</div>
                 </div>
                 <div class="group-label">Rychlé prvky</div>
             </div>
-            <div class="tool-group">
+            <div class="tool-group" data-pack="legal">
                 <div class="icons">
-                    <div class="btn-icon" onclick="lookupCaseLaw()"><div class="icon-sq">🏛️</div>Judikatura</div>
-                    <div class="btn-icon" onclick="autoLinkLaws()"><div class="icon-sq">🔗</div>Odkazovat zákony</div>
+                    <div class="btn-icon" data-pack="legal" onclick="lookupCaseLaw()"><div class="icon-sq">🏛️</div>Judikatura</div>
+                    <div class="btn-icon" data-pack="legal" onclick="autoLinkLaws()"><div class="icon-sq">🔗</div>Odkazovat zákony</div>
                 </div>
                 <div class="group-label">Rešerše</div>
             </div>
@@ -440,15 +440,15 @@
                 <div class="icons">
                     <div class="btn-icon" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Dopis Online</div>
                     <div class="btn-icon" onclick="signDigital()"><div class="icon-sq">🔑</div>E-podpis</div>
-                    <div class="btn-icon" onclick="startMailMerge()" style="background: rgba(37,99,235,0.08); border: 1px solid #bfdbfe;"><div class="icon-sq">📨</div>Kampaň</div>
+                    <div class="btn-icon" data-pack="business" onclick="startMailMerge()" style="background: rgba(37,99,235,0.08); border: 1px solid #bfdbfe;"><div class="icon-sq">📨</div>Kampaň</div>
                     <div class="btn-icon" onclick="openContacts()" style="background: rgba(16,185,129,0.08); border: 1px solid #a7f3d0;"><div class="icon-sq">📒</div>Adresář</div>
                 </div>
                 <div class="group-label">Distribuce</div>
             </div>
             <div class="tool-group">
                 <div class="icons">
-                    <div class="btn-icon" onclick="logTime()"><div class="icon-sq">⏰</div>Zapsat úkon</div>
-                    <div class="btn-icon" onclick="exportTimesheet()"><div class="icon-sq">📤</div>Exportovat</div>
+                    <div class="btn-icon" data-pack="business" onclick="logTime()"><div class="icon-sq">⏰</div>Zapsat úkon</div>
+                    <div class="btn-icon" data-pack="business" onclick="exportTimesheet()"><div class="icon-sq">📤</div>Exportovat</div>
                 </div>
                 <div class="group-label">Evidence práce</div>
             </div>
@@ -775,9 +775,9 @@
                     <div class="btn-icon" onclick="searchAres()"><div class="icon-sq">🏢</div>ARES</div>
                     <div class="btn-icon" onclick="insertParty()"><div class="icon-sq">👤</div>Vložit stranu</div>
                     <div class="btn-icon" onclick="insertLetterhead()"><div class="icon-sq">📄</div>Vložit hlavičku</div>
-                    <div class="btn-icon" onclick="createReplyFromDocument()"><div class="icon-sq">↩️</div>Odpovědět</div>
-                    <div class="btn-icon" onclick="openDatovkaDialog()"><div class="icon-sq">📨</div>Datovky</div>
-                    <div class="btn-icon" onclick="openIsdsSettings()"><div class="icon-sq">⚙️</div>Nastavení DS</div>
+                    <div class="btn-icon" data-pack="legal" onclick="createReplyFromDocument()"><div class="icon-sq">↩️</div>Odpovědět</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openDatovkaDialog()"><div class="icon-sq">📨</div>Datovky</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openIsdsSettings()"><div class="icon-sq">⚙️</div>Nastavení DS</div>
                     <div class="btn-icon" onclick="openKeyBackup()"><div class="icon-sq">🔐</div>Záloha klíče</div>
                     <div class="btn-icon" onclick="openFeedback()"><div class="icon-sq">🐞</div>Nahlásit chybu</div>
                 </div>
@@ -1201,6 +1201,11 @@
     </div> <!-- Konec app-container -->
 
     <!-- SDK & UI Modules -->
+    <script src="js/core/lexis-edition.js"></script>
+    <script src="js/core/lexis-legal-calc.js"></script>
+    <script src="js/core/lexis-legal-docs.js"></script>
+    <script src="js/core/lexis-legal-linker.js"></script>
+    <script src="js/core/lexis-validators.js"></script>
     <script src="js/providers/ai-provider.js"></script>
     <script src="js/core/court-data.js"></script>
     <script src="js/core/court-registry.js"></script>

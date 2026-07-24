@@ -128,6 +128,34 @@ function findDeadlineDate(text) {
     return null;
 }
 
+// Najde v textu lhůty zadané POČTEM DNÍ („lhůta 15 dní", „do 30 dnů",
+// „ve lhůtě 15 pracovních dní"). Vrací pole { days, context } bez duplicit.
+// (Konkrétní datum lhůty řeší findDeadlineDate výše.) Dřív byly tyto regexy
+// přímo v UI ve scanTextForDeadlines.
+function detectDeadlineDays(text) {
+    if (!text) return [];
+    const regexes = [
+        /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-ž]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi,
+        /\bdo\s+(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/gi
+    ];
+    const detected = [];
+    for (const line of String(text).split('\n')) {
+        if (line.trim().length < 10) continue;
+        for (const regex of regexes) {
+            let m;
+            regex.lastIndex = 0;
+            while ((m = regex.exec(line)) !== null) {
+                const days = parseInt(m[1], 10);
+                const context = line.trim().replace(/\s+/g, ' ');
+                if (!detected.some(d => d.days === days && d.context === context)) {
+                    detected.push({ days, context });
+                }
+            }
+        }
+    }
+    return detected;
+}
+
 // Sestaví .ics (celodenní událost lhůty s připomenutím).
 // event = { uid?, title, date (Date|'YYYY-MM-DD'), description?, location?, reminderDays? }
 function buildDeadlineIcs(event) {
@@ -235,6 +263,7 @@ module.exports = {
     easterSunday,
     parseCzechDate,
     findDeadlineDate,
+    detectDeadlineDays,
     buildDeadlineIcs,
     googleCalendarUrl,
     outlookCalendarUrl,

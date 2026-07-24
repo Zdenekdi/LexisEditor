@@ -3,13 +3,21 @@
  * LexisFeedback — nahlášení chyby / zpětná vazba pro beta testery.
  * Posbírá verzi aplikace, OS a posledních pár zachycených chyb a připojí popis
  * od uživatele. Bez serveru: uživatel report zkopíruje nebo pošle e-mailem.
- * Cílovou e-mailovou adresu nastav v REPORT_EMAIL níže.
+ * Cílová e-mailová adresa se bere z konfigurace edice (supportEmail) nebo z
+ * window.LEXIS_SUPPORT_EMAIL — není natvrdo v kódu.
  */
 (function () {
     'use strict';
 
-    // TODO: doplň cílovou adresu pro chybové reporty (např. tvůj e-mail).
-    const REPORT_EMAIL = 'podpora@lexiseditor.cz';
+    // Cílová adresa pro chybové reporty. Není natvrdo — bere se (v tomto pořadí):
+    //  1) window.LEXIS_SUPPORT_EMAIL (přepis z buildu/nasazení),
+    //  2) supportEmail z konfigurace edice (js/core/lexis-edition.js — brand = config),
+    //  3) fallback placeholder.
+    function reportEmail() {
+        return window.LEXIS_SUPPORT_EMAIL
+            || (window.Edition && window.Edition.supportEmail)
+            || 'podpora@lexiseditor.cz';
+    }
 
     // Kruhový buffer posledních chyb (zachytává window.onerror a nezachycené promise).
     const _errors = [];
@@ -77,7 +85,7 @@
 
         card.querySelector('#fb-send').onclick = () => {
             const report = buildReport(card.querySelector('#fb-desc').value.trim());
-            const url = 'mailto:' + encodeURIComponent(REPORT_EMAIL)
+            const url = 'mailto:' + encodeURIComponent(reportEmail())
                 + '?subject=' + encodeURIComponent('LexisEditor — hlášení chyby (v' + appVersion() + ')')
                 + '&body=' + encodeURIComponent(report);
             // V Electronu spolehlivě přes shell.openExternal (nové okno pošty),

@@ -77,6 +77,28 @@
         return { subject, court: court ? court.nazev : '', spzn, cj, ico, vec };
     }
 
+    // Rozloží řetězec spisové značky („12 C 34/2026") na strukturu pro hlídání
+    // jednání (senát / druh věci / číslo / ročník). Dvojmístný rok normalizuje na
+    // čtyřmístný podle aktuálního století. Vrací null, když formát nesedí.
+    // Jeden zdroj pravdy — dřív měl sken jednání v lexis-ui.js vlastní regex.
+    function parseSpzn(spzn) {
+        if (!spzn) return null;
+        const m = String(spzn).match(/(\d+)\s*([A-Za-zÀ-ž]{1,6})\s*(\d+)\s*\/\s*(\d{2,4})/);
+        if (!m) return null;
+        let rocnik = parseInt(m[4], 10);
+        if (m[4].length === 2) {
+            const yy = new Date().getFullYear() % 100;
+            rocnik = rocnik <= yy ? 2000 + rocnik : 1900 + rocnik;
+        }
+        return {
+            cisloSenatu: parseInt(m[1], 10),
+            druhVeci: m[2].toUpperCase(),
+            bcVec: parseInt(m[3], 10),
+            rocnik: rocnik,
+            fullText: `${m[1]} ${m[2]} ${m[3]}/${rocnik}`
+        };
+    }
+
     // Sestaví HTML odpovědi s hlavičkou (náležitosti + tělo).
     function buildReplyHtml(f) {
         const lines = [];
@@ -163,5 +185,5 @@
     }
 
     // Veřejné API — jeden zdroj pravdy pro tvorbu odpovědí (extrakce, hlavička, soud).
-    window.LexisReply = { detectCourt, extract, buildReplyHtml, courtInfo, docText };
+    window.LexisReply = { detectCourt, extract, parseSpzn, buildReplyHtml, courtInfo, docText };
 })();
