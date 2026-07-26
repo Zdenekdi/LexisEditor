@@ -1000,6 +1000,7 @@ ipcMain.handle('open-external-url', async (event, url) => {
 ipcMain.handle('compose-email-attach', async (event, opts) => {
     const o = opts || {};
     if (!o.to) return { success: false, error: 'Chybí příjemce.' };
+    const createdTmp = []; // dočasné přílohy, které po odeslání uklidíme
     // Přílohy zadané jako base64 (např. PDF vyexportované z aktuálního dokumentu) zapíšeme
     // do temp a přidáme k attachmentPaths. Když příloha selže, pokračujeme bez ní (e-mail se
     // stejně otevře ke kontrole). Base64 nikdy nekončí v příkazové řádce — jen na disku v temp.
@@ -1012,6 +1013,7 @@ ipcMain.handle('compose-email-attach', async (event, opts) => {
                 const tmpAtt = path.join(os.tmpdir(), `lexis_att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}_${safe}`);
                 fs.writeFileSync(tmpAtt, Buffer.from(a.base64, 'base64'));
                 o.attachmentPaths.push(tmpAtt);
+                createdTmp.push(tmpAtt);
             }
         }
     } catch (e) { /* příloha nepovinná — pokračuj bez ní */ }
@@ -1043,6 +1045,15 @@ ipcMain.handle('compose-email-attach', async (event, opts) => {
         return { success: false, error: 'unsupported-platform' };
     } catch (e) {
         return { success: false, error: e.message };
+    } finally {
+        // Přílohy jsme zapsali do temp; Mail/Outlook je přečte při vytvoření zprávy.
+        // Uklidíme je se zpožděním (ne hned — okno pošty je může číst asynchronně).
+        if (createdTmp.length) {
+            const timer = setTimeout(() => {
+                for (const tp of createdTmp) { try { fs.unlinkSync(tp); } catch (e) { /* ignore */ } }
+            }, 60000);
+            if (timer && typeof timer.unref === 'function') timer.unref();
+        }
     }
 });
 

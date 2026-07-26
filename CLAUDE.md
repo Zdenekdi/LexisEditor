@@ -40,6 +40,11 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
   (ASN.1 → zapouzdřený obsah), tolerantně k namespace prefixům a s `dmFileDescr` jako atributem i
   elementem; heuristika zůstává jako fallback. Ověřeno na uměle podepsaném CMS.
 
+- [x] **HOTOVO — Odpověď na příchozí datovku.** Přijaté datové zprávy mají nově akci „↩️ Odpovědět“,
+  která vytáhne č.j./sp. zn. z přijaté zprávy (`LexisReply.extract`) a vloží do editoru koncept odpovědi
+  s hlavičkou (`LexisReply.buildReplyHtml`). Logika je v `js/ui/lexis-reply-inbox.js` (+ test
+  `tests/unit/replyInbox.test.js`), `lexis-reply.js` zůstal netknutý. Advokát koncept zkontroluje a odešle.
+
 - [x] **HOTOVO — E-mail klientovi z dokumentu (odchozí tok).** Z otevřeného dokumentu jedním klikem
   („📧 E-mail klientovi" v ribbonu Export) připraví PDF přílohu a předvyplní e-mail klientovi z adresáře.
   Čistá logika `js/core/lexis-mail-draft.js` (+ testy `tests/unit/mailDraft.test.js`), UI `js/ui/lexis-mail-client.js`;
