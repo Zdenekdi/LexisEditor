@@ -12,6 +12,7 @@ Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 ### Přidáno
 - **Edice a generalizace**: oddělení edic (základ / Pro pro advokáty), příprava pro firmy i jednotlivce; právní logika vytažena do samostatných modulů.
 - **Datové schránky (ISDS)**: schránka příchozích i odchozích zpráv, režimy stažení, podepsané doručenky, lhůta → kalendář, přeposlání klientovi.
+- **E-mail klientovi**: z otevřeného dokumentu jedním klikem připraví PDF přílohu a předvyplněný e-mail klientovi z adresáře; advokát jen zkontroluje a odešle.
 - **Najít/Nahradit** v editoru; jednoklikové vložení účastníka a odpověď s hlavičkou z otevřeného dokumentu.
 
 ### Změněno / Refaktoring

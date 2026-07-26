@@ -1000,6 +1000,21 @@ ipcMain.handle('open-external-url', async (event, url) => {
 ipcMain.handle('compose-email-attach', async (event, opts) => {
     const o = opts || {};
     if (!o.to) return { success: false, error: 'Chybí příjemce.' };
+    // Přílohy zadané jako base64 (např. PDF vyexportované z aktuálního dokumentu) zapíšeme
+    // do temp a přidáme k attachmentPaths. Když příloha selže, pokračujeme bez ní (e-mail se
+    // stejně otevře ke kontrole). Base64 nikdy nekončí v příkazové řádce — jen na disku v temp.
+    try {
+        if (Array.isArray(o.attachmentsB64) && o.attachmentsB64.length) {
+            o.attachmentPaths = (o.attachmentPaths || []).slice();
+            for (const a of o.attachmentsB64) {
+                if (!a || !a.base64) continue;
+                const safe = String(a.name || 'priloha.pdf').replace(/[^\w\-. ]+/g, '_');
+                const tmpAtt = path.join(os.tmpdir(), `lexis_att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}_${safe}`);
+                fs.writeFileSync(tmpAtt, Buffer.from(a.base64, 'base64'));
+                o.attachmentPaths.push(tmpAtt);
+            }
+        }
+    } catch (e) { /* příloha nepovinná — pokračuj bez ní */ }
     try {
         const { execFile } = require('child_process');
         const composeScript = require('./js/core/email-compose-script');

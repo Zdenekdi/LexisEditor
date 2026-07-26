@@ -40,6 +40,12 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
   (ASN.1 → zapouzdřený obsah), tolerantně k namespace prefixům a s `dmFileDescr` jako atributem i
   elementem; heuristika zůstává jako fallback. Ověřeno na uměle podepsaném CMS.
 
+- [x] **HOTOVO — E-mail klientovi z dokumentu (odchozí tok).** Z otevřeného dokumentu jedním klikem
+  („📧 E-mail klientovi" v ribbonu Export) připraví PDF přílohu a předvyplní e-mail klientovi z adresáře.
+  Čistá logika `js/core/lexis-mail-draft.js` (+ testy `tests/unit/mailDraft.test.js`), UI `js/ui/lexis-mail-client.js`;
+  `compose-email-attach` v `main.js` nově umí přílohy jako base64. Nic se neodesílá samo — otevře se okno
+  pošty ke kontrole; fallback na `mailto` bez přílohy.
+
 - [x] **HOTOVO — Automatické napojení na LexisLocal token.** Editor si API token LexisLocalu **čte sám**
   z lokálního souboru (`<LEXIS_KEY_DIR|~/.lexislocal>/api_token`) přes IPC (`get-lexislocal-token` +
   synchronní varianta), `preload.js` ho vystavuje jako `electronAPI.lexisLocalToken`. `ai-provider.js`
