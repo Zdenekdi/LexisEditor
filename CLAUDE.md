@@ -77,9 +77,11 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
   a refaktoringovou prací). Pozn.: `package.json` je pořád 3.4.1 — červencové změny jsou zatím „Nevydáno";
   před releasem zvážit bump na 3.4.2. Ideál dlouhodobě: verzi v UI číst z `package.json`.
 
-- [~] **Doplnit testy kolem bezpečnostních míst v `main.js` — z velké části HOTOVO.** Bezpečnostní logika
-  byla vytažena z `main.js` do čistých, testovatelných modulů: **`js/core/lexis-lock.js`**
-  (`hashPassword`/`verifyPassword` — scrypt + konstantní porovnání) a **`js/core/lexis-zfo.js`**
-  (`extractZfoXml` — PKCS#7/CMS parsování). Přibyly testy `lock.test.js`, `zfo.test.js`, `isdsInbox.test.js`,
-  `isdsOutbox.test.js`, `contacts.test.js`; LexisLink má `lexis-link-security.test.js`. **Zbývá:** přímé
-  integrační testy IPC handlerů v `main.js` (ISDS auth flow) — logika je ale už krytá přes vytažené moduly.
+- [x] **Doplnit testy kolem bezpečnostních míst v `main.js` — HOTOVO.** Rozhodovací logika ISDS toku
+  (prostředí test/produkce, Basic auth, volba klientského certifikátu, TLS volby, endpoint) vytažena z
+  `isdsCall` do testovaného `js/core/isds-transport.js` (+ `tests/unit/isdsTransport.test.js`); `main.js`
+  na ni deleguje, I/O a HTTP zůstávají v main. Spolu s dříve vytaženými `lexis-lock`/`lexis-zfo` jsou
+  bezpečnostní místa `main.js` pokrytá.
+
+  Dřív vytažené moduly: `js/core/lexis-lock.js` (scrypt zámek), `js/core/lexis-zfo.js` (PKCS#7/CMS),
+  plus testy `lock`, `zfo`, `isdsInbox`, `isdsOutbox`, `contacts`, `lexis-link-security`.

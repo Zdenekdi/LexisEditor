@@ -12,6 +12,7 @@ const lexisLinkSec = require('./js/core/lexis-link-security.js');
 const lexisLock = require('./js/core/lexis-lock.js');
 const lexisZfo = require('./js/core/lexis-zfo.js');
 const isdsClient = require('./js/core/isds-client.js');
+const isdsTransport = require('./js/core/isds-transport.js');
 const { IsdsOutbox } = require('./js/core/isds-outbox.js');
 const { IsdsInbox } = require('./js/core/isds-inbox.js');
 
@@ -50,30 +51,17 @@ function httpsPostWithCert(url, headers, body, tls) {
 // creds = { login, pass, env, host?, basePath?, certPfx?, certPass?, certPem?, keyPem? }.
 // service = 'messages'|'info'|'search'|'manage', operation = název operace (pro SOAPAction).
 async function isdsCall(creds, service, operation, soapBody) {
-    const env = (creds && creds.env === 'production') ? 'production' : 'test';
     // Certifikát může přijít jako buffer (certPfx) nebo cesta k .p12 (certPath) — druhé
     // umožňuje ověřit spojení rovnou z formuláře, ještě před uložením konfigurace.
     let certPfx = creds && creds.certPfx;
     if (!certPfx && creds && creds.certPath) {
         try { certPfx = fs.readFileSync(creds.certPath); } catch (e) { /* padneme na Basic auth */ }
     }
-    const useCert = !!(certPfx || (creds && creds.certPem && creds.keyPem));
-    const override = (creds && (creds.host || creds.basePath)) ? { host: creds.host, basePath: creds.basePath } : null;
-    const url = isdsClient.buildEndpoint(env, service, override, useCert);
-
-    const headers = {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': isdsClient.soapAction(operation)
-    };
-    // Login certificate = jméno+heslo + klientský cert; jméno/heslo je i u běžného přístupu.
-    if (creds && creds.login) {
-        headers['Authorization'] = 'Basic ' + Buffer.from(`${creds.login}:${creds.pass || ''}`).toString('base64');
-    }
+    // Rozhodovací logika (prostředí, endpoint, Basic auth, mTLS) je v testovaném
+    // modulu js/core/isds-transport.js. Zde zůstává už jen I/O a HTTP.
+    const { url, headers, useCert, tls } = isdsTransport.buildRequest(creds, service, operation, { isdsClient, certPfx });
 
     if (useCert) {
-        const tls = certPfx
-            ? { pfx: certPfx, passphrase: creds.certPass || undefined }
-            : { cert: creds.certPem, key: creds.keyPem, passphrase: creds.certPass || undefined };
         return httpsPostWithCert(url, headers, soapBody, tls);
     }
 

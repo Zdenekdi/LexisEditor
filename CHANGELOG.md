@@ -19,6 +19,7 @@ Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 ### Změněno / Refaktoring
 - Bezpečnostní logika vytažena z `main.js` do testovaných modulů (`js/core/lexis-lock.js`, `js/core/lexis-zfo.js`); přibyly testy (zámek, zfo, ISDS inbox/outbox, kontakty).
 - **Hromadné generování (kampaně)**: čistá logika CSV/merge vytažena do `js/core/lexis-merge.js` s testy; `lexis-ui.js` deleguje.
+- **Testy ISDS**: rozhodovací logika ISDS požadavku vytažena z `main.js` do `js/core/isds-transport.js` s testy (prostředí, auth, mTLS, endpoint).
 - **Testy lhůt**: doplněno pokrytí právně kritického `lexis-calendar.js` (Velikonoce, české svátky, pracovní dny, výpočet lhůt dle § 57 o.s.ř., generování .ics) — 48 kontrol.
 - **Rozbití monolitů**: renderer skript oddělen z `index.html` do `js/renderer-bootstrap.js`; `js/ui/lexis-ui.js` (6472 ř.) rozděleno na jádro + 6 prototype-mixin modulů (`lexis-ui-1..6.js`) beze změny chování.
 
