@@ -10,6 +10,7 @@ const forge = require('node-forge');
 const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
 const lexisLock = require('./js/core/lexis-lock.js');
+const lexisZfo = require('./js/core/lexis-zfo.js');
 const isdsClient = require('./js/core/isds-client.js');
 const { IsdsOutbox } = require('./js/core/isds-outbox.js');
 const { IsdsInbox } = require('./js/core/isds-inbox.js');
@@ -1121,51 +1122,8 @@ ipcMain.handle('import-pdf', async () => {
 });
 
 // --- ZFO IMPORT (Datové zprávy) ---
-// Rekurzivně posbírá řetězcové hodnoty listů z ASN.1 stromu (pro nalezení XML v CMS).
-function collectAsn1Strings(node, out) {
-    if (!node || typeof node !== 'object' || out.length > 5000) return;
-    if (typeof node.value === 'string') {
-        out.push(node.value);
-    } else if (Array.isArray(node.value)) {
-        for (const child of node.value) collectAsn1Strings(child, out);
-    }
-}
-
-// Vytáhne XML datové zprávy ze ZFO. ZFO je PKCS#7 / CMS (DER) — korektně ho
-// rozparsujeme přes node-forge a najdeme zapouzdřený obsah (eContent) s XML.
-// Když soubor není platný DER (netypický/nepodepsaný export), spadneme na heuristiku.
-// Vše je tolerantní k namespace prefixům (např. <p:dmMessage>).
-function extractZfoXml(zfoBuffer) {
-    const hasMsg = (s) => /<(?:[\w-]+:)?dmMessage[\s>]/.test(s) || /<\?xml/.test(s);
-    // 1) Korektní CMS/DER cesta.
-    try {
-        const der = forge.util.createBuffer(zfoBuffer.toString('binary'));
-        const asn1 = forge.asn1.fromDer(der);
-        const leaves = [];
-        collectAsn1Strings(asn1, leaves);
-        for (const raw of leaves) {
-            if (!raw || raw.length < 20) continue;
-            let utf8 = raw;
-            try { utf8 = forge.util.decodeUtf8(raw); } catch (e) {}
-            if (hasMsg(utf8)) return utf8;
-            if (hasMsg(raw)) return raw;
-        }
-    } catch (e) { /* není platný DER → heuristika níže */ }
-
-    // 2) Heuristika pro netypické/nepodepsané soubory.
-    const bin = zfoBuffer.toString('binary');
-    const m = bin.match(/<(?:[\w-]+:)?dmMessage[\s>][\s\S]*?<\/(?:[\w-]+:)?dmMessage>/);
-    if (m) return m[0];
-    const x = bin.indexOf('<?xml');
-    if (x !== -1) return bin.slice(x);
-    return '';
-}
-
-// Namespace-tolerantní hodnota elementu.
-function zfoTagValue(xml, tag) {
-    const m = xml.match(new RegExp('<(?:[\\w-]+:)?' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w-]+:)?' + tag + '>'));
-    return m ? m[1].trim() : '';
-}
+// Parsování ZFO (ASN.1/CMS → XML, tolerantní heuristika, extrakce elementů) je
+// vytažené do testovaného js/core/lexis-zfo.js (viz lexisZfo.*).
 
 ipcMain.handle('import-zfo', async (event, filePath) => {
     try {
@@ -1184,15 +1142,15 @@ ipcMain.handle('import-zfo', async (event, filePath) => {
         const zfoBuffer = fs.readFileSync(selectedPath);
 
         // Korektní extrakce XML z PKCS#7/CMS kontejneru přes node-forge (viz extractZfoXml).
-        const xmlContent = extractZfoXml(zfoBuffer);
+        const xmlContent = lexisZfo.extractZfoXml(zfoBuffer);
         if (!xmlContent) {
             throw new Error('Nepodařilo se extrahovat obsah datové zprávy ze ZFO (neplatný nebo nepodporovaný formát).');
         }
 
         // Metadata (tolerantní k namespace prefixům).
-        const sender = zfoTagValue(xmlContent, 'dmSender');
-        const senderId = zfoTagValue(xmlContent, 'dbIDSender');
-        const subject = zfoTagValue(xmlContent, 'dmAnnotation');
+        const sender = lexisZfo.zfoTagValue(xmlContent, 'dmSender');
+        const senderId = lexisZfo.zfoTagValue(xmlContent, 'dbIDSender');
+        const subject = lexisZfo.zfoTagValue(xmlContent, 'dmAnnotation');
 
         // Přílohy: dmFileDescr může být ELEMENT i ATRIBUT (reálný ISDS formát),
         // dmEncodedContent je víceřádkový base64.
@@ -1203,8 +1161,8 @@ ipcMain.handle('import-zfo', async (event, filePath) => {
             const attrs = fm[1] || '';
             const inner = fm[2] || '';
             const descrAttr = attrs.match(/dmFileDescr\s*=\s*"([^"]*)"/i);
-            const name = (descrAttr ? descrAttr[1] : zfoTagValue(inner, 'dmFileDescr')) || 'priloha';
-            const content = zfoTagValue(inner, 'dmEncodedContent');
+            const name = (descrAttr ? descrAttr[1] : lexisZfo.zfoTagValue(inner, 'dmFileDescr')) || 'priloha';
+            const content = lexisZfo.zfoTagValue(inner, 'dmEncodedContent');
             if (content) {
                 attachments.push({
                     name,
