@@ -57,4 +57,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     lockDeleteConfig: () => ipcRenderer.invoke('lock-delete-config'),
     lockVerifyPassword: (password) => ipcRenderer.invoke('lock-verify-password', password),
     lockTouchIdAvailable: () => ipcRenderer.invoke('lock-touchid-available'),
+    // --- LexisLocal API token (čte se z lokálního souboru, žádné ruční vkládání) ---
+    getLexisLocalToken: () => ipcRenderer.invoke('get-lexislocal-token'),
+    lexisLocalToken: (() => { try { return ipcRenderer.sendSync('get-lexislocal-token-sync') || ''; } catch (e) { return ''; } })(),
 });

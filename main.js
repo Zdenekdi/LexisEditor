@@ -228,6 +228,19 @@ ipcMain.handle('get-version', () => {
     return app.getVersion();
 });
 
+// API token LexisLocal backendu čteme přímo z lokálního souboru (~/.lexislocal/api_token,
+// resp. LEXIS_KEY_DIR) — editor běží na stejném stroji jako backend, takže token
+// nemusí uživatel nikam vkládat. Sync varianta pro synchronní čtení v preloadu.
+function readLexisLocalToken() {
+    try {
+        const dir = process.env.LEXIS_KEY_DIR || path.join(os.homedir(), '.lexislocal');
+        const p = path.join(dir, 'api_token');
+        return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').trim() : '';
+    } catch (e) { return ''; }
+}
+ipcMain.handle('get-lexislocal-token', () => readLexisLocalToken());
+ipcMain.on('get-lexislocal-token-sync', (event) => { event.returnValue = readLexisLocalToken(); });
+
 // Start aplikace
 app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
