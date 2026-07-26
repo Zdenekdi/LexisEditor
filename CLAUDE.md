@@ -2,7 +2,8 @@
 
 Kontext pro Claude Code. LexisEditor je Electron desktop aplikace (AI-native editor pro advokáty).
 Hlavní části: `main.js` (Electron main / IPC), `preload.js` (contextBridge), `index.html` (renderer),
-`js/core/*`, `js/providers/ai-provider.js`, `js/ui/*`. Sesterský projekt: **LexisLocal** (lokální AI backend).
+`js/core/*` (mj. `lexis-lock.js` — zámek/scrypt, `lexis-zfo.js` — parsování .zfo, `lexis-link-security.js`),
+`js/providers/ai-provider.js`, `js/ui/*`. Sesterský projekt: **LexisLocal** (lokální AI backend).
 
 Build/test: `npm start`, `npm test` (jest), `npm run test:e2e` (playwright), `npm run dist`.
 
@@ -39,18 +40,30 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
   (ASN.1 → zapouzdřený obsah), tolerantně k namespace prefixům a s `dmFileDescr` jako atributem i
   elementem; heuristika zůstává jako fallback. Ověřeno na uměle podepsaném CMS.
 
-- [ ] **Rozbít monolity.** `js/ui/lexis-ui.js` (372 KB) a `index.html` (143 KB) jsou obří. Rozdělit
-  `lexis-ui.js` do domén, oddělit renderer JS od `index.html`.
+- [x] **HOTOVO — Automatické napojení na LexisLocal token.** Editor si API token LexisLocalu **čte sám**
+  z lokálního souboru (`<LEXIS_KEY_DIR|~/.lexislocal>/api_token`) přes IPC (`get-lexislocal-token` +
+  synchronní varianta), `preload.js` ho vystavuje jako `electronAPI.lexisLocalToken`. `ai-provider.js`
+  i `lexis-ui.js` ho automaticky posílají v hlavičce `X-API-Token`. Uživatel nic nevkládá ručně — až se
+  na backendu zapne vynucení tokenu (`LEXIS_ENFORCE_TOKEN=1`), editor bude fungovat bez zásahu.
+
+- [x] **Rozbít monolity — HOTOVO.** `js/ui/lexis-ui.js` rozděleno z 6472 na ~805 řádků — 203 metod
+  vytaženo do 6 prototype-mixin modulů (`lexis-ui-1..6.js`). Renderer skript (414 ř.) oddělen z `index.html`
+  do `js/renderer-bootstrap.js` (index.html 2116 → ~1707 ř.). Rozbití přes AST (@babel/parser), ověřeno
+  `node --check` + vm-harnessem (všech 213 metod na prototypu).
 
 ### 🟢 Nízké (hygiena)
 
 - [x] **HOTOVO (.gitignore) — Uklidit repo.** Do `.gitignore` přidány `chunk-*.js`, `*-temp.js`,
   `temp_script.js`, `build/`. (Pokud jsou některé z nich ještě trackované, doplnit `git rm --cached`.)
 
-- [ ] **Sjednotit verze.** Nekonzistence: `package.json` 3.4.1 vs README v3.3.2 vs CHANGELOG 3.4.0.
-  Načítat verzi z `package.json` (jeden zdroj pravdy), srovnat README/CHANGELOG. Důležité kvůli
-  auto-updateru.
+- [x] **Sjednotit verze — HOTOVO.** `package.json` = **3.4.1**, README **v3.4.1**, CHANGELOG doplněn
+  (záznam **3.4.1** = Windows Hello + kalkulátor tarifu, + sekce **Nevydáno** s červencovou bezpečnostní
+  a refaktoringovou prací). Pozn.: `package.json` je pořád 3.4.1 — červencové změny jsou zatím „Nevydáno";
+  před releasem zvážit bump na 3.4.2. Ideál dlouhodobě: verzi v UI číst z `package.json`.
 
-- [ ] **Doplnit testy kolem bezpečnostních míst v `main.js`.** Editor má jen 1 unit + 1 smoke e2e;
-  ISDS auth, LexisLink, `lock-verify-password` a zfo import nejsou pokryté. Doplnit unit/integration testy
-  pro tyto IPC handlery a lock logiku (backend LexisLocal má solidní sadu – použít jako vzor).
+- [~] **Doplnit testy kolem bezpečnostních míst v `main.js` — z velké části HOTOVO.** Bezpečnostní logika
+  byla vytažena z `main.js` do čistých, testovatelných modulů: **`js/core/lexis-lock.js`**
+  (`hashPassword`/`verifyPassword` — scrypt + konstantní porovnání) a **`js/core/lexis-zfo.js`**
+  (`extractZfoXml` — PKCS#7/CMS parsování). Přibyly testy `lock.test.js`, `zfo.test.js`, `isdsInbox.test.js`,
+  `isdsOutbox.test.js`, `contacts.test.js`; LexisLink má `lexis-link-security.test.js`. **Zbývá:** přímé
+  integrační testy IPC handlerů v `main.js` (ISDS auth flow) — logika je ale už krytá přes vytažené moduly.

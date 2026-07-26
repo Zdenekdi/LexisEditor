@@ -1,0 +1,1514 @@
+// lexis-ui-3.js — část UI vytažená z lexis-ui.js (prototype-mixin, beze změny chování).
+// Načítá se v index.html PO lexis-ui.js. Obsahuje: importCurrentPdfText, generateReplyFromPdf, switchSidebarTab, switchAITab, anonymizeDocument, showAnonymizationDialog, scanForVariables, sendViaEmail, saveAsTemplateDialog, exportWebPreview, indexCurrentDocument, exportToDocx, exportToBundle, searchAres, exec, indent, applyStyle, applyHighlight, setLineHeight, toggleDictation, openPostDialog, syncCloud, showHelpTip, saveAISettings, loadAISettings, saveFeatureSettings, loadFeatureSettings, updateAIProviderDefaults, getLexisLocalConnection, toggleLexisLocalSelectors, fetchLexisLocalModels, toggleStatusDropdown, setDocumentStatus, saveActiveDocumentState
+Object.assign(LexisUI.prototype, {
+
+    importCurrentPdfText() {
+        if (!this.currentPdfText) {
+            this.customAlert("Žádný text k importu nebyl nalezen.");
+            return;
+        }
+        
+        try {
+            const range = this.core.quill.getSelection(true);
+            this.core.quill.insertText(range.index, `\n${this.currentPdfText}\n`);
+            this.customAlert("✅ <b>Text byl importován!</b><br><br>Extrahovaný obsah z PDF byl vložen na pozici kurzoru.");
+        } catch (e) {
+            console.error(e);
+            this.customAlert("Nepodařilo se vložit text do editoru: " + e.message);
+        }
+    },
+
+    async generateReplyFromPdf() {
+        if (!this.currentPdfText) {
+            this.customAlert("Nebyly nalezeny žádné textové podklady k analýze.");
+            return;
+        }
+
+        // 1. Č.j. / spisová značka — SDÍLENÁ extrakce (window.LexisReply.extract),
+        //    aby obě cesty tvorby odpovědi extrahovaly stejně. Regex fallback jen
+        //    pro případ, že modul není načtený.
+        let fileNumber = '';
+        if (window.LexisReply && window.LexisReply.extract) {
+            const ex = window.LexisReply.extract(this.currentPdfText);
+            fileNumber = ex.cj || ex.spzn || '';
+        }
+        if (!fileNumber) {
+            const cjRegexes = [
+                /(?:č\s*\.\s*j\s*\.|číslo\s*jednací|sp\s*\.\s*zn\s*\.)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i,
+                /(?:spisová\s*značka|spis\.?\s*zn\.?)\s*([0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+(?:\s+[0-9A-Za-zěščřžýáíéóúůďťňĎŇŤŠČŘŽÝÁÍÉÚŮÓ\-_\/]+)*)/i
+            ];
+            for (const regex of cjRegexes) {
+                const match = regex.exec(this.currentPdfText);
+                if (match && match[1]) { fileNumber = match[1].trim(); break; }
+            }
+        }
+        if (!fileNumber) {
+            fileNumber = 'Spis. zn. / Č. j. nevyplněno';
+        }
+        
+        // 2. Extract court — sdílená detekce (window.LexisReply), s regex fallbackem.
+        let recipient = 'Příslušný soud / Orgán';
+        const detectedCourt = (window.LexisReply && window.LexisReply.courtInfo)
+            ? window.LexisReply.courtInfo(this.currentPdfText) : null;
+        if (detectedCourt && detectedCourt.nazev) {
+            recipient = detectedCourt.nazev;
+        } else {
+            const courtRegex = /(?:okresní|krajský|vrchní|ústavní|nejvyšší)\s+soud\s+(?:v|ve|brně|praze|ostravě|plzni|olomouci|hradci|[a-zá-žěščřžýáíéóúůďťň]+)/i;
+            const courtMatch = courtRegex.exec(this.currentPdfText);
+            if (courtMatch) recipient = courtMatch[0].trim().replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase());
+        }
+
+        // 3. Try to extract deadline
+        const deadlineRegex = /(?:lhůt[ěau]|lhůta|termín)\s+(?:k\s+[a-zá-žěščřžýáíéóúůďťň]+\s+)?(?:činí\s+)?(?:do\s+)?(\d+)\s+(?:pracovních\s+)?(?:dn[ůí]|dní)/i;
+        const deadlineMatch = deadlineRegex.exec(this.currentPdfText);
+        const days = deadlineMatch ? parseInt(deadlineMatch[1]) : 15; // default to 15 days if not found
+
+        // 4. Confirm with user via customPrompt / confirmation
+        this.customPrompt(`📝 <b>Automatický návrh odpovědi</b><br><br>Detekovali jsme následující údaje z příchozího PDF. Můžete je upravit před vygenerováním:<br><br><b>Příjemce:</b>`, recipient, async (updatedRecipient) => {
+            if (!updatedRecipient) return;
+            
+            this.customPrompt(`<b>Spisová značka / Číslo jednací (č. j.):</b>`, fileNumber, async (updatedCj) => {
+                if (!updatedCj) return;
+                
+                this.customPrompt(`<b>Lhůta na odpověď (v počtu dní):</b>`, days.toString(), async (updatedDaysStr) => {
+                    const updatedDays = parseInt(updatedDaysStr) || 15;
+                    
+                    // Create beautiful reply template in editor
+                    const dateStr = new Date().toLocaleDateString('cs-CZ');
+                    const replyHtml = `
+                        <h1 class="ql-align-center" style="font-size: 16pt; color: #1e3a8a;">VYJÁDŘENÍ ÚČASTNÍKA</h1>
+                        <p><br></p>
+                        <p><b>Adresát:</b></p>
+                        <p><b>${updatedRecipient}</b></p>
+                        <p>[Adresa soudu]</p>
+                        <p><br></p>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                            <tbody>
+                                <tr>
+                                    <td style="width: 50%; padding: 5px 0;"><b>K č. j. / sp. zn.:</b> ${updatedCj}</td>
+                                    <td style="width: 50%; padding: 5px 0; text-align: right;"><b>Datum:</b> ${dateStr}</td>
+                                </tr>
+                                <tr>
+                                    <td style="width: 50%; padding: 5px 0;"><b>Zastoupený:</b> [Jméno klienta]</td>
+                                    <td style="width: 50%; padding: 5px 0; text-align: right;"><b>Právní zástupce:</b> Advokátní kancelář Lexis</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <hr style="border: none; border-top: 1px solid #cbd5e1; margin-bottom: 20px;">
+                        <p>K výzvě soudu ze dne [doplňte datum výzvy] k č. j. <b>${updatedCj}</b> podává účastník prostřednictvím svého právního zástupce následující vyjádření:</p>
+                        <p><br></p>
+                        <p><b>I.</b></p>
+                        <p>Účastník se plně vyjadřuje k žalobě tak, že s nárokem uplatněným žalobcem nesouhlasí a navrhuje, aby soud žalobu v plném rozsahu zamítl.</p>
+                        <p><br></p>
+                        <p><b>II.</b></p>
+                        <p>[Doplňte podrobnou právní a skutkovou argumentaci...]</p>
+                        <p><br></p>
+                        <p><b>III.</b></p>
+                        <p>S ohledem na výše uvedené navrhujeme, aby soud vydal tento</p>
+                        <p><br></p>
+                        <p class="ql-align-center"><b>r e z o l u c i :</b></p>
+                        <p><br></p>
+                        <p><b>Žaloba se v plném rozsahu zamítá. Žalobce je povinen uhradit žalovanému náklady řízení k rukám jeho právního zástupce do 3 dnů od právní moci rozsudku.</b></p>
+                        <p><br></p>
+                        <p style="text-align: right;">[Podpis zmocněnce / Razítko]</p>
+                    `;
+                    
+                    // 5. Update editor text and set state
+                    this.core.setContent(replyHtml);
+                    this.resetHeaderFooterDOM();
+                    this.setDocumentStatus('draft', true);
+                    
+                    // 6. Automatically register in Deadline Guard & active document memory!
+                    const id = 'dl_' + Date.now();
+                    const date = new Date();
+                    date.setDate(date.getDate() + updatedDays);
+                    
+                    const newDl = {
+                        id: id,
+                        title: `Odpověď: ${updatedCj}`,
+                        days: updatedDays,
+                        dueDate: date.toISOString().split('T')[0],
+                        context: `Číslo jednací: ${updatedCj}, Odesílatel: ${updatedRecipient}`,
+                        createdAt: new Date().toISOString().split('T')[0]
+                    };
+                    
+                    this.activeDeadlines.push(newDl);
+                    await this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
+                    this.renderDeadlines();
+                    
+                    // Store in active document metadata
+                    this.currentDocumentDeadline = {
+                        dueDate: newDl.dueDate,
+                        days: updatedDays,
+                        title: newDl.title,
+                        context: newDl.context
+                    };
+                    this.currentDocumentCj = updatedCj;
+                    this.updateDeadlineBadge();
+                    this.saveActiveDocumentState();
+                    
+                    // Hide the detected section if we created the response
+                    const detectedSection = document.getElementById('detected-deadlines-section');
+                    if (detectedSection) detectedSection.style.display = 'none';
+                    
+                    this.customAlert(`✨ <b>Odpověď vygenerována!</b><br><br>1. Šablona vyjádření s hlavičkou a č. j. <b>${updatedCj}</b> byla připravena v editoru.<br>2. Lhůta na odpověď (<b>${updatedDays} dní</b>, tj. do <b>${newDl.dueDate}</b>) byla bezpečně uložena v interní paměti dokumentu a v hlídači.<br>3. Stav byl nastaven na <b>✍️ Rozpracované</b>.`);
+                });
+            });
+        });
+    },
+
+    switchSidebarTab(tabName) {
+        document.querySelectorAll('.main-sidebar-tab').forEach(t => t.classList.remove('active'));
+        const activeTab = document.getElementById(`tab-sb-${tabName}`);
+        if (activeTab) activeTab.classList.add('active');
+        
+        const aiSubtabs = document.getElementById('ai-subtabs');
+        const aiOutput = document.getElementById('ai-output');
+        const aiInput = document.getElementById('ai-input-container');
+        const aiActions = document.getElementById('ai-actions');
+        const clausesView = document.getElementById('clause-library-view');
+        const templatesView = document.getElementById('template-vars-view');
+        
+        if (tabName === 'ai') {
+            if (aiSubtabs) aiSubtabs.style.display = 'flex';
+            if (aiOutput) aiOutput.style.display = 'block';
+            if (aiInput) aiInput.style.display = 'flex';
+            if (aiActions) aiActions.style.display = 'flex';
+            if (clausesView) clausesView.style.display = 'none';
+            if (templatesView) templatesView.style.display = 'none';
+        } else if (tabName === 'clauses') {
+            if (aiSubtabs) aiSubtabs.style.display = 'none';
+            if (aiOutput) aiOutput.style.display = 'none';
+            if (aiInput) aiInput.style.display = 'none';
+            if (aiActions) aiActions.style.display = 'none';
+            if (clausesView) clausesView.style.display = 'block';
+            if (templatesView) templatesView.style.display = 'none';
+            this.loadCustomClauses();
+        } else if (tabName === 'templates') {
+            if (aiSubtabs) aiSubtabs.style.display = 'none';
+            if (aiOutput) aiOutput.style.display = 'none';
+            if (aiInput) aiInput.style.display = 'none';
+            if (aiActions) aiActions.style.display = 'none';
+            if (clausesView) clausesView.style.display = 'none';
+            if (templatesView) templatesView.style.display = 'block';
+            this.scanForVariables();
+        }
+    },
+
+    switchAITab(subTab, el) {
+        document.querySelectorAll('.ai-tab').forEach(t => t.classList.remove('active'));
+        if (el) el.classList.add('active');
+        
+        const output = document.getElementById('ai-output');
+        const actions = document.getElementById('ai-actions');
+        if (!output) return;
+        
+        if (subTab === 'chat') {
+            output.innerHTML = "Dobrý den, jsem váš právní agent. Zadejte libovolný dotaz nebo si nechte zkontrolovat smlouvu.";
+            if (actions) actions.style.display = 'none';
+        } else if (subTab === 'research') {
+            output.innerHTML = "🔍 <b>Právní rešerše</b><br><br>Zadejte téma nebo ustanovení zákona, které si přejete vyhledat či analyzovat (např. <i>výpověď z nájmu</i>).";
+            if (actions) {
+                actions.style.display = 'flex';
+                actions.innerHTML = `
+                    <button onclick="document.getElementById('ai-prompt').value='Analyzuj judikaturu k § 2285 OZ'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-right:5px; margin-bottom:5px;">§ 2285 Judikatura</button>
+                    <button onclick="document.getElementById('ai-prompt').value='Vyhledej judikáty ohledně smluvní pokuty'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-bottom:5px;">Smluvní pokuta</button>
+                `;
+            }
+        } else if (subTab === 'sovereignty') {
+            output.innerHTML = `
+                <style>
+                    .sov-card {
+                        background: rgba(255, 255, 255, 0.7);
+                        backdrop-filter: blur(10px);
+                        border: 1px solid rgba(226, 232, 240, 0.8);
+                        border-radius: 12px;
+                        padding: 14px;
+                        margin-bottom: 15px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+                        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    .sov-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+                        border-color: rgba(99, 102, 241, 0.4);
+                    }
+                    .sov-btn {
+                        width: 100%;
+                        padding: 8px 14px;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 11px;
+                        font-weight: 700;
+                        cursor: pointer;
+                        transition: all 0.2s ease-in-out;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+                    }
+                    .sov-btn-blue {
+                        background: linear-gradient(135deg, #003399, #1e40af);
+                        color: white;
+                    }
+                    .sov-btn-blue:hover {
+                        background: linear-gradient(135deg, #1e40af, #1d4ed8);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 6px rgba(30, 64, 175, 0.2);
+                    }
+                    .sov-btn-green {
+                        background: linear-gradient(135deg, #16a34a, #15803d);
+                        color: white;
+                    }
+                    .sov-btn-green:hover {
+                        background: linear-gradient(135deg, #15803d, #166534);
+                        transform: translateY(-1px);
+                        box-shadow: 0 4px 6px rgba(22, 163, 74, 0.2);
+                    }
+                    .ledger-dot {
+                        width: 6px;
+                        height: 6px;
+                        background: #6366f1;
+                        border-radius: 50%;
+                        display: inline-block;
+                        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+                    }
+                    .ledger-badge {
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 8px;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                </style>
+                <div style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; line-height: 1.5; padding: 5px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <h3 style="margin:0; color:#003399; display:flex; align-items:center; gap:8px; font-size: 14px; font-weight: 800;">
+                            <span>🇪🇺</span> Technologická suverenita
+                        </h3>
+                        <span style="font-size: 9px; font-weight: bold; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px;">Lokální AI</span>
+                    </div>
+                    <p style="font-size:11px; color:#64748b; line-height:1.4; margin: 0 0 15px 0;">
+                        Systém běží lokálně na vašem HW a plně odpovídá evropským nařízením o ochraně osobních údajů (GDPR) a AI Act.
+                    </p>
+                    
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>🔋</span> Ekologická Telemetrie & HW
+                        </h4>
+                        <div id="sovereign-telemetry-status" style="font-size:11px; display:flex; flex-direction:column; gap:6px;">
+                            Načítám telemetrická data z lokálního serveru...
+                        </div>
+                    </div>
+
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="display:flex; align-items:center; gap:6px;"><span>📜</span> AI Act Ledger (Audit)</span>
+                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:rgba(0,51,153,0.1); color:#003399; border:1px solid rgba(0,51,153,0.2); border-radius:4px; font-size:9px; font-weight:800; cursor:pointer; transition: all 0.2s;">Ověřit integritu</button>
+                        </h4>
+                        <div id="ledger-verification-status" style="font-size:10px; margin-bottom:8px; font-weight:bold;"></div>
+                        <div id="ledger-recent-transactions" style="font-size:10px; color:#64748b; display:flex; flex-direction:column; gap:4px;">
+                            Načítám poslední transakce...
+                        </div>
+                    </div>
+
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>🔑</span> Rotace šifrovacích klíčů
+                        </h4>
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                            Vektorové databáze (RAG) jsou kryptograficky odděleny pro každý spis. Můžete rotovat šifrovací klíče.
+                        </p>
+                        <button onclick="window.rotateLocalKeys()" class="sov-btn sov-btn-blue">
+                            🔄 Rotovat šifrovací klíče
+                        </button>
+                        <div id="key-rotation-status" style="font-size:10px; margin-top:5px; font-weight:bold;"></div>
+                    </div>
+
+                    <div class="sov-card">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                            <span>📦</span> Dublin Core PDF/A Archivace
+                        </h4>
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                            Stáhněte si standardizovaná metadata v Dublin Core XML formátu k aktuálnímu dokumentu.
+                        </p>
+                        <button onclick="window.downloadArchivalMetadata()" class="sov-btn sov-btn-green">
+                            📥 Stáhnout Dublin Core XML
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            window.loadSovereignTelemetry = async () => {
+                const statusEl = document.getElementById('sovereign-telemetry-status');
+                if (!statusEl) return;
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/system/telemetry`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+                    
+                    const stats = await response.json();
+                    
+                    const ramUsedGb = stats.memoryTotalGb - stats.memoryFreeGb;
+                    const ramPct = Math.round((ramUsedGb / stats.memoryTotalGb) * 100);
+                    
+                    const vramTotal = stats.vramTotalGb || 8;
+                    const vramFree = stats.vramFreeGb || 5;
+                    const vramUsedGb = vramTotal - vramFree;
+                    const vramPct = Math.round((vramUsedGb / vramTotal) * 100);
+
+                    statusEl.innerHTML = `
+                        <div style="font-size: 10px; color: #64748b; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                            <div><strong>OS:</strong> ${stats.platform} (${stats.arch})</div>
+                            <div style="text-align: right;"><strong>CPU:</strong> ${stats.cpuCores} jader</div>
+                            <div><strong>Uptime:</strong> ${Math.round(stats.uptimeSeconds / 3600)} hod</div>
+                            <div style="text-align: right;"><strong>Zatížení:</strong> ${stats.systemLoad}</div>
+                        </div>
+                        
+                        <div style="margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                                <span>🧠 Operační paměť (RAM)</span>
+                                <span>${ramUsedGb.toFixed(1)} / ${stats.memoryTotalGb} GB (${ramPct}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${ramPct}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 3px;"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                                <span>🔋 Grafická paměť (VRAM)</span>
+                                <span>${vramUsedGb.toFixed(1)} / ${vramTotal} GB (${vramPct}%)</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${vramPct}%; height: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); border-radius: 3px;"></div>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    statusEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`;
+                }
+            };
+
+            window.verifyLedgerIntegrity = async () => {
+                const statusEl = document.getElementById('ledger-verification-status');
+                if (!statusEl) return;
+                statusEl.innerHTML = "Ověřuji hashovací blockchain řetězec...";
+                statusEl.style.color = "#64748b";
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/audit/transparency/verify`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při verifikaci.");
+                    
+                    const data = await response.json();
+                    if (data.valid) {
+                        statusEl.innerHTML = "✅ Integrita ledgeru je 100% v pořádku!";
+                        statusEl.style.color = "#16a34a";
+                    } else {
+                        statusEl.innerHTML = `❌ Narušena integrita: ${data.reason}`;
+                        statusEl.style.color = "#ef4444";
+                    }
+                } catch (e) {
+                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
+                    statusEl.style.color = "#ef4444";
+                }
+            };
+
+            window.loadRecentLedgerTransactions = async () => {
+                const listEl = document.getElementById('ledger-recent-transactions');
+                if (!listEl) return;
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/audit/transparency`, { headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při načítání transakcí.");
+                    
+                    const logs = await response.json();
+                    if (logs.length === 0) {
+                        listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#94a3b8; font-size:10px;'>Žádné záznamy v ledgeru.</div>";
+                        return;
+                    }
+                    
+                    const recent = logs.slice(-4).reverse();
+                    listEl.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px; position: relative;">
+                            ${recent.map((log, idx) => {
+                                const isKeyRotation = log.action && log.action.includes('rotate');
+                                const badgeColor = isKeyRotation ? 'background:#fee2e2; color:#ef4444;' : 'background:#e0f2fe; color:#0369a1;';
+                                return `
+                                    <div style="display: flex; gap: 10px; align-items: flex-start; position: relative;">
+                                        <div style="display: flex; flex-direction: column; align-items: center;">
+                                            <span class="ledger-dot"></span>
+                                            ${idx < recent.length - 1 ? '<div style="width: 1px; height: 35px; background: #e2e8f0; margin-top: 4px;"></div>' : ''}
+                                        </div>
+                                        <div style="flex: 1; font-size: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                                                <span style="font-weight: bold; color: #1e293b;">${log.action}</span>
+                                                <span class="ledger-badge" style="${badgeColor}">${log.humanApproved ? 'ověřeno' : 'systém'}</span>
+                                            </div>
+                                            <div style="color: #64748b; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                                                ${log.prompt || 'Bez dodatečných parametrů'}
+                                            </div>
+                                            <div style="color: #94a3b8; font-size: 8px; font-family: monospace; margin-top: 1px;">
+                                                Hash: ${log.hash ? log.hash.substring(0, 16) : 'N/A'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } catch (e) {
+                    listEl.innerHTML = "<div style='color:#ef4444; font-size:10px;'>Chyba při načítání auditních logů.</div>";
+                }
+            };
+
+            window.rotateLocalKeys = async () => {
+                const statusEl = document.getElementById('key-rotation-status');
+                if (!statusEl) return;
+                statusEl.innerHTML = "Rotuji klíče a přešifrovávám databázi...";
+                statusEl.style.color = "#64748b";
+                
+                try {
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/system/rotate-key`, { method: 'POST', headers: conn.headers });
+                    if (!response.ok) throw new Error("Chyba při rotaci klíče.");
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        statusEl.innerHTML = "✅ Klíč úspěšně rotován a RAG indexy přešifrovány!";
+                        statusEl.style.color = "#16a34a";
+                    } else {
+                        throw new Error(data.error || "Neznámá chyba.");
+                    }
+                } catch (e) {
+                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
+                    statusEl.style.color = "#ef4444";
+                }
+            };
+
+            window.downloadArchivalMetadata = async () => {
+                try {
+                    const title = this.currentDocumentTitle || "Nový dokument";
+                    const creator = (await this.core.storage.get('settings', 'lawyer-name')) || "JUDr. Martin Černý";
+                    const description = this.core.getText().substring(0, 200).trim() || "Archivovaný dokument";
+                    const language = document.getElementById('app-lang')?.value || "cs";
+
+                    const conn = this.getLexisLocalConnection();
+                    const response = await fetch(`${conn.baseUrl}/api/document/archive`, {
+                        method: 'POST',
+                        headers: conn.headers,
+                        body: JSON.stringify({
+                            title,
+                            creator,
+                            subject: 'Právní dokument',
+                            description,
+                            type: 'Text',
+                            language,
+                            rights: 'Copyright (c) ' + new Date().getFullYear() + ' ' + creator
+                        })
+                    });
+
+                    if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+
+                    const xmlText = await response.text();
+                    
+                    const blob = new Blob([xmlText], { type: 'application/xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_metadata.xml`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    alert("Chyba při stahování metadat: " + e.message);
+                }
+            };
+
+            if (actions) actions.style.display = 'none';
+            window.loadSovereignTelemetry();
+            window.loadRecentLedgerTransactions();
+        } else if (subTab === 'summary') {
+            output.innerHTML = "📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.";
+            if (actions) {
+                actions.style.display = 'flex';
+                actions.innerHTML = `
+                    <button onclick="document.getElementById('ai-prompt').value='Vytvoř stručné a strukturované shrnutí tohoto textu.'; window.sendAIQuery()" style="padding:8px 16px; background:var(--word-blue); color:white; border:none; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ Spustit shrnutí</button>
+                `;
+            }
+        } else if (subTab === 'kb') {
+            output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
+            if (actions) actions.style.display = 'none';
+        }
+    },
+
+    async anonymizeDocument() {
+        const text = this.core.getText();
+        if (!text || !text.trim()) {
+            this.dialogs.customAlert("Dokument je prázdný, není co anonymizovat.");
+            return;
+        }
+
+        try {
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/document/anonymize`, {
+                method: 'POST',
+                headers: conn.headers,
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) throw new Error("Chyba při komunikaci se serverem.");
+            const data = await response.json();
+            
+            this.showAnonymizationDialog(text, data.anonymized);
+        } catch (e) {
+            this.dialogs.customAlert("Nepodařilo se anonymizovat dokument: " + e.message);
+        }
+    },
+
+    showAnonymizationDialog(originalText, anonymizedText) {
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.background = 'rgba(15, 23, 42, 0.4)';
+        overlay.style.backdropFilter = 'blur(12px)';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '9999';
+        overlay.style.fontFamily = "'Inter', sans-serif";
+        overlay.style.transition = 'all 0.3s ease';
+
+        const dialog = document.createElement('div');
+        dialog.style.background = 'rgba(255, 255, 255, 0.95)';
+        dialog.style.border = '1px solid rgba(255, 255, 255, 0.4)';
+        dialog.style.padding = '30px';
+        dialog.style.borderRadius = '16px';
+        dialog.style.maxWidth = '750px';
+        dialog.style.width = '90%';
+        dialog.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.25)';
+        dialog.style.display = 'flex';
+        dialog.style.flexDirection = 'column';
+        dialog.style.gap = '20px';
+        dialog.style.transform = 'scale(0.95)';
+        dialog.style.transition = 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)';
+
+        dialog.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; background: rgba(22, 163, 74, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #16a34a;">🛡️</div>
+                <div>
+                    <h3 style="margin: 0; color: #1e293b; font-size: 15px; font-weight: 800;">GDPR Data Shield Anonymizace</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
+                        Detekovali a odstranili jsme citlivé údaje. Zkontrolujte výsledek a uložte změny.
+                    </p>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 20px; height: 320px;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase;">PŮVODNÍ TEXT</span>
+                    <textarea readonly style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; resize: none; background: #f8fafc; color: #94a3b8; line-height: 1.5; font-family: inherit;">${originalText}</textarea>
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                    <span style="font-size: 10px; font-weight: 800; color: #16a34a; letter-spacing: 0.5px; text-transform: uppercase;">ANONYMIZOVANÝ TEXT</span>
+                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #bbf7d0; border-radius: 8px; resize: none; background: #f0fdf4; color: #166534; line-height: 1.5; font-family: inherit; outline: none; transition: border-color 0.2s;">${anonymizedText}</textarea>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 5px;">
+                <button id="btn-anon-cancel" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; color: #475569; transition: background 0.2s;">Zrušit</button>
+                <button id="btn-anon-confirm" style="padding: 10px 20px; background: linear-gradient(135deg, #16a34a, #15803d); color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);">Nahradit text v dokumentu</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        setTimeout(() => {
+            dialog.style.transform = 'scale(1)';
+        }, 10);
+
+        dialog.querySelector('#btn-anon-cancel').onclick = () => {
+            dialog.style.transform = 'scale(0.95)';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 250);
+        };
+
+        dialog.querySelector('#btn-anon-confirm').onclick = () => {
+            const finalText = dialog.querySelector('#anonymized-preview-text').value;
+            const anonymizedHtml = finalText
+                .split('\n')
+                .map(para => para.trim() ? `<p>${para}</p>` : '<p><br></p>')
+                .join('');
+            this.core.setContent(anonymizedHtml);
+            
+            dialog.style.transform = 'scale(0.95)';
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(overlay);
+            }, 250);
+        };
+    },
+
+    scanForVariables() {
+        const form = document.getElementById('variables-form');
+        if (!form) return;
+        
+        form.innerHTML = '';
+        const text = this.core.getText();
+        
+        const regex = /\[([A-ZÁ-Ž0-9_]{3,30})\]|\{\{([a-zA-Z0-9_á-žÁ-Ž]{2,30})\}\}/g;
+        const variables = new Set();
+        let match;
+        
+        while ((match = regex.exec(text)) !== null) {
+            const varName = match[1] || match[2];
+            variables.add(varName);
+        }
+        
+        if (variables.size === 0) {
+            form.innerHTML = '<div style="font-size:11px; color:#64748b; text-align:center; padding:10px;">Nebyly nalezeny žádné proměnné typu [JMÉNO] nebo {{jmeno}}.</div>';
+            return;
+        }
+        
+        variables.forEach(varName => {
+            const container = document.createElement('div');
+            container.style = "display:flex; flex-direction:column; gap:4px; margin-bottom:10px;";
+            
+            const label = document.createElement('label');
+            label.style = "font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;";
+            label.innerText = varName;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = `Vyplňte ${varName}...`;
+            input.style = "padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:12px;";
+            
+            input.addEventListener('input', () => {
+                const val = input.value;
+                if (!val) return;
+                
+                let currentText = this.core.quill.root.innerHTML;
+                const updatedHtml = currentText
+                    .split(`[${varName}]`).join(val)
+                    .split(`{{${varName}}}`).join(val);
+                
+                this.core.quill.root.innerHTML = updatedHtml;
+            });
+            
+            container.appendChild(label);
+            container.appendChild(input);
+            form.appendChild(container);
+        });
+    },
+
+    sendViaEmail() {
+        const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+        const subject = "Dokument z LexisEditoru: " + docTitle;
+        const documentText = this.core.getText() || "";
+        const emailContent = documentText.length < 1500 ? documentText : (documentText.substring(0, 1500) + "\n\n...[Text zkrácen z důvodu limitu délky odkazu]...");
+        const body = `${emailContent}\n\n---\nOdesláno z LexisEditoru`;
+        // Bez pevného příjemce — advokát vyplní adresáta v poštovním klientu
+        // (dřív tu byla natvrdo cizí vývojářská adresa). V Electronu přes
+        // shell.openExternal (nové okno pošty), v prohlížeči fallback.
+        const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        if (window.electronAPI && window.electronAPI.openExternalUrl) window.electronAPI.openExternalUrl(url);
+        else window.location.href = url;
+    },
+
+    async saveAsTemplateDialog() {
+        this.checkEnterpriseFeature("Ukládání šablon", async () => {
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const title = text.substring(0, 30).trim() || "Nový vzor";
+            
+            this.customPrompt("Zadejte název nové šablony:", title, async (tplName) => {
+                if (!tplName) return;
+                
+                const templateKey = `tpl_${Date.now()}`;
+                const tplObj = {
+                    title: tplName,
+                    icon: '📄',
+                    desc: 'Uživatelská šablona z editoru',
+                    content: html
+                };
+                
+                // Uložit do IndexedDB
+                await this.core.storage.set('templates', { id: templateKey, ...tplObj });
+                
+                // Také uložit přes Electron API, pokud existuje
+                if (window.electronAPI && window.electronAPI.saveTemplate) {
+                    try {
+                        await window.electronAPI.saveTemplate(templateKey, tplObj);
+                    } catch (e) {
+                        console.warn("Chyba při ukládání šablony do Electron FS:", e);
+                    }
+                }
+                
+                // Aktualizovat start screen
+                this.loadDynamicTemplates();
+                this.customAlert(`✅ <b>Šablona uložena!</b><br><br>Šablona <b>${tplName}</b> byla uložena a bude k dispozici na Úvodní obrazovce.`);
+            });
+        });
+    },
+
+    exportWebPreview() {
+        const html = this.core.getContent();
+        const headerArea = document.getElementById('header-area');
+        const footerArea = document.getElementById('footer-area');
+        const headerHtml = headerArea ? headerArea.innerHTML : '';
+        const footerHtml = footerArea ? footerArea.innerHTML : '';
+        // Náhled musí obsahovat hlavičku i patičku, jinak vypadají jinak než dokument.
+        const full = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Náhled</title></head><body>`
+            + (headerHtml ? `<div class="page-header" style="padding:10mm 20mm 5mm;">${headerHtml}</div>` : '')
+            + `<div class="ql-editor">${html}</div>`
+            + (footerHtml ? `<div class="page-footer" style="padding:5mm 20mm 10mm;">${footerHtml}</div>` : '')
+            + `</body></html>`;
+        const blob = new Blob([full], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+    },
+
+    indexCurrentDocument() {
+        this.checkEnterpriseFeature("Indexace Znalostní báze", async () => {
+            const text = this.core.getText();
+            if (text.trim().length < 10) {
+                this.customAlert("Dokument je příliš krátký pro indexaci.");
+                return;
+            }
+            
+            this.showLoader("Indexuji dokument do lokální Znalostní báze...", async () => {
+                const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+                const chunk = {
+                    title: docTitle,
+                    content: text,
+                    timestamp: new Date().toLocaleString('cs-CZ')
+                };
+                
+                if (!this.core.knowledgeBase) this.core.knowledgeBase = [];
+                this.core.knowledgeBase.push(chunk);
+                
+                await this.core.storage.set('settings', { key: 'knowledge-base', value: this.core.knowledgeBase });
+                this.customAlert(`✅ <b>Indexace úspěšná!</b><br><br>Dokument <b>${docTitle}</b> byl indexován do lokální znalostní báze pro AI rešerše.`);
+            });
+        });
+    },
+
+    async exportToDocx() {
+        if (window.electronAPI && window.electronAPI.exportDocx) {
+            const html = this.core.getContent();
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+            const headerHtml = headerArea ? headerArea.innerHTML : '';
+            const footerHtml = footerArea ? footerArea.innerHTML : '';
+            try {
+                const result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);
+                if (result && result.success) {
+                    this.customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}`);
+                } else if (result && !result.canceled) {
+                    this.customAlert(`Chyba při ukládání dokumentu:\n\n${result.error}`);
+                }
+            } catch (error) {
+                this.customAlert(`Neočekávaná chyba:\n\n${error.message}`);
+            }
+        } else {
+            this.customAlert("Export do DOCX je dostupný pouze v desktopové (Electron) verzi LexisEditoru.");
+        }
+    },
+
+    exportToBundle() {
+        this.checkEnterpriseFeature("Export do Lexis Bundle (.lexis)", async () => {
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const docTitle = document.getElementById('window-doc-title').innerText || "Bez názvu";
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+
+            const bundle = {
+                title: docTitle,
+                html: html,
+                text: text,
+                // Hlavička a patička musí být součástí bundlu, jinak se při re-importu ztratí.
+                headerHtml: headerArea ? headerArea.innerHTML : '',
+                footerHtml: footerArea ? footerArea.innerHTML : '',
+                exportedAt: new Date().toISOString(),
+                version: this.appVersion || '',
+                footnotes: this.core.footnotes || []
+            };
+            
+            const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${docTitle.replace(/[^a-zA-Z0-9-_\sá-žÁ-Ž]/g, '')}.lexis`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.customAlert(`📦 <b>Lexis Bundle vygenerován!</b><br><br>Soubor <b>.lexis</b> obsahuje kompletní text, formátování, zápatí a metadata a byl úspěšně stažen.`);
+        });
+    },
+
+    async searchAres() {
+        this.customPrompt("Zadejte IČO subjektu (8 číslic):", "", async (ico) => {
+            if (!ico) return;
+            const cleanIco = ico.replace(/\s/g, '');
+
+            // Předběžná kontrola IČO (kontrolní součet) — chytí překlep dřív než ARES.
+            if (window.LexisValidators && !window.LexisValidators.isValidIco(cleanIco)) {
+                return this.customAlert("❌ <b>Neplatné IČO</b><br><br>IČO musí mít 8 číslic a platný kontrolní součet. Zkontroluj překlep.");
+            }
+
+            if (window.electronAPI && window.electronAPI.searchAres) {
+                this.showLoader("Lustruji subjekt v ARES...", async () => {
+                    try {
+                        const result = await window.electronAPI.searchAres(cleanIco);
+                        if (result && result.success) {
+                            const d = result.data;
+                            const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                            const html = `
+                                <div style="${baseStyle}">
+                                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
+                                    <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES: Právnická/Fyzická osoba</p>
+                                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
+                                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                        <div><strong>IČO:</strong> ${d.ico}</div>
+                                        <div><strong>DIČ:</strong> ${d.dic || 'Neuvedeno'}</div>
+                                        <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
+                                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Staženo z Rejstříku MFČR (${d.pravniForma})</div>
+                                    </div>
+                                </div>
+                                <p><br></p>
+                            `;
+                            
+                            const range = this.core.quill.getSelection(true);
+                            this.core.safePasteHTML(range.index, html);
+                        } else {
+                            this.customAlert(`ARES API nenašlo žádná data nebo selhalo:\n\n${result.error}`);
+                        }
+                    } catch (error) {
+                        this.customAlert(`Neočekávaná chyba při volání ARES:\n\n${error.message}`);
+                    }
+                });
+            } else {
+                // Lokální simulace, pokud jsme v prohlížeči (pro demo účely)
+                this.showLoader("Simuluji lustraci v ARES (prohlížeč)...", () => {
+                    const results = {
+                        "27082440": { obchodniJmeno: "Alza.cz a.s.", ico: "27082440", dic: "CZ27082440", sidlo: "Jankovcova 1522/53, Holešovice, 170 00 Praha 7", pravniForma: "Akciová společnost" },
+                        "25107354": { obchodniJmeno: "Seznam.cz, a.s.", ico: "25107354", dic: "CZ25107354", sidlo: "Radlická 3294/10, Smíchov, 150 00 Praha 5", pravniForma: "Akciová společnost" }
+                    };
+                    const d = results[cleanIco];
+                    if (d) {
+                        const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                        const html = `
+                            <div style="${baseStyle}">
+                                <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
+                                <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES (Simulace): Právnická osoba</p>
+                                <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
+                                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                    <div><strong>IČO:</strong> ${d.ico}</div>
+                                    <div><strong>DIČ:</strong> ${d.dic}</div>
+                                    <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
+                                    <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Simulovaná data pro prohlížeč (${d.pravniForma})</div>
+                                </div>
+                            </div>
+                            <p><br></p>
+                        `;
+                        const range = this.core.quill.getSelection(true);
+                        this.core.safePasteHTML(range.index, html);
+                    } else {
+                        this.customAlert("Subjekt nebyl v simulátoru ARES nalezen (použijte IČO: 27082440). Hledání v reálném registru vyžaduje spuštění v Electronu.");
+                    }
+                });
+            }
+        });
+    },
+
+    exec(format, value = true) {
+        const current = this.core.quill.getFormat();
+        if (current[format] === value) {
+            this.core.quill.format(format, false);
+        } else {
+            this.core.quill.format(format, value);
+        }
+    },
+
+    indent(val) {
+        const range = this.core.quill.getSelection();
+        if (range) {
+            const currentIndent = this.core.quill.getFormat(range).indent || 0;
+            const newIndent = Math.max(0, currentIndent + val);
+            this.core.quill.format('indent', newIndent === 0 ? false : newIndent);
+        }
+    },
+
+    applyStyle(style) {
+        if (style === 'h1') {
+            this.core.quill.format('header', 1);
+        } else if (style === 'h2') {
+            this.core.quill.format('header', 2);
+        } else {
+            this.core.quill.format('header', false);
+        }
+    },
+
+    applyHighlight(color) {
+        const current = this.core.quill.getFormat();
+        if (current.background === color) {
+            this.core.quill.format('background', false);
+        } else {
+            this.core.quill.format('background', color);
+        }
+    },
+
+    setLineHeight(val) {
+        this.core.quill.format('lineheight', val);
+    },
+
+    toggleDictation() {
+        const btn = document.getElementById('dictation-btn');
+        if (this.isDictating) {
+            if (this.recognition) {
+                this.recognition.stop();
+            }
+            this.isDictating = false;
+            if (btn) {
+                btn.style.background = '';
+                btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+            }
+            this.customAlert("🎙️ <b>Diktování zastaveno.</b>");
+        } else {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                this.customAlert("⚠️ Webová diktace není v tomto prohlížeči podporována. Spusťte aplikaci v Chrome nebo Electronu.");
+                return;
+            }
+            
+            this.recognition = new SpeechRecognition();
+            this.recognition.lang = 'cs-CZ';
+            this.recognition.continuous = true;
+            this.recognition.interimResults = false;
+            
+            this.recognition.onstart = () => {
+                this.isDictating = true;
+                if (btn) {
+                    btn.style.background = 'rgba(239, 68, 68, 0.2)';
+                    btn.innerHTML = '<div class="icon-sq">🔴</div>Nahrávám...';
+                }
+            };
+            
+            this.recognition.onresult = (event) => {
+                const text = event.results[event.results.length - 1][0].transcript;
+                const range = this.core.quill.getSelection(true);
+                this.core.quill.insertText(range.index, text + " ");
+            };
+            
+            this.recognition.onerror = (e) => {
+                console.error("Chyba diktování:", e);
+                if (this.recognition) this.recognition.stop();
+            };
+            
+            this.recognition.onend = () => {
+                this.isDictating = false;
+                if (btn) {
+                    btn.style.background = '';
+                    btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+                }
+            };
+            
+            this.recognition.start();
+        }
+    },
+
+    openPostDialog() {
+        const overlay = document.createElement('div');
+        overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);";
+        
+        const modal = document.createElement('div');
+        modal.style = "background:#fff;padding:28px;border-radius:16px;width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif;border:1px solid #e2e8f0;position:relative;animation: modalFadeIn 0.3s ease;";
+        
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            @keyframes modalFadeIn {
+                from { opacity: 0; transform: translateY(-20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+        
+        modal.innerHTML = `
+            <div style="font-weight:700;font-size:18px;margin-bottom:8px;color:#1e293b;display:flex;align-items:center;gap:10px;">
+                <span>✉️</span> Dopis Online (Česká pošta)
+            </div>
+            <div style="font-size:13px;color:#64748b;margin-bottom:20px;">Odešlete aktuální dokument jako fyzický dopis.</div>
+            
+            <div style="margin-bottom:15px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Adresát (Příjemce):</label>
+                <input id="post-recipient" type="text" value="Jan Novák, Jankovcova 1522, 170 00 Praha" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;box-sizing:border-box;">
+            </div>
+            
+            <div style="margin-bottom:20px;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Typ zásilky:</label>
+                <select id="post-type" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;" onchange="document.getElementById('post-price').innerText = this.value === 'registered' ? '54 Kč' : '26 Kč'">
+                    <option value="standard">Obyčejné psaní (A5/A4) — 26 Kč</option>
+                    <option value="registered">Doporučené psaní — 54 Kč</option>
+                </select>
+            </div>
+            
+            <div style="background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#334155;">
+                <span>Předpokládaná cena:</span>
+                <strong id="post-price" style="color:#2563eb;font-size:15px;margin-left:auto;">26 Kč</strong>
+            </div>
+            
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button id="post-cancel" style="padding:10px 18px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px;">Zrušit</button>
+                <button id="post-send" style="padding:10px 18px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(37,99,235,0.2);">Odeslat dopis</button>
+            </div>
+        `;
+        
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        const close = () => document.body.removeChild(overlay);
+        modal.querySelector('#post-cancel').onclick = close;
+        modal.querySelector('#post-send').onclick = () => {
+            const recip = modal.querySelector('#post-recipient').value;
+            const type = modal.querySelector('#post-type').value === 'registered' ? 'doporučeně' : 'obyčejně';
+            
+            close();
+            // POZOR: skutečné podání zásilky přes PostServis (Dopis Online) NENÍ zapojené —
+            // v main.js je jen uložení přihlašovacích údajů a test spojení, ne odeslání.
+            // Nikdy netvrdíme „Zásilka podána", když se k České poště nic nepředalo.
+            this.customAlert(
+                `✉️ <b>Automatické podání přes Dopis Online zatím není aktivní</b><br><br>`
+                + `Dopis pro příjemce <b>${this._esc ? this._esc(recip) : recip}</b> se přes Českou poštu <b>automaticky neodeslal</b> `
+                + `(napojení na PostServis není zapojené). Dokument máš připravený v editoru — odešli ho zatím jinou cestou `
+                + `(datová schránka, e-mail, nebo ho vytiskni a podej na poště, ${this._esc ? this._esc(type) : type}).`
+            );
+        };
+    },
+
+    syncCloud(service) {
+        // POZOR: napojení na externí cloud (Dropbox/Drive/OneDrive/…) NENÍ implementováno.
+        // Dřív tato funkce jen předstírala úspěch („zálohováno a synchronizováno") — což je
+        // u nástroje, na jehož zálohy se advokát spoléhá, nebezpečné. Nikdy netvrdíme, že se
+        // data někam nahrála, když se nenahrála. LexisEditor je navíc záměrně lokální
+        // (datová suverenita) — data zůstávají šifrovaně na tomto počítači.
+        this.customAlert(
+            `☁️ <b>Synchronizace s ${this._esc ? this._esc(service) : service} zatím není aktivní</b><br><br>`
+            + 'Napojení na externí cloudové úložiště zatím není zapojené — <b>žádná data se nikam nenahrála</b>. '
+            + 'LexisEditor ukládá dokumenty i knihovnu doložek <b>šifrovaně lokálně</b> na tomto počítači. '
+            + 'Zálohu si zajisti lokálně (Time Machine / kopie složky) nebo přes „Záloha klíče".'
+        );
+    },
+
+    showHelpTip(topic) {
+        let title = "";
+        let text = "";
+        
+        if (topic === 'redlining') {
+            title = "🕵️ Sledování změn (Redlining)";
+            text = `1. Aktivujte funkci kliknutím na tlačítko <b>Sledovat změny</b> na kartě <i>Revize</i>.<br>
+2. Veškerý nově přidaný text se v editoru zobrazí zeleně podtržený.<br>
+3. Smazaný text se červeně přeškrtne, ale zůstane zachován pro revizi.<br>
+4. Následně můžete jednotlivé změny vybrat a kliknout na <b>Přijmout</b> nebo <b>Odmítnout</b>.`;
+        } else if (topic === 'blackline') {
+            title = "⚖️ Porovnání verzí (Blackline)";
+            text = `1. Klikněte na tlačítko <b>Srovnat verze</b> na kartě <i>Revize</i>. <br>
+2. Systém automaticky porovná aktuální otevřený dokument s poslední verzí uloženou v databázi.<br>
+3. Všechny změny, přídavky a škrty se přehledně zobrazí v porovnávacím okně.`;
+        } else if (topic === 'connect') {
+            title = "🔗 Integrace LexisConnect";
+            text = `LexisEditor na pozadí naslouchá na standardním portu <b>3300</b>.<br><br>
+Ostatní advokátní systémy (např. <i>Evolio</i> nebo <i>SingleCase</i>) mohou zaslat standardní POST požadavek na endpoint <code>/api/import</code> s formátem HTML dokumentu a editor jej okamžitě načte.<br><br>
+Tímto způsobem funguje bezproblémové propojení s vaším stávajícím cloudovým systémem.`;
+        } else if (topic === 'scan') {
+            title = "📸 Mobilní skenování (LexisLink)";
+            text = `1. Otevřete <b>LexisLink Remote</b> ve svém mobilním telefonu (odkaz naleznete v horním Ribbonu).<br>
+2. Zvolte možnost <b>Skenovat dokument</b>.<br>
+3. Vyfoťte papírovou smlouvu nebo listinu.<br>
+4. Mobilní telefon provede okamžité lokální OCR a pošle hotový text přímo do vašeho rozpracovaného dokumentu v PC na pozici kurzoru.`;
+        } else if (topic === 'clauses') {
+            title = "📚 Knihovna právních doložek";
+            text = `1. Označte v dokumentu libovolný text (např. rozhodčí doložku nebo ujednání o úroku z prodlení).<br>
+2. V postranním panelu <i>Toolbox</i> zvolte záložku <b>Doložky</b> a klikněte na <b>Uložit vybrané</b>.<br>
+3. Doložku pojmenujte. Od té chvíle ji máte bezpečně uloženou v IndexedDB a můžete ji jediným kliknutím vložit do jakékoliv jiné smlouvy.`;
+        } else if (topic === 'toc') {
+            title = "📜 Automatické generování obsahu";
+            text = `1. Formátujte nadpisy v dokumentu jako <b>Nadpis 1</b> (H1) nebo <b>Nadpis 2</b> (H2).<br>
+2. Nastavte kurzor na místo, kde má být obsah.<br>
+3. Na kartě <i>Vložit</i> klikněte na <b>Obsah</b>.<br>
+4. LexisEditor dynamicky projde strukturu a vygeneruje čistý, formátovaný přehled kapitol.`;
+        } else if (topic === 'qat-guide') {
+            title = "📌 Panel Rychlý přístup (QAT)";
+            text = `<b>Přizpůsobení panelu Rychlý přístup:</b><br><br>
+1. <b>Připnutí nových funkcí:</b> Klikněte pravým tlačítkem myši na jakoukoli ikonu/funkci v horním Ribbon menu a zvolte <i>„Přidat na panel Rychlý přístup“</i>.<br>
+2. <b>Odebrání:</b> Klikněte pravým tlačítkem myši na ikonu přímo v horním panelu rychlého přístupu (zcela nahoře vedle názvu souboru) a zvolte <i>„Odebrat/Skrýt z panelu Rychlý přístup“</i>.<br>
+3. <b>Rychlé nastavení:</b> Můžete také kliknout na šipku <b>▾</b> na konci panelu Rychlého přístupu pro rychlé zapnutí/vypnutí výchozích systémových tlačítek (Uložit, Zpět, Tisk...).`;
+        } else if (topic === 'user-guide') {
+            title = "📖 Návod na zprovoznění lokální AI (Apple Intelligence & Ollama)";
+            text = `<div style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; font-family: inherit; line-height: 1.6; font-size: 13px;">
+                <p>Vítejte u kompletního průvodce pro nastavení <b>100% offline umělé inteligence</b> v LexisEditoru. Všechna data jsou zpracovávána výhradně na vašem lokálním počítači.</p>
+                
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:16px;">🍏 Metoda A: Apple Intelligence (přes "apfel")</h3>
+                <p>Umožňuje přímý přístup k integrovanému 3B AI modelu ve vašem Macu s procesorem Apple Silicon (M1/M2/M3/M4) s macOS 15.0+ (Sequoia).</p>
+                <ol style="padding-left: 20px;">
+                    <li>Otevřete aplikaci <b>Terminál</b>.</li>
+                    <li>Nainstalujte Homebrew (pokud jej nemáte):<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></li>
+                    <li>Nainstalujte nástroj apfel:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">brew install Arthur-Ficial/tap/apfel</code></li>
+                    <li>Spusťte lokální AI server:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px; font-weight:bold;">apfel --serve</code></li>
+                    <li>Na kartě <b>LexisAI</b> zvolte jako poskytovatele <b>Apple Intelligence (apfel)</b>. Endpoint a model se nastaví automaticky.</li>
+                </ol>
+                <div style="background:rgba(37,99,235,0.08); border-left:4px solid #2563eb; padding:8px 12px; margin:12px 0; border-radius:0 4px 4px 0; font-size:12px;">
+                    💡 <b>Tip:</b> Okno s běžícím příkazem <code>apfel --serve</code> ponechte otevřené na pozadí.
+                </div>
+
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🦙 Metoda B: Ollama (Univerzální lokální AI)</h3>
+                <p>Vhodné pro Windows, Linux i starší Intel Macy. Umožňuje spouštět libovolné open-source modely (např. Llama 3).</p>
+                <ol style="padding-left: 20px;">
+                    <li>Stáhněte a nainstalujte aplikaci ze stránky <a href="https://ollama.com" target="_blank" style="color:#2563eb; text-decoration:underline;">ollama.com</a>.</li>
+                    <li>Otevřete Terminál / Příkazový řádek a stáhněte model Llama 3:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">ollama run llama3</code></li>
+                    <li>V Ribbonu na kartě <b>LexisAI</b> zvolte poskytovatele <b>Ollama (Local)</b>.</li>
+                </ol>
+
+                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🔒 Absolutní Datová Suverenita</h3>
+                <p>Veškeré rešerše, audity smluv i hlasové diktování probíhají offline v paměti vašeho počítače. Žádná data neopouštějí váš stroj.</p>
+            </div>`;
+        } else if (topic === 'updates') {
+            title = "🔄 Kontrola aktualizací";
+            text = `<b>Aktuální verze:</b> v${this.appVersion || '—'}<br><br>
+Provádím kontrolu lokálního úložiště a serverů...<br>
+<i>Vaše verze je aktuální. Žádné nové aktualizace nejsou k dispozici.</i>`;
+        } else if (topic === 'about') {
+            title = "ℹ️ O aplikaci LexisEditor";
+            text = `<b>LexisEditor Professional Legal Workspace</b><br>
+Verze: <b>3.5.0</b><br><br>
+Lokální právní textový procesor s integrovaným AI asistentem, napojením na státní registry (ARES) a šifrovaným úložištěm.<br><br>
+<i>Vyvinuto s důrazem na absolutní datovou suverenitu advokátní praxe. All rights reserved.</i>`;
+        }
+        
+        this.customAlert(`<b>${title}</b><br><br>${text}`);
+    },
+
+    saveAISettings() {
+        const provEl = document.getElementById('ai-provider');
+        const modelEl = document.getElementById('ai-model');
+        const endEl = document.getElementById('ai-endpoint');
+        const keyEl = document.getElementById('ai-apikey');
+        const fallbackEl = document.getElementById('ai-offline-fallback');
+        
+        if (!provEl) return;
+        
+        const settings = {
+            provider: provEl.value,
+            model: modelEl ? modelEl.value : "llama3",
+            endpoint: endEl ? endEl.value : "http://localhost:11434/api/generate",
+            apiKey: keyEl ? keyEl.value : "",
+            enableOfflineFallback: fallbackEl ? fallbackEl.checked : true
+        };
+        localStorage.setItem('lexis_ai_settings', JSON.stringify(settings));
+        console.log('AI Settings saved:', settings);
+    },
+
+    loadAISettings() {
+        const saved = localStorage.getItem('lexis_ai_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                const provEl = document.getElementById('ai-provider');
+                const modelEl = document.getElementById('ai-model');
+                const endEl = document.getElementById('ai-endpoint');
+                const keyEl = document.getElementById('ai-apikey');
+                const fallbackEl = document.getElementById('ai-offline-fallback');
+                
+                if (provEl && s.provider) provEl.value = s.provider;
+                if (modelEl && s.model) modelEl.value = s.model;
+                if (endEl && s.endpoint) endEl.value = s.endpoint;
+                if (keyEl && s.apiKey) keyEl.value = s.apiKey;
+                if (fallbackEl && s.enableOfflineFallback !== undefined) fallbackEl.checked = s.enableOfflineFallback;
+            } catch (e) {
+                console.error("Chyba při načítání AI nastavení:", e);
+            }
+        }
+        this.toggleLexisLocalSelectors();
+    },
+
+    saveFeatureSettings() {
+        const liveDlEl = document.getElementById('settings-live-deadline-scan');
+        const watcherEl = document.getElementById('settings-desktop-file-watcher');
+        const linkTargetEl = document.getElementById('settings-legal-link-target');
+        
+        this.enableLiveDeadlineScan = liveDlEl ? liveDlEl.checked : true;
+        this.enableDesktopFileWatcher = watcherEl ? watcherEl.checked : true;
+        this.legalLinkTarget = linkTargetEl ? linkTargetEl.value : "zakonyprolidi";
+        
+        const settings = {
+            enableLiveDeadlineScan: this.enableLiveDeadlineScan,
+            enableDesktopFileWatcher: this.enableDesktopFileWatcher,
+            legalLinkTarget: this.legalLinkTarget
+        };
+        localStorage.setItem('lexis_feature_settings', JSON.stringify(settings));
+        console.log('Feature settings saved:', settings);
+        
+        // Notify backend about watcher state change
+        try {
+            const conn = this.getLexisLocalConnection();
+            fetch(`${conn.baseUrl}/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST', headers: conn.headers })
+                .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
+        } catch (e) {
+            console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
+        }
+    },
+
+    loadFeatureSettings() {
+        const saved = localStorage.getItem('lexis_feature_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                if (s.enableLiveDeadlineScan !== undefined) this.enableLiveDeadlineScan = s.enableLiveDeadlineScan;
+                if (s.enableDesktopFileWatcher !== undefined) this.enableDesktopFileWatcher = s.enableDesktopFileWatcher;
+                if (s.legalLinkTarget !== undefined) this.legalLinkTarget = s.legalLinkTarget;
+            } catch (e) {
+                console.error("Chyba při parsování nastavení volitelných funkcí:", e);
+            }
+        }
+        
+        // Set DOM elements state
+        const liveDlEl = document.getElementById('settings-live-deadline-scan');
+        const watcherEl = document.getElementById('settings-desktop-file-watcher');
+        const linkTargetEl = document.getElementById('settings-legal-link-target');
+        
+        if (liveDlEl) liveDlEl.checked = this.enableLiveDeadlineScan;
+        if (watcherEl) watcherEl.checked = this.enableDesktopFileWatcher;
+        if (linkTargetEl) linkTargetEl.value = this.legalLinkTarget;
+        
+        // Notify backend about watch state
+        try {
+            const conn = this.getLexisLocalConnection();
+            fetch(`${conn.baseUrl}/api/watcher/toggle?active=${this.enableDesktopFileWatcher}`, { method: 'POST', headers: conn.headers })
+                .catch(e => console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil."));
+        } catch (e) {
+            console.log("LexisLocal je offline, stav watcheru se na pozadí neuložil.");
+        }
+    },
+
+    updateAIProviderDefaults() {
+        const provEl = document.getElementById('ai-provider');
+        const modelEl = document.getElementById('ai-model');
+        const endEl = document.getElementById('ai-endpoint');
+        
+        if (!provEl || !modelEl || !endEl) return;
+        
+        const provider = provEl.value;
+        if (provider === 'lexislocal') {
+            modelEl.value = "swarm";
+            endEl.value = "http://localhost:4000";
+        } else if (provider === 'apfel') {
+            modelEl.value = "apple-intelligence";
+            endEl.value = "http://localhost:11434/v1/chat/completions";
+        } else if (provider === 'ollama') {
+            modelEl.value = "llama3";
+            endEl.value = "http://localhost:11434/api/generate";
+        } else if (provider === 'openai') {
+            modelEl.value = "gpt-4o";
+            endEl.value = "https://api.openai.com/v1/chat/completions";
+        } else if (provider === 'deepseek') {
+            modelEl.value = "deepseek-chat";
+            endEl.value = "https://api.deepseek.com/v1/chat/completions";
+        } else if (provider === 'google') {
+            modelEl.value = "gemini-pro";
+            endEl.value = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+        } else if (provider === 'lmstudio') {
+            modelEl.value = "local-model";
+            endEl.value = "http://localhost:1234/v1/chat/completions";
+        }
+        this.saveAISettings();
+        this.toggleLexisLocalSelectors();
+    },
+
+    getLexisLocalConnection() {
+        let endpoint = "http://localhost:4000";
+        let apiKey = "";
+
+        const endEl = document.getElementById('ai-endpoint');
+        const keyEl = document.getElementById('ai-apikey');
+
+        if (endEl && endEl.value) endpoint = endEl.value;
+        if (keyEl && keyEl.value) apiKey = keyEl.value;
+
+        const saved = localStorage.getItem('lexis_ai_settings');
+        if (saved) {
+            try {
+                const s = JSON.parse(saved);
+                if (s.endpoint) endpoint = s.endpoint;
+                if (s.apiKey) apiKey = s.apiKey;
+            } catch (e) {}
+        }
+
+        // Heuristically adjust port and protocol if it points to Ollama
+        let baseUrl = endpoint;
+        if (baseUrl.includes("11434") || baseUrl.includes("/api/generate")) {
+            const isHttps = endpoint.startsWith("https:");
+            baseUrl = `${isHttps ? "https" : "http"}://localhost:4000`;
+        }
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.slice(0, -1);
+        }
+
+        const headers = { "Content-Type": "application/json" };
+        // Token: ruční klíč má přednost, jinak auto z lokálního souboru (přes preload).
+        const llToken = apiKey || (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.lexisLocalToken) || "";
+        if (llToken) {
+            headers["X-API-Token"] = llToken;
+        }
+
+        return { baseUrl, headers };
+    },
+
+    toggleLexisLocalSelectors() {
+        const provEl = document.getElementById('ai-provider');
+        const container = document.getElementById('lexislocal-selectors-container');
+        const modelBox = document.getElementById('lexislocal-model-box');
+        if (!provEl || !container) return;
+        
+        container.style.display = 'flex';
+        
+        if (provEl.value === 'lexislocal') {
+            if (modelBox) modelBox.style.display = 'flex';
+            this.fetchLexisLocalModels();
+        } else {
+            if (modelBox) modelBox.style.display = 'none';
+        }
+    },
+
+    async fetchLexisLocalModels() {
+        const modelSelect = document.getElementById('lexislocal-model');
+        if (!modelSelect) return;
+        
+        try {
+            const conn = this.getLexisLocalConnection();
+            const response = await fetch(`${conn.baseUrl}/api/models`, { headers: conn.headers });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.models && data.models.length > 0) {
+                    modelSelect.innerHTML = '';
+                    data.models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.name;
+                        opt.innerText = m.name;
+                        modelSelect.appendChild(opt);
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("⚠️ Nepodařilo se načíst modely z LexisLocal backendu:", e);
+        }
+    },
+
+    toggleStatusDropdown(event) {
+        event.stopPropagation();
+        const dd = document.getElementById('status-dropdown');
+        if (dd) {
+            const isShown = dd.style.display === 'block';
+            dd.style.display = isShown ? 'none' : 'block';
+        }
+    },
+
+    setDocumentStatus(status, suppressNotification = false) {
+        this.documentStatus = status;
+        const badge = document.getElementById('doc-status-badge');
+        if (!badge) return;
+        
+        // Remove all previous status classes
+        badge.className = 'status-pill';
+        
+        let label = '';
+        if (status === 'draft') {
+            badge.classList.add('status-draft');
+            label = '✍️ Rozpracované';
+        } else if (status === 'ai') {
+            badge.classList.add('status-ai');
+            label = '✨ Generované AI';
+        } else if (status === 'review') {
+            badge.classList.add('status-review');
+            label = '🔍 Ke kontrole';
+        } else if (status === 'final') {
+            badge.classList.add('status-final');
+            label = '✅ Hotové';
+        }
+        
+        badge.innerText = label;
+        
+        if (!suppressNotification) {
+            if (status === 'final') {
+                this.customConfirm(
+                    `💼 <b>Stav dokumentu změněn na: ✅ Hotové</b><br><br>` +
+                    `Přejete si tento dokument automaticky <b>převést na čistý úřední formát</b>?<br><br>` +
+                    `Tento proces:<br>` +
+                    `• Převede hypertextové odkazy (Legal Linker) na běžný text.<br>` +
+                    `• Schválí všechny sledované změny (smazaný text zmizí, přidaný se sloučí).<br>` +
+                    `• Vypne režim sledování změn.`,
+                    `Vyčistit a dokončit`,
+                    `Ponechat s revizemi`,
+                    (shouldClean) => {
+                        if (shouldClean) {
+                            this.cleanDocumentForOfficialSubmission();
+                        } else {
+                            this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b> (odkazy a revize byly ponechány beze změny).`);
+                        }
+                    }
+                );
+            } else {
+                this.customAlert(`💼 <b>Stav dokumentu změněn</b><br><br>Dokument byl označen jako: <b>${label}</b>`);
+            }
+        }
+        
+        this.saveActiveDocumentState();
+    },
+
+    async saveActiveDocumentState() {
+        try {
+            if (!this.currentDocumentId) {
+                this.currentDocumentId = 'doc_' + Date.now();
+            }
+            
+            const html = this.core.getContent();
+            const text = this.core.getText();
+            const title = this.currentDocumentTitle || text.substring(0, 30).trim() || "Nový dokument";
+            
+            const headerArea = document.getElementById('header-area');
+            const footerArea = document.getElementById('footer-area');
+            const headerHtml = headerArea ? headerArea.innerHTML : '';
+            const footerHtml = footerArea ? footerArea.innerHTML : '';
+            
+            const state = {
+                id: this.currentDocumentId,
+                html: html,
+                text: text,
+                title: title,
+                status: this.documentStatus || 'draft',
+                deadline: this.currentDocumentDeadline || null,
+                cj: this.currentDocumentCj || '',
+                headerHtml: headerHtml,
+                footerHtml: footerHtml,
+                updatedAt: new Date().toISOString()
+            };
+            
+            await this.core.storage.set('documents', state);
+            await this.core.storage.set('settings', { key: 'active-document-id', value: this.currentDocumentId });
+        } catch (e) {
+            console.error("Chyba při ukládání stavu aktivního dokumentu:", e);
+        }
+    }
+
+});

@@ -2,6 +2,26 @@
 
 Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
+## [Nevydáno]
+### Zabezpečení
+- **Zámek aplikace**: heslo se ukládá jako scrypt hash se solí a ověřuje v konstantním čase; minimální délka hesla (8) vynucená v hlavním procesu; starší hash se při ověření migruje.
+- **Parsování `.zfo`**: korektní čtení PKCS#7/CMS přes node-forge (ASN.1), heuristika jen jako fallback.
+- **Offline AI**: fallback už negeneruje konkrétní paragrafy ani spisové značky — jen jasné upozornění, že jde o offline režim bez právního stanoviska.
+- **Automatické napojení na LexisLocal token**: editor si API token čte sám z lokálního souboru a posílá ho v hlavičce `X-API-Token`; není třeba nic vkládat ručně.
+
+### Přidáno
+- **Edice a generalizace**: oddělení edic (základ / Pro pro advokáty), příprava pro firmy i jednotlivce; právní logika vytažena do samostatných modulů.
+- **Datové schránky (ISDS)**: schránka příchozích i odchozích zpráv, režimy stažení, podepsané doručenky, lhůta → kalendář, přeposlání klientovi.
+- **Najít/Nahradit** v editoru; jednoklikové vložení účastníka a odpověď s hlavičkou z otevřeného dokumentu.
+
+### Změněno / Refaktoring
+- Bezpečnostní logika vytažena z `main.js` do testovaných modulů (`js/core/lexis-lock.js`, `js/core/lexis-zfo.js`); přibyly testy (zámek, zfo, ISDS inbox/outbox, kontakty).
+- **Rozbití monolitů**: renderer skript oddělen z `index.html` do `js/renderer-bootstrap.js`; `js/ui/lexis-ui.js` (6472 ř.) rozděleno na jádro + 6 prototype-mixin modulů (`lexis-ui-1..6.js`) beze změny chování.
+
+## [3.4.1] - 2026-06-15
+### Opraveno
+- Lokální opravy pro **Windows Hello** (biometrické přihlášení) a **kalkulátor advokátního tarifu** (odměny).
+
 ## [3.4.0] - 2026-05-31
 ### Přidáno
 - **Chytré záhlaví a zápatí**: AI generátor nyní respektuje layout a generuje obsah výhradně do těla dokumentu s chytrou extrakcí spisových značek.
