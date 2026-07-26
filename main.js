@@ -9,6 +9,7 @@ const pdf = require('pdf-parse');
 const forge = require('node-forge');
 const crypto = require('crypto');
 const lexisLinkSec = require('./js/core/lexis-link-security.js');
+const lexisLock = require('./js/core/lexis-lock.js');
 const isdsClient = require('./js/core/isds-client.js');
 const { IsdsOutbox } = require('./js/core/isds-outbox.js');
 const { IsdsInbox } = require('./js/core/isds-inbox.js');
@@ -1556,11 +1557,9 @@ const lockConfigPath = path.join(app.getPath('userData'), 'lexis_lock.json');
 
 // Uložení nastavení zámku (enable/disable + jednosměrně hašované heslo)
 // Heslo se ukládá jako scrypt hash se solí — NELZE ho zpětně dešifrovat.
+// Deleguje na testovaný js/core/lexis-lock.js (formát zachován beze změny).
 function hashPasswordScrypt(password) {
-    const salt = crypto.randomBytes(16);
-    const keylen = 64;
-    const derived = crypto.scryptSync(password, salt, keylen);
-    return { salt: salt.toString('hex'), hash: derived.toString('hex'), keylen };
+    return lexisLock.hashPassword(password);
 }
 
 ipcMain.handle('lock-save-config', async (event, config) => {
@@ -1636,12 +1635,7 @@ ipcMain.handle('lock-verify-password', async (event, inputPassword) => {
 
         // Preferovaná cesta: scrypt hash se solí, porovnání v konstantním čase.
         if (raw.passwordScrypt && raw.passwordScrypt.salt && raw.passwordScrypt.hash) {
-            const salt = Buffer.from(raw.passwordScrypt.salt, 'hex');
-            const keylen = raw.passwordScrypt.keylen || 64;
-            const derived = crypto.scryptSync(inputPassword || '', salt, keylen);
-            const stored = Buffer.from(raw.passwordScrypt.hash, 'hex');
-            const ok = derived.length === stored.length && crypto.timingSafeEqual(derived, stored);
-            return { success: ok };
+            return { success: lexisLock.verifyPassword(raw.passwordScrypt, inputPassword) };
         }
 
         // Legacy (reverzibilní safeStorage) — ověř a rovnou upgraduj na scrypt.
