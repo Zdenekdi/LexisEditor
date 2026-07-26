@@ -18,7 +18,11 @@ Všechny podstatné změny v tomto projektu budou zaznamenány v tomto souboru.
 
 ### Změněno / Refaktoring
 - Bezpečnostní logika vytažena z `main.js` do testovaných modulů (`js/core/lexis-lock.js`, `js/core/lexis-zfo.js`); přibyly testy (zámek, zfo, ISDS inbox/outbox, kontakty).
+- **Hromadné generování (kampaně)**: čistá logika CSV/merge vytažena do `js/core/lexis-merge.js` s testy; `lexis-ui.js` deleguje.
 - **Rozbití monolitů**: renderer skript oddělen z `index.html` do `js/renderer-bootstrap.js`; `js/ui/lexis-ui.js` (6472 ř.) rozděleno na jádro + 6 prototype-mixin modulů (`lexis-ui-1..6.js`) beze změny chování.
+
+### Opraveno
+- **CSV pro hromadné generování**: pole v uvozovkách s čárkou (typicky adresa) se už nerozdělí špatně.
 
 ## [3.4.1] - 2026-06-15
 ### Opraveno

@@ -760,6 +760,11 @@ Object.assign(LexisUI.prototype, {
     },
 
     parseCsvToRecords(csvText) {
+        // Delegace na sdílenou, testovanou logiku (js/core/lexis-merge.js) — jeden zdroj
+        // pravdy, navíc s podporou uvozovek (adresa s čárkou). Fallback pro jistotu.
+        if (window.LexisMerge && window.LexisMerge.parseCsvToRecords) {
+            return window.LexisMerge.parseCsvToRecords(csvText);
+        }
         const lines = csvText.trim().split('\n').filter(l => l.trim());
         if (lines.length < 2) return [];
         const headers = lines[0].split(',').map(h => h.trim());

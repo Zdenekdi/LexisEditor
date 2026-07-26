@@ -40,6 +40,11 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
   (ASN.1 → zapouzdřený obsah), tolerantně k namespace prefixům a s `dmFileDescr` jako atributem i
   elementem; heuristika zůstává jako fallback. Ověřeno na uměle podepsaném CMS.
 
+- [x] **HOTOVO — Hromadné generování: vytažená a testovaná logika + oprava CSV.** Čistá logika
+  mail-merge (CSV → záznamy, dosazení `{{Klíč}}`) je v `js/core/lexis-merge.js` (+ testy
+  `tests/unit/merge.test.js`); `lexis-ui.js` na ni deleguje. Parser CSV nově zvládá **uvozovky**
+  (adresa s čárkou, např. „nám. Míru 7, Praha 2", se nerozbije) — pro CSV bez uvozovek beze změny.
+
 - [x] **HOTOVO — Odpověď na příchozí datovku.** Přijaté datové zprávy mají nově akci „↩️ Odpovědět“,
   která vytáhne č.j./sp. zn. z přijaté zprávy (`LexisReply.extract`) a vloží do editoru koncept odpovědi
   s hlavičkou (`LexisReply.buildReplyHtml`). Logika je v `js/ui/lexis-reply-inbox.js` (+ test
