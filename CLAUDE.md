@@ -18,6 +18,7 @@ Build/test: `npm start`, `npm test` (jest), `npm run test:e2e` (playwright), `np
 > + testy; `calculateDeadlineDate` beze změny. **Zbývá jen napojení:** pipeline `watcher.js`/`paperless.js`
 > a AI extraktor pořád ukládají jen `deadlineDays` — přepnout na jednotky (auto-ukládá bez potvrzení,
 > doporučuji projít s tebou).
+> ✅ End-to-end HOTOVO: pipeline (watcher.js/paperless.js) uklada nedenni lhuty do detectedDeadlines[] s needsReview; editor je v inboxu zobrazuje jako Lhuty k overeni s tlacitkem Potvrdit (ulozi do hlidace pres promptAddDeadlineDate).
 
 
 Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tamního repa.

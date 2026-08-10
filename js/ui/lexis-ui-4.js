@@ -230,6 +230,19 @@ Object.assign(LexisUI.prototype, {
                             insolvencyBadge = `<span style="font-size: 9px; font-weight: 800; color: #be123c; background: #ffe4e6; border: 1px solid #fda4af; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">⚠️ V INSOLVENCI (${doc.insolvencyCase})</span>`;
                         }
                         
+                        // Lhůty v měsících/týdnech detekované backendem (needsReview) — advokát je potvrzuje.
+                        let reviewHtml = '';
+                        if (Array.isArray(doc.detectedDeadlines) && doc.detectedDeadlines.length) {
+                            const lbl = { week: 'týd.', month: 'měs.', year: 'r.', day: 'dní' };
+                            reviewHtml = `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:6px 8px;font-size:10px;color:#92400e;">`
+                                + `<div style="font-weight:700;margin-bottom:3px;">⏳ Lhůty k ověření (detekováno z textu):</div>`
+                                + doc.detectedDeadlines.map(d => `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:2px;">`
+                                    + `<span>${d.amount} ${lbl[d.unit] || d.unit} → <b>${d.deadlineDate}</b></span>`
+                                    + `<button class="review-dl-btn" data-date="${d.deadlineDate}" data-ctx="${window.escapeHTML(String(d.context || '')).replace(/"/g,'&quot;')}" style="padding:2px 8px;font-size:9px;font-weight:700;color:#fff;background:#f59e0b;border:none;border-radius:4px;cursor:pointer;">✓ Potvrdit</button>`
+                                    + `</div>`).join('')
+                                + `</div>`;
+                        }
+
                         card.innerHTML = `
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px;">
                                 <div style="font-weight: 700; font-size: 12px; color: #1e293b; display: flex; align-items: center; gap: 4px;">
@@ -245,6 +258,7 @@ Object.assign(LexisUI.prototype, {
                             <div style="font-size: 10px; color: #64748b; font-style: italic; background: #f8fafc; padding: 6px; border-radius: 4px; line-height: 1.3;">
                                 ${doc.summary}
                             </div>
+                            ${reviewHtml}
                             <div style="display: flex; gap: 6px; margin-top: 4px;">
                                 <button id="prepare-reply-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}" style="flex: 1; padding: 5px 8px; font-size: 10px; font-weight: 700; color: white; background: var(--word-blue); border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">📝 Připravit odpověď</button>
                                 <button id="mark-done-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}" style="padding: 5px 8px; font-size: 10px; font-weight: 600; color: #64748b; background: #e2e8f0; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">🔕 Hotovo</button>
@@ -258,6 +272,11 @@ Object.assign(LexisUI.prototype, {
                         const doneBtn = card.querySelector(`[id="mark-done-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}"]`);
                         if (prepBtn) prepBtn.onclick = () => this.prepareReply(doc);
                         if (doneBtn) doneBtn.onclick = () => this.markInboxRead(doc.fileName);
+                        card.querySelectorAll('.review-dl-btn').forEach(btn => {
+                            btn.onclick = () => this.promptAddDeadlineDate(
+                                btn.getAttribute('data-date'),
+                                btn.getAttribute('data-ctx') || (doc.caseNumber + ' — lhůta z dokumentu'));
+                        });
                     });
                 } else {
                     inboxList.innerHTML = `<div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 0;">Žádné nové spisy ke zpracování.</div>`;
