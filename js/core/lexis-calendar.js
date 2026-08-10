@@ -89,6 +89,38 @@ function computeDeadline(deliveredAt, days) {
     return nextWorkingDay(addDays(deliveredAt, days));
 }
 
+// Přičte měsíce s ošetřením konce měsíce (§ 57 odst. 2 o.s.ř.): výsledek má stejné
+// číslo dne; není-li takový den v cílovém měsíci (např. 31. → únor), vezme se
+// POSLEDNÍ den měsíce. Rok = 12 měsíců.
+function addMonthsClamped(d, months) {
+    const date = (d instanceof Date) ? new Date(d.getTime()) : new Date(d);
+    const total = date.getMonth() + (parseInt(months, 10) || 0);
+    const y = date.getFullYear() + Math.floor(total / 12);
+    const m = ((total % 12) + 12) % 12;
+    const lastDay = new Date(y, m + 1, 0).getDate(); // 0. den následujícího měsíce = poslední den cílového
+    return new Date(y, m, Math.min(date.getDate(), lastDay));
+}
+
+// Obecný výpočet konce lhůty podle jednotky. § 57 o.s.ř.:
+//   • dny: poslední den = doručení + N (den doručení se nepočítá),
+//   • týdny/měsíce/roky (odst. 2): končí dnem, který se OZNAČENÍM shoduje se dnem
+//     počátku (u týdnů = stejný den v týdnu → + 7·N dní; u měsíců/let = stejné číslo
+//     dne s ošetřením konce měsíce).
+// V každém případě: padne-li konec na So/Ne/svátek, posun na následující pracovní den.
+// unit ∈ {'day','week','month','year'} (default 'day').
+function computeDeadlineByUnit(deliveredAt, amount, unit) {
+    const n = parseInt(amount, 10) || 0;
+    let end;
+    switch (unit) {
+        case 'week':  end = addDays(deliveredAt, n * 7); break;
+        case 'month': end = addMonthsClamped(deliveredAt, n); break;
+        case 'year':  end = addMonthsClamped(deliveredAt, n * 12); break;
+        case 'day':
+        default:      end = addDays(deliveredAt, n); break;
+    }
+    return nextWorkingDay(end);
+}
+
 // České měsíce (genitiv, jak se píší v datu „25. července 2026"), bez diakritiky.
 const CZ_MONTHS = {
     ledna: 1, unora: 2, brezna: 3, dubna: 4, kvetna: 5, cervna: 6,
@@ -154,6 +186,66 @@ function detectDeadlineDays(text) {
         }
     }
     return detected;
+}
+
+// České číslovky (1–30, běžné tvary vč. skloňování) → číslo. Jen jednoznačné.
+var _CZ_NUM = {
+    'jeden':1,'jednoho':1,'jedne':1,'jednu':1,'jedna':1,
+    'dva':2,'dvou':2,'dve':2,'dvema':2,
+    'tri':3,'trech':3,'trem':3,
+    'ctyri':4,'ctyr':4,'ctyrech':4,
+    'pet':5,'peti':5,'sest':6,'sesti':6,'sedm':7,'sedmi':7,'osm':8,'osmi':8,
+    'devet':9,'deviti':9,'deset':10,'desiti':10,
+    'patnact':15,'patnacti':15,'dvacet':20,'dvaceti':20,'tricet':30,'triceti':30
+};
+function _deaccent(s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+function _parseNum(token) {
+    if (token == null) return null;
+    var s = String(token).trim();
+    if (/^\d+$/.test(s)) return parseInt(s, 10);
+    var key = _deaccent(s);
+    return Object.prototype.hasOwnProperty.call(_CZ_NUM, key) ? _CZ_NUM[key] : null;
+}
+
+// Detekuje lhůty zadané POČTEM + JEDNOTKOU (dny/týdny/měsíce/roky), digit i slovní
+// číslovkou. Vrací [{ amount, unit, context }] bez duplicit (unit: 'day'|'week'|'month'|'year').
+// Pozor na false-positive: měsíce/týdny/roky bere jen v řádcích s lhůtovým kontextem
+// (lhůta, do…, nejpozději, podat, vyjádření, odvolání, dovolání, žaloba, stížnost, termín…).
+// Doplňuje detectDeadlineDays (ta zůstává pro zpětnou kompatibilitu jen na dny).
+function detectDeadlines(text) {
+    if (!text) return [];
+    var NUM = '(\\d+|jed(?:en|noho|n[eé]|nu|na)|dv(?:a|ou|[eě]|[eě]ma)|t[rř][ií]|t[rř]ech|t[rř]em|[cč]ty[rř](?:i|ech)?|p[eě]t|p[eě]ti|[sš]est|[sš]esti|sedm|sedmi|osm|osmi|dev[eě]t|dev[ií]ti|deset|des[ií]ti|patn[aá]ct|patn[aá]cti|dvacet|dvaceti|t[rř]icet|t[rř]iceti)';
+    var END = '(?![a-zá-žA-ZÁ-Ž])'; // konec slova i za českou diakritikou (\b je u á-ž nespolehlivé)
+    var pat = {
+        day:   new RegExp(NUM + '\\s+(?:pracovn[ií]ch\\s+)?(?:den|dnech|dn[uůíey])' + END, 'gi'),
+        week:  new RegExp(NUM + '\\s+(?:t[yý]dnech|t[yý]den|t[yý]dn[uůyeí])' + END, 'gi'),
+        month: new RegExp(NUM + '\\s+m[eě]s[ií]c[uůeieí]*' + END, 'gi'),
+        year:  new RegExp(NUM + '\\s+(?:let|roky|rok[uůy]?|roce)' + END, 'gi')
+    };
+    // Kontext lhůty (pro měsíce/týdny/roky povinný; pro dny volnější, jako dřív).
+    var ctxRe = /(lh[uů]t|nejpozd|ve lh[uů]t|do\s+\d|do\s+[a-zá-ž]+\s+(?:m[eě]s|t[yý]d|dn|rok|let)|podat|vyj[aá]d[rř]|odvol|dovol|n[aá]mitk|[zž]alob|st[ií][zž]nost|kasa[cč]n|term[ií]n)/i;
+    var out = [];
+    var lines = String(text).split(/[\n\r]+/);
+    for (var li = 0; li < lines.length; li++) {
+        var line = lines[li];
+        if (line.trim().length < 8) continue;
+        var hasCtx = ctxRe.test(line);
+        var ctx = line.trim().replace(/\s+/g, ' ');
+        ['day', 'week', 'month', 'year'].forEach(function (unit) {
+            if (unit !== 'day' && !hasCtx) return; // měsíce/týdny/roky jen v lhůtovém kontextu
+            var re = pat[unit]; re.lastIndex = 0; var m;
+            while ((m = re.exec(line)) !== null) {
+                var amount = _parseNum(m[1]);
+                if (!amount || amount <= 0) continue;
+                if (!out.some(function (d) { return d.amount === amount && d.unit === unit && d.context === ctx; })) {
+                    out.push({ amount: amount, unit: unit, context: ctx });
+                }
+            }
+        });
+    }
+    return out;
 }
 
 // Sestaví .ics (celodenní událost lhůty s připomenutím).
@@ -257,6 +349,8 @@ module.exports = {
     toIsoDate,
     addDays,
     computeDeadline,
+    computeDeadlineByUnit,
+    addMonthsClamped,
     czechHolidays,
     isWorkingDay,
     nextWorkingDay,
@@ -264,6 +358,7 @@ module.exports = {
     parseCzechDate,
     findDeadlineDate,
     detectDeadlineDays,
+    detectDeadlines,
     buildDeadlineIcs,
     googleCalendarUrl,
     outlookCalendarUrl,

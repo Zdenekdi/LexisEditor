@@ -136,3 +136,70 @@ describe('calendarTargets / URL', () => {
         expect(t.outlookLive).toContain('outlook.live.com');
     });
 });
+
+describe('computeDeadlineByUnit + addMonthsClamped (§ 57 odst. 2 o.s.ř.)', () => {
+    test('addMonthsClamped: shoda dne, jinak poslední den měsíce', () => {
+        expect(C.toIsoDate(C.addMonthsClamped(new Date(2025, 0, 31), 1))).toBe('2025-02-28'); // 31.1.→ únor nemá 31 → 28.2.
+        expect(C.toIsoDate(C.addMonthsClamped(new Date(2024, 0, 31), 1))).toBe('2024-02-29'); // přestupný rok
+        expect(C.toIsoDate(C.addMonthsClamped(new Date(2025, 2, 15), 2))).toBe('2025-05-15'); // běžný posun
+        expect(C.toIsoDate(C.addMonthsClamped(new Date(2025, 10, 30), 3))).toBe('2026-02-28'); // přes rok, konec měsíce
+    });
+    test('addMonthsClamped: rok = 12 měsíců, s ošetřením 29.2.', () => {
+        expect(C.toIsoDate(C.addMonthsClamped(new Date(2024, 1, 29), 12))).toBe('2025-02-28');
+    });
+    test('měsíční lhůta: výsledek = posun dne + případný posun na pracovní den', () => {
+        const base = new Date(2025, 1, 15); // 15. 2. 2025
+        const raw = C.addMonthsClamped(base, 1); // 15. 3. 2025
+        const got = C.computeDeadlineByUnit(base, 1, 'month');
+        expect(C.toIsoDate(got)).toBe(C.toIsoDate(C.nextWorkingDay(raw))); // shoda s očekávanou kompozicí
+        expect(C.isWorkingDay(got)).toBe(true); // výsledek je vždy pracovní den
+    });
+    test('týdenní lhůta = + 7·N dní, pak posun na pracovní den', () => {
+        // doručeno Po 6. 1. 2025, 2 týdny → Po 20. 1. 2025 (pracovní)
+        expect(C.toIsoDate(C.computeDeadlineByUnit(new Date(2025, 0, 6), 2, 'week'))).toBe('2025-01-20');
+    });
+    test('denní jednotka je shodná se stávajícím computeDeadline (zpětná kompatibilita)', () => {
+        [5, 15, 30].forEach(n => {
+            const d = new Date(2025, 0, 2);
+            expect(C.toIsoDate(C.computeDeadlineByUnit(d, n, 'day'))).toBe(C.toIsoDate(C.computeDeadline(d, n)));
+        });
+    });
+    test('roční lhůta: 2 roky od 15. 3. 2025 → posun dne + pracovní den', () => {
+        const base = new Date(2025, 2, 15);
+        const raw = C.addMonthsClamped(base, 24);
+        expect(C.toIsoDate(C.computeDeadlineByUnit(base, 2, 'year'))).toBe(C.toIsoDate(C.nextWorkingDay(raw)));
+    });
+});
+
+describe('detectDeadlines (dny/týdny/měsíce/roky, digit i slovní číslovky)', () => {
+    const units = (t) => C.detectDeadlines(t).map(d => `${d.amount} ${d.unit}`);
+    test('dny — koncovky dnů/dní', () => {
+        expect(units('Odvolání lze podat ve lhůtě 15 dnů od doručení.')).toContain('15 day');
+        expect(units('Ve lhůtě 8 dní podejte námitky.')).toContain('8 day');
+        expect(units('Vyjádření zašlete do 30 dnů.')).toContain('30 day');
+    });
+    test('měsíce — digit i slovní číslovka', () => {
+        expect(units('Žalobu podejte nejpozději do 2 měsíců.')).toContain('2 month');
+        expect(units('Dovolání lze podat do dvou měsíců od doručení rozhodnutí.')).toContain('2 month');
+        expect(units('Námitky lze podat ve lhůtě jednoho měsíce ode dne doručení.')).toContain('1 month');
+    });
+    test('týdny a roky', () => {
+        expect(units('Kasační stížnost je nutno podat ve lhůtě dvou týdnů.')).toContain('2 week');
+        expect(units('Ve lhůtě 3 týdnů se vyjádřete k podání.')).toContain('3 week');
+        expect(units('Promlčecí lhůta činí 1 rok od splatnosti.')).toContain('1 year');
+    });
+    test('kombinace na jednom vstupu', () => {
+        const u = units('Odvolání do 15 dnů; dovolání do 2 měsíců.');
+        expect(u).toContain('15 day');
+        expect(u).toContain('2 month');
+    });
+    test('NEfalešně: dvouletá smlouva ani odkaz na paragraf nejsou lhůta', () => {
+        expect(units('Smlouva se uzavírá na dobu 2 let.')).toEqual([]);
+        expect(units('Podle § 15 odst. 3 zákona.')).toEqual([]);
+    });
+    test('výsledek nese amount/unit/context', () => {
+        const r = C.detectDeadlines('Žalobu podejte nejpozději do 2 měsíců.');
+        expect(r[0]).toMatchObject({ amount: 2, unit: 'month' });
+        expect(typeof r[0].context).toBe('string');
+    });
+});

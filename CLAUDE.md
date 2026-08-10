@@ -11,6 +11,13 @@ Build/test: `npm start`, `npm test` (jest), `npm run test:e2e` (playwright), `np
 
 ## TODO / Známé problémy
 
+> ✅ **Lhůty v měsících/týdnech — v editoru HOTOVO.** `lexis-calendar` počítá (`computeDeadlineByUnit`,
+> § 57/2) i detekuje (`detectDeadlines` — dny/týdny/měsíce/roky, digit i slovní číslovky, s ochranou proti
+> false-positive) lhůty; `scanTextForDeadlines` je zobrazuje k potvrzení a ukládá se správně spočtené datum.
+> **Zbývá (backend):** `LexisLocal/backend/lib/extraction.js` (`calculateDeadlineDate`) a AI extraktor pořád
+> počítají jen ve dnech — sjednotit s editorem.
+
+
 Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tamního repa.
 
 ### 🔴 Kritické (bezpečnost)

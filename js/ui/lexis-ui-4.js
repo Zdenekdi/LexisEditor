@@ -800,6 +800,12 @@ Object.assign(LexisUI.prototype, {
             ? window.LexisCalendar.detectDeadlineDays(text)
             : [];
 
+        // Lhůty v měsících/týdnech/letech (§ 57/2) — datum se počítá přes computeDeadlineByUnit,
+        // uloží se stejnou cestou jako termín zadaný datem. Advokát každou detekci potvrzuje.
+        const unitDeadlines = (window.LexisCalendar && window.LexisCalendar.detectDeadlines)
+            ? window.LexisCalendar.detectDeadlines(text).filter(d => d.unit !== 'day')
+            : [];
+
         // Detekce KONKRÉTNÍHO data lhůty/termínu (předvolání, jednání, „nejpozději do…"),
         // aby se do hlídače dostal i termín zadaný datem, ne jen počtem dní.
         let fixed = null;
@@ -818,7 +824,7 @@ Object.assign(LexisUI.prototype, {
 
         if (!detectedList || !detectedSection) return;
 
-        if (detected.length > 0 || fixed) {
+        if (detected.length > 0 || fixed || unitDeadlines.length > 0) {
             detectedSection.style.display = 'block';
             let html = '';
             if (fixed) {
@@ -840,6 +846,20 @@ Object.assign(LexisUI.prototype, {
                     <div style="font-style: italic; color: #92400e; max-height: 45px; overflow-y: auto; line-height: 1.3;">"${d.context.substring(0, 100)}${d.context.length > 100 ? '...' : ''}"</div>
                 </div>
             `).join('');
+
+            html += unitDeadlines.map((d) => {
+                const due = window.LexisCalendar.computeDeadlineByUnit(new Date(), d.amount, d.unit);
+                const iso = window.LexisCalendar.toIsoDate(due);
+                const label = { week: 'týd.', month: 'měs.', year: 'r.' }[d.unit] || d.unit;
+                return `
+                <div style="background: white; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #78350f;">
+                    <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span>⚠️ Detekována lhůta: ${d.amount} ${label} → ${iso}</span>
+                        <button onclick="window.saveDetectedDeadlineDate('${iso}', '${encodeURIComponent(d.context)}')" style="background: #f59e0b; color: white; border: none; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s;">➕ Uložit</button>
+                    </div>
+                    <div style="font-style: italic; color: #92400e; max-height: 45px; overflow-y: auto; line-height: 1.3;">"${d.context.substring(0, 100)}${d.context.length > 100 ? '...' : ''}"</div>
+                </div>`;
+            }).join('');
             detectedList.innerHTML = html;
         } else {
             detectedSection.style.display = 'none';
