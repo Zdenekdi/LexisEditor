@@ -37,6 +37,12 @@
       'Persona (swarm) + model. Vše přes zvoleného poskytovatele — lokálně (Ollama / Apple Intelligence) zcela offline.',
       'Zprovoznění lokální AI: Nápověda → „Návod: Lokální AI".'
     ]],
+    ['Externí rešerše (☁ cloud, nepovinné)', [
+      '<b>Ověřená judikatura a citace</b> od externího poskytovatele — <b>Ověřit citaci</b>, <b>Najít judikaturu</b>, <b>Dohledat ustanovení</b> (pravé tlačítko nad výběrem).',
+      'Poskytovatelé: <b>LawGPT.cz</b> (zdarma, bez přihlášení) a <b>DirectCase</b> (vlastní účet, připravuje se). Zapnutí a volba v Nastavení → „Externí rešerše".',
+      '<b>Pozor:</b> jde o <b>cloudovou</b> službu (ne offline) — dotaz opouští počítač. Ve výchozím stavu je <b>vypnutá</b>; při prvním použití potvrdíte souhlas. Před odesláním lze text anonymizovat.',
+      'Výsledky vždy ověřte v primárním zdroji před citací v podání.'
+    ]],
     ['Datová schránka (ISDS)', [
       '1. Nastavení DS (přihlašovací údaje / certifikát).',
       '2. Odeslání: Dopis Online / Odpovědět → zařadí k odeslání.',

@@ -143,13 +143,22 @@
     }
     return '';
   }
+  var KNOWN_FIELDS = ['title', 'nazev', 'name', 'heading', 'label', 'court', 'soud', 'source',
+    'spisova_znacka', 'spisovaZnacka', 'sp_zn', 'spzn', 'ecli', 'jednaci_cislo', 'cislo',
+    'date', 'datum', 'rozhodnuti', 'decided', 'published', 'url', 'link', 'odkaz', 'href',
+    'source_url', 'sourceUrl', 'snippet', 'text', 'excerpt', 'vyrez', 'content', 'summary',
+    'preview', 'fragment'];
+  function looksLikeResult(o) {
+    return o && typeof o === 'object' && KNOWN_FIELDS.some(function (k) { return o[k] != null && o[k] !== ''; });
+  }
   function toArray(data) {
     if (Array.isArray(data)) return data;
     if (!data || typeof data !== 'object') return [];
     var cand = data.results || data.items || data.data || data.judgments || data.laws || data.hits || data.documents;
     if (Array.isArray(cand)) return cand;
-    // jediný objekt → zabalit
-    return [data];
+    // jediný objekt zabalíme jen tehdy, když skutečně vypadá jako výsledek
+    // (nese aspoň jedno známé pole) — prázdné {} → žádné výsledky.
+    return looksLikeResult(data) ? [data] : [];
   }
   function normalizeItem(it) {
     if (it == null) return { title: '', meta: '', snippet: '', url: '' };
@@ -182,26 +191,32 @@
     if (!p.ready) throw new Error(p.note || (p.nazev + ' není připraven.'));
     return p;
   }
+  // Pozn.: obalujeme Promise.resolve().then(...), aby se i synchronní chyba z
+  // ensureReady() (např. nepřipravený poskytovatel) projevila jako ODMÍTNUTÝ
+  // Promise, ne jako synchronní výjimka — jinak by ji .catch() v UI minul.
   function verifyCitation(text) {
-    var p = ensureReady();
-    return Promise.resolve(p.searchJudgments(String(text || '').trim(), 6))
-      .then(function (data) {
+    return Promise.resolve().then(function () {
+      var p = ensureReady();
+      return Promise.resolve(p.searchJudgments(String(text || '').trim(), 6)).then(function (data) {
         return { provider: p.id, providerName: p.nazev, kind: 'citace', query: text, results: normalizeList(data) };
       });
+    });
   }
   function findCaseLaw(query) {
-    var p = ensureReady();
-    return Promise.resolve(p.searchJudgments(String(query || '').trim(), 8))
-      .then(function (data) {
+    return Promise.resolve().then(function () {
+      var p = ensureReady();
+      return Promise.resolve(p.searchJudgments(String(query || '').trim(), 8)).then(function (data) {
         return { provider: p.id, providerName: p.nazev, kind: 'judikatura', query: query, results: normalizeList(data) };
       });
+    });
   }
   function findLaw(query) {
-    var p = ensureReady();
-    return Promise.resolve(p.searchLaws(String(query || '').trim(), 6))
-      .then(function (data) {
+    return Promise.resolve().then(function () {
+      var p = ensureReady();
+      return Promise.resolve(p.searchLaws(String(query || '').trim(), 6)).then(function (data) {
         return { provider: p.id, providerName: p.nazev, kind: 'zakon', query: query, results: normalizeList(data) };
       });
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -493,4 +508,5 @@
   // Globální aliasy pro onclick v HTML
   window.researchVerifyCitation = uiVerifyCitation;
   window.researchFindCaseLaw = uiFindCaseLaw;
+  window.researchFindLaw = uiFindLaw;
 })();

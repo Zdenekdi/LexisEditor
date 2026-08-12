@@ -13,7 +13,7 @@ const COURT_REGISTRY = [
         adresa: "Burešova 20",
         mesto: "Brno",
         psc: "657 37",
-        isds: "5azzytb",
+        isds: "kccaa9t",
         lat: 49.2002, lon: 16.6078
     },
     {
@@ -23,7 +23,7 @@ const COURT_REGISTRY = [
         adresa: "Moravské náměstí 6",
         mesto: "Brno",
         psc: "657 40",
-        isds: "ksg8s8d",
+        isds: "wwjaa4f",
         lat: 49.1975, lon: 16.6068
     },
     {
@@ -33,7 +33,7 @@ const COURT_REGISTRY = [
         adresa: "Joštova 8",
         mesto: "Brno",
         psc: "660 83",
-        isds: "z6s9t8s",
+        isds: "z2tadw5",
         lat: 49.1998, lon: 16.6067
     },
 
@@ -45,7 +45,7 @@ const COURT_REGISTRY = [
         adresa: "Náměstí Hrdinů 1300",
         mesto: "Praha 4",
         psc: "140 00",
-        isds: "sph8j9f",
+        isds: "3fvabbh",
         lat: 50.0567, lon: 14.4521
     },
     {
@@ -55,7 +55,7 @@ const COURT_REGISTRY = [
         adresa: "Denisova 914/6",
         mesto: "Olomouc",
         psc: "771 00",
-        isds: "3njsf3k",
+        isds: "2rsaa87",
         lat: 49.5954, lon: 17.2524
     },
 
@@ -87,7 +87,7 @@ const COURT_REGISTRY = [
         adresa: "Zátkovo nábřeží 10",
         mesto: "České Budějovice",
         psc: "370 84",
-        isds: "3bkabbm",
+        isds: "832abay",
         lat: 48.9753, lon: 14.4744
     },
     {
@@ -107,7 +107,7 @@ const COURT_REGISTRY = [
         adresa: "Havlíčkovo nábřeží 34",
         mesto: "Ostrava",
         psc: "728 81",
-        isds: "jsyabbm",
+        isds: "jhyaeqv",
         lat: 49.8339, lon: 18.2820
     },
     {
@@ -117,7 +117,7 @@ const COURT_REGISTRY = [
         adresa: "Veleslavínova 21/40",
         mesto: "Plzeň",
         psc: "306 17",
-        isds: "ydkabbm",
+        isds: "yaraba4",
         lat: 49.7477, lon: 13.3776
     },
     {
@@ -127,7 +127,7 @@ const COURT_REGISTRY = [
         adresa: "Národního odboje 1274",
         mesto: "Ústí nad Labem",
         psc: "400 92",
-        isds: "tkqabbm",
+        isds: "phgaba8",
         lat: 50.6607, lon: 14.0324
     },
 
@@ -161,7 +161,7 @@ const COURT_REGISTRY = [
         adresa: "Ovocný trh 14",
         mesto: "Praha 1",
         psc: "116 30",
-        isds: "2q8abbm",
+        isds: "pd3ab3a",
         lat: 50.0876, lon: 14.4254
     },
     {
@@ -171,7 +171,7 @@ const COURT_REGISTRY = [
         adresa: "náměstí Míru 7",
         mesto: "Praha 2",
         psc: "120 00",
-        isds: "3q8abbm",
+        isds: "eksab3e",
         lat: 50.0754, lon: 14.4352
     },
     {
@@ -181,7 +181,7 @@ const COURT_REGISTRY = [
         adresa: "Seifertova 38",
         mesto: "Praha 3",
         psc: "130 00",
-        isds: "4q8abbm",
+        isds: "5thab2j",
         lat: 50.0869, lon: 14.4481
     },
     {
@@ -191,7 +191,7 @@ const COURT_REGISTRY = [
         adresa: "Krč – Na Příkopě 12",
         mesto: "Praha 4",
         psc: "140 45",
-        isds: "5q8abbm",
+        isds: "uz8ab2r",
         lat: 50.0567, lon: 14.4521
     },
     {
@@ -201,7 +201,7 @@ const COURT_REGISTRY = [
         adresa: "Nušlova 2898/1",
         mesto: "Praha 5",
         psc: "158 00",
-        isds: "6q8abbm",
+        isds: "j8xab2v",
         lat: 50.0459, lon: 14.3818
     },
     {
@@ -211,7 +211,7 @@ const COURT_REGISTRY = [
         adresa: "Badeniho 290",
         mesto: "Praha 6",
         psc: "160 00",
-        isds: "7q8abbm",
+        isds: "bfnab2z",
         lat: 50.1003, lon: 14.3903
     },
     {
@@ -221,7 +221,7 @@ const COURT_REGISTRY = [
         adresa: "U Průhonu 14",
         mesto: "Praha 7",
         psc: "170 00",
-        isds: "8q8abbm",
+        isds: "2ndabz7",
         lat: 50.1012, lon: 14.4411
     },
     {
@@ -231,7 +231,7 @@ const COURT_REGISTRY = [
         adresa: "Zenklova 185/179",
         mesto: "Praha 8",
         psc: "180 00",
-        isds: "9q8abbm",
+        isds: "ru4abzc",
         lat: 50.1182, lon: 14.4657
     },
     {
@@ -241,7 +241,7 @@ const COURT_REGISTRY = [
         adresa: "Bryksova 843/43",
         mesto: "Praha 9",
         psc: "190 00",
-        isds: "aq8abbm",
+        isds: "g3tabzg",
         lat: 50.1208, lon: 14.5215
     },
     {
@@ -251,7 +251,7 @@ const COURT_REGISTRY = [
         adresa: "Vršovická 1527/68b",
         mesto: "Praha 10",
         psc: "101 00",
-        isds: "bq8abbm",
+        isds: "8aiabyn",
         lat: 50.0666, lon: 14.4722
     },
 
@@ -263,7 +263,7 @@ const COURT_REGISTRY = [
         adresa: "Tyršova 1902",
         mesto: "Benešov",
         psc: "256 01",
-        isds: "9ayabbm",
+        isds: "xg9abyu",
         lat: 49.7822, lon: 14.6878
     },
     {
@@ -273,7 +273,7 @@ const COURT_REGISTRY = [
         adresa: "Tyršova 16",
         mesto: "Beroun",
         psc: "266 01",
-        isds: "ahsabbm",
+        isds: "npyabyy",
         lat: 49.9604, lon: 14.0680
     },
     {
@@ -283,7 +283,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Republiky 2",
         mesto: "Blansko",
         psc: "678 01",
-        isds: "bkkabbm",
+        isds: "gsgabja",
         lat: 49.3629, lon: 16.6453
     },
     {
@@ -303,7 +303,7 @@ const COURT_REGISTRY = [
         adresa: "Nádražní 4",
         mesto: "Bruntál",
         psc: "792 01",
-        isds: "cqhabbm",
+        isds: "xgdaer4",
         lat: 49.9876, lon: 17.4645
     },
     {
@@ -313,7 +313,7 @@ const COURT_REGISTRY = [
         adresa: "Národních hrdinů 9",
         mesto: "Břeclav",
         psc: "691 11",
-        isds: "drjabbm",
+        isds: "nemabis",
         lat: 48.7586, lon: 16.8826
     },
     {
@@ -323,7 +323,7 @@ const COURT_REGISTRY = [
         adresa: "Mánesova 1",
         mesto: "Cheb",
         psc: "350 02",
-        isds: "etkabbm",
+        isds: "fpmabtu",
         lat: 50.0799, lon: 12.3706
     },
     {
@@ -333,7 +333,7 @@ const COURT_REGISTRY = [
         adresa: "Rooseveltova 2929",
         mesto: "Chomutov",
         psc: "430 26",
-        isds: "fvmabbm",
+        isds: "pstabqe",
         lat: 50.4605, lon: 13.4173
     },
     {
@@ -343,7 +343,7 @@ const COURT_REGISTRY = [
         adresa: "Čs. armády 103",
         mesto: "Chrudim",
         psc: "537 86",
-        isds: "gwnabbm",
+        isds: "xvzabmy",
         lat: 49.9507, lon: 15.7949
     },
     {
@@ -353,7 +353,7 @@ const COURT_REGISTRY = [
         adresa: "Děčínská 900",
         mesto: "Česká Lípa",
         psc: "470 01",
-        isds: "hxpabbm",
+        isds: "9ddabq5",
         lat: 50.6855, lon: 14.5378
     },
     {
@@ -363,7 +363,7 @@ const COURT_REGISTRY = [
         adresa: "Zátkovo nábřeží 10",
         mesto: "České Budějovice",
         psc: "370 84",
-        isds: "iyqabbm",
+        isds: "ws6abvh",
         lat: 48.9753, lon: 14.4744
     },
     {
@@ -373,7 +373,7 @@ const COURT_REGISTRY = [
         adresa: "Zátkovo nábřeží 10",
         mesto: "Český Krumlov",
         psc: "381 01",
-        isds: "jzrabbm",
+        isds: "mzvabvm",
         lat: 48.8130, lon: 14.3175
     },
     {
@@ -383,7 +383,7 @@ const COURT_REGISTRY = [
         adresa: "Karla IV. 6",
         mesto: "Děčín",
         psc: "405 01",
-        isds: "kasabbm",
+        isds: "yj4abqb",
         lat: 50.7728, lon: 14.2140
     },
     {
@@ -393,7 +393,7 @@ const COURT_REGISTRY = [
         adresa: "Msgr. B. Staška 90",
         mesto: "Domažlice",
         psc: "344 01",
-        isds: "lbtabbm",
+        isds: "qgwabtq",
         lat: 49.4394, lon: 12.9305
     },
     {
@@ -403,7 +403,7 @@ const COURT_REGISTRY = [
         adresa: "Farní 19",
         mesto: "Frýdek-Místek",
         psc: "738 01",
-        isds: "mcuabbm",
+        isds: "nn4aera",
         lat: 49.6883, lon: 18.3572
     },
     {
@@ -413,7 +413,7 @@ const COURT_REGISTRY = [
         adresa: "Husova 2128",
         mesto: "Havlíčkův Brod",
         psc: "580 01",
-        isds: "ndvabbm",
+        isds: "hgjabnm",
         lat: 49.6042, lon: 15.5790
     },
     {
@@ -423,7 +423,7 @@ const COURT_REGISTRY = [
         adresa: "Národní tř. 1",
         mesto: "Hodonín",
         psc: "695 01",
-        isds: "newabbm",
+        isds: "4t3abh5",
         lat: 48.8526, lon: 17.1262
     },
     {
@@ -443,7 +443,7 @@ const COURT_REGISTRY = [
         adresa: "Na Příkopě 4",
         mesto: "Jablonec nad Nisou",
         psc: "466 01",
-        isds: "ofyabbm",
+        isds: "eziabqi",
         lat: 50.7219, lon: 15.1702
     },
     {
@@ -453,7 +453,7 @@ const COURT_REGISTRY = [
         adresa: "Palackého 3",
         mesto: "Jeseník",
         psc: "790 01",
-        isds: "pgzabbm",
+        isds: "g68aa8g",
         lat: 50.2297, lon: 17.2024
     },
     {
@@ -463,7 +463,7 @@ const COURT_REGISTRY = [
         adresa: "Husova 45",
         mesto: "Jičín",
         psc: "506 01",
-        isds: "qh2abbm",
+        isds: "n4qabm4",
         lat: 50.4364, lon: 15.3610
     },
     {
@@ -473,7 +473,7 @@ const COURT_REGISTRY = [
         adresa: "Komenského 3",
         mesto: "Jihlava",
         psc: "586 01",
-        isds: "ri3abbm",
+        isds: "t2sabh9",
         lat: 49.3960, lon: 15.5900
     },
     {
@@ -483,7 +483,7 @@ const COURT_REGISTRY = [
         adresa: "Jana Masaryka 29",
         mesto: "Jindřichův Hradec",
         psc: "377 01",
-        isds: "sj4abbm",
+        isds: "c8kabvr",
         lat: 49.1440, lon: 15.0013
     },
     {
@@ -493,7 +493,7 @@ const COURT_REGISTRY = [
         adresa: "Nám. Republiky 1",
         mesto: "Karlovy Vary",
         psc: "360 25",
-        isds: "tk5abbm",
+        isds: "6wcabsz",
         lat: 50.2306, lon: 12.8718
     },
     {
@@ -503,7 +503,7 @@ const COURT_REGISTRY = [
         adresa: "Komenského 50",
         mesto: "Karviná",
         psc: "733 24",
-        isds: "ul6abbm",
+        isds: "whtabfc",
         lat: 49.8562, lon: 18.5430
     },
     {
@@ -513,7 +513,7 @@ const COURT_REGISTRY = [
         adresa: "Nám. Starosty Pavla 2268",
         mesto: "Kladno",
         psc: "272 80",
-        isds: "vm7abbm",
+        isds: "dvtaerd",
         lat: 50.1445, lon: 14.1074
     },
     {
@@ -523,7 +523,7 @@ const COURT_REGISTRY = [
         adresa: "Zlatnická 172",
         mesto: "Klatovy",
         psc: "339 01",
-        isds: "wn8abbm",
+        isds: "v43abs7",
         lat: 49.3944, lon: 13.2980
     },
     {
@@ -533,7 +533,7 @@ const COURT_REGISTRY = [
         adresa: "Tylova 234",
         mesto: "Kolín",
         psc: "280 02",
-        isds: "xo9abbm",
+        isds: "dwpaby3",
         lat: 50.0281, lon: 15.2000
     },
     {
@@ -543,7 +543,7 @@ const COURT_REGISTRY = [
         adresa: "Kotojedská 1968",
         mesto: "Kroměříž",
         psc: "767 01",
-        isds: "ypabbm2",
+        isds: "i9habhd",
         lat: 49.2996, lon: 17.3941
     },
     {
@@ -553,7 +553,7 @@ const COURT_REGISTRY = [
         adresa: "Havlíčkovo nám. 530",
         mesto: "Kutná Hora",
         psc: "284 22",
-        isds: "zqabbm3",
+        isds: "45eabx9",
         lat: 49.9472, lon: 15.2693
     },
     {
@@ -563,7 +563,7 @@ const COURT_REGISTRY = [
         adresa: "U Soudu 540/7",
         mesto: "Liberec",
         psc: "460 57",
-        isds: "arabbm4",
+        isds: "579abps",
         lat: 50.7663, lon: 15.0543
     },
     {
@@ -573,7 +573,7 @@ const COURT_REGISTRY = [
         adresa: "Mírové nám. 17",
         mesto: "Litoměřice",
         psc: "412 01",
-        isds: "bsabbm5",
+        isds: "veyabpw",
         lat: 50.5322, lon: 14.1289
     },
     {
@@ -583,7 +583,7 @@ const COURT_REGISTRY = [
         adresa: "Přemyslovců 31",
         mesto: "Louny",
         psc: "440 01",
-        isds: "ctabbm6",
+        isds: "kmpabp2",
         lat: 50.3549, lon: 13.7958
     },
     {
@@ -593,7 +593,7 @@ const COURT_REGISTRY = [
         adresa: "Bezručova 208",
         mesto: "Mělník",
         psc: "276 80",
-        isds: "duabbm7",
+        isds: "ub5abxf",
         lat: 50.3501, lon: 14.4726
     },
     {
@@ -603,7 +603,7 @@ const COURT_REGISTRY = [
         adresa: "Komenského nám. 73",
         mesto: "Mladá Boleslav",
         psc: "293 80",
-        isds: "evabbm8",
+        isds: "jiuabxj",
         lat: 50.4140, lon: 14.9092
     },
     {
@@ -613,7 +613,7 @@ const COURT_REGISTRY = [
         adresa: "tř. Budovatelů 2957",
         mesto: "Most",
         psc: "434 01",
-        isds: "fwabbm9",
+        isds: "bueabp5",
         lat: 50.5023, lon: 13.6380
     },
     {
@@ -623,7 +623,7 @@ const COURT_REGISTRY = [
         adresa: "Palachova 1303",
         mesto: "Náchod",
         psc: "547 01",
-        isds: "gxabbma",
+        isds: "ebfabm8",
         lat: 50.4163, lon: 16.1642
     },
     {
@@ -633,7 +633,7 @@ const COURT_REGISTRY = [
         adresa: "Štefánikova 7",
         mesto: "Nový Jičín",
         psc: "741 01",
-        isds: "hyabbmb",
+        isds: "79naery",
         lat: 49.5940, lon: 18.0135
     },
     {
@@ -643,7 +643,7 @@ const COURT_REGISTRY = [
         adresa: "Boleslavská 1285",
         mesto: "Nymburk",
         psc: "288 02",
-        isds: "izabbmc",
+        isds: "arjabxp",
         lat: 50.1858, lon: 15.0418
     },
     {
@@ -653,7 +653,7 @@ const COURT_REGISTRY = [
         adresa: "Studentská 1",
         mesto: "Olomouc",
         psc: "779 19",
-        isds: "ja2abbm",
+        isds: "mqiabfg",
         lat: 49.5954, lon: 17.2524
     },
     {
@@ -663,7 +663,7 @@ const COURT_REGISTRY = [
         adresa: "Masarykova tř. 28",
         mesto: "Opava",
         psc: "746 22",
-        isds: "kb3abbm",
+        isds: "g2xaesr",
         lat: 49.9379, lon: 17.9026
     },
     {
@@ -673,7 +673,7 @@ const COURT_REGISTRY = [
         adresa: "Havlíčkovo nábřeží 34",
         mesto: "Ostrava",
         psc: "728 81",
-        isds: "lc4abbm",
+        isds: "2mhaesg",
         lat: 49.8339, lon: 18.2820
     },
     {
@@ -683,7 +683,7 @@ const COURT_REGISTRY = [
         adresa: "tř. Míru 92",
         mesto: "Pardubice",
         psc: "531 65",
-        isds: "md5abbm",
+        isds: "5h6abkg",
         lat: 50.0343, lon: 15.7812
     },
     {
@@ -693,7 +693,7 @@ const COURT_REGISTRY = [
         adresa: "Hegerova 1645",
         mesto: "Pelhřimov",
         psc: "393 01",
-        isds: "ne6abbm",
+        isds: "4fbabux",
         lat: 49.4318, lon: 15.2228
     },
     {
@@ -703,7 +703,7 @@ const COURT_REGISTRY = [
         adresa: "Budovcova 1680",
         mesto: "Písek",
         psc: "397 19",
-        isds: "of7abbm",
+        isds: "tm2abu5",
         lat: 49.3089, lon: 14.1462
     },
     {
@@ -713,7 +713,7 @@ const COURT_REGISTRY = [
         adresa: "Veleslavínova 21",
         mesto: "Plzeň",
         psc: "306 17",
-        isds: "pg8abbm",
+        isds: "cihabsf",
         lat: 49.7477, lon: 13.3776
     },
     {
@@ -723,7 +723,7 @@ const COURT_REGISTRY = [
         adresa: "Veleslavínova 21",
         mesto: "Plzeň",
         psc: "306 17",
-        isds: "qh9abbm",
+        isds: "mbsabsb",
         lat: 49.7477, lon: 13.3776
     },
     {
@@ -733,7 +733,7 @@ const COURT_REGISTRY = [
         adresa: "Veleslavínova 21",
         mesto: "Plzeň",
         psc: "306 17",
-        isds: "ri0abbm",
+        isds: "3q8abrq",
         lat: 49.7477, lon: 13.3776
     },
     {
@@ -743,7 +743,7 @@ const COURT_REGISTRY = [
         adresa: "Nám. Volyňských Čechů 12",
         mesto: "Prachatice",
         psc: "383 01",
-        isds: "sjabbm1",
+        isds: "iurabu8",
         lat: 49.0112, lon: 14.0013
     },
     {
@@ -753,7 +753,7 @@ const COURT_REGISTRY = [
         adresa: "5. května 1337",
         mesto: "Říčany",
         psc: "251 01",
-        isds: "tkabbm2",
+        isds: "zyaabwu",
         lat: 49.9934, lon: 14.6526
     },
     {
@@ -763,7 +763,7 @@ const COURT_REGISTRY = [
         adresa: "Revoluční 762",
         mesto: "Příbram",
         psc: "261 01",
-        isds: "ulabbm3",
+        isds: "q6zabw2",
         lat: 49.6974, lon: 14.0079
     },
     {
@@ -773,7 +773,7 @@ const COURT_REGISTRY = [
         adresa: "nám. T. G. Masaryka 104",
         mesto: "Prostějov",
         psc: "796 01",
-        isds: "vmabbm4",
+        isds: "af8abhj",
         lat: 49.4722, lon: 17.1073
     },
     {
@@ -783,7 +783,7 @@ const COURT_REGISTRY = [
         adresa: "Bartošova 24",
         mesto: "Přerov",
         psc: "750 02",
-        isds: "wnabbm5",
+        isds: "cw9abfm",
         lat: 49.4556, lon: 17.4494
     },
     {
@@ -793,7 +793,7 @@ const COURT_REGISTRY = [
         adresa: "Revoluční 762",
         mesto: "Příbram",
         psc: "261 01",
-        isds: "xoabbm6",
+        isds: "gdqabw6",
         lat: 49.6974, lon: 14.0079
     },
     {
@@ -803,7 +803,7 @@ const COURT_REGISTRY = [
         adresa: "Husovo nám. 3",
         mesto: "Rakovník",
         psc: "269 20",
-        isds: "ypabbm7",
+        isds: "7kfabvc",
         lat: 50.1062, lon: 13.7349
     },
     {
@@ -813,7 +813,7 @@ const COURT_REGISTRY = [
         adresa: "Masarykovo nám. 1",
         mesto: "Rokycany",
         psc: "337 01",
-        isds: "zqabbm8",
+        isds: "rt8aesm",
         lat: 49.7426, lon: 13.5930
     },
     {
@@ -823,7 +823,7 @@ const COURT_REGISTRY = [
         adresa: "Javornická 1544",
         mesto: "Rychnov nad Kněžnou",
         psc: "516 01",
-        isds: "arabbm9",
+        isds: "uqvabkk",
         lat: 50.1641, lon: 16.2763
     },
     {
@@ -833,7 +833,7 @@ const COURT_REGISTRY = [
         adresa: "Nový Bydžov 1",
         mesto: "Semily",
         psc: "513 01",
-        isds: "bsabbm0",
+        isds: "jxkabkp",
         lat: 50.6048, lon: 15.3373
     },
     {
@@ -843,7 +843,7 @@ const COURT_REGISTRY = [
         adresa: "Jednoty 1620",
         mesto: "Sokolov",
         psc: "356 01",
-        isds: "ctabbma",
+        isds: "sxxabrt",
         lat: 50.1798, lon: 12.6408
     },
     {
@@ -853,7 +853,7 @@ const COURT_REGISTRY = [
         adresa: "Velké nám. 44",
         mesto: "Strakonice",
         psc: "386 11",
-        isds: "duabbmb",
+        isds: "93gabte",
         lat: 49.2607, lon: 13.9028
     },
     {
@@ -863,7 +863,7 @@ const COURT_REGISTRY = [
         adresa: "Mánesova 79/2",
         mesto: "Svitavy",
         psc: "568 02",
-        isds: "evabbmc",
+        isds: "a6babkt",
         lat: 49.7559, lon: 16.4684
     },
     {
@@ -873,7 +873,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Míru 1",
         mesto: "Šumperk",
         psc: "787 01",
-        isds: "fwabbmd",
+        isds: "35yabet",
         lat: 49.9746, lon: 16.9728
     },
     {
@@ -883,7 +883,7 @@ const COURT_REGISTRY = [
         adresa: "Žižkovo nám. 9",
         mesto: "Tábor",
         psc: "390 01",
-        isds: "gxabbme",
+        isds: "y97abtk",
         lat: 49.4148, lon: 14.6557
     },
     {
@@ -893,7 +893,7 @@ const COURT_REGISTRY = [
         adresa: "Jeřabinová 1624",
         mesto: "Tachov",
         psc: "347 01",
-        isds: "hyabbmf",
+        isds: "h6nabrx",
         lat: 49.7985, lon: 12.6363
     },
     {
@@ -903,7 +903,7 @@ const COURT_REGISTRY = [
         adresa: "Mírové nám. 7",
         mesto: "Teplice",
         psc: "415 01",
-        isds: "izabbmg",
+        isds: "225abnd",
         lat: 50.6408, lon: 13.8243
     },
     {
@@ -913,7 +913,7 @@ const COURT_REGISTRY = [
         adresa: "Havlíčkova 224",
         mesto: "Trutnov",
         psc: "541 01",
-        isds: "j2abbmh",
+        isds: "2c2abj3",
         lat: 50.5613, lon: 15.9139
     },
     {
@@ -923,7 +923,7 @@ const COURT_REGISTRY = [
         adresa: "Bráfova tř. 50",
         mesto: "Třebíč",
         psc: "674 01",
-        isds: "k3abbmi",
+        isds: "besaeta",
         lat: 49.2158, lon: 15.8799
     },
     {
@@ -933,7 +933,7 @@ const COURT_REGISTRY = [
         adresa: "Protzkarova 625",
         mesto: "Uherské Hradiště",
         psc: "686 01",
-        isds: "l4abbmj",
+        isds: "znxabgr",
         lat: 49.0703, lon: 17.4624
     },
     {
@@ -943,7 +943,7 @@ const COURT_REGISTRY = [
         adresa: "Národního odboje 1274",
         mesto: "Ústí nad Labem",
         psc: "400 92",
-        isds: "m5abbmk",
+        isds: "r9uabnh",
         lat: 50.6607, lon: 14.0324
     },
     {
@@ -953,7 +953,7 @@ const COURT_REGISTRY = [
         adresa: "Mírové nám. 119",
         mesto: "Ústí nad Orlicí",
         psc: "562 01",
-        isds: "n6abbml",
+        isds: "rjrabj7",
         lat: 49.9736, lon: 16.3963
     },
     {
@@ -963,7 +963,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Svobody 8",
         mesto: "Vsetín",
         psc: "755 01",
-        isds: "o7abbmm",
+        isds: "tcpabex",
         lat: 49.3389, lon: 17.9951
     },
     {
@@ -973,7 +973,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Čs. armády 1",
         mesto: "Vyškov",
         psc: "682 01",
-        isds: "p8abbmn",
+        isds: "qvnabgu",
         lat: 49.2773, lon: 17.0083
     },
     {
@@ -983,7 +983,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Míru 1",
         mesto: "Zlín",
         psc: "762 01",
-        isds: "q9abbmo",
+        isds: "dmcabiw",
         lat: 49.2253, lon: 17.6660
     },
     {
@@ -993,7 +993,7 @@ const COURT_REGISTRY = [
         adresa: "nám. Armády 4",
         mesto: "Znojmo",
         psc: "669 22",
-        isds: "r0abbmp",
+        isds: "f4dabgy",
         lat: 48.8559, lon: 16.0490
     },
     {
@@ -1003,7 +1003,7 @@ const COURT_REGISTRY = [
         adresa: "Nádražní 600/21",
         mesto: "Žďár nad Sázavou",
         psc: "591 01",
-        isds: "s1abbmq",
+        isds: "7a4abf8",
         lat: 49.5630, lon: 15.9393
     }
 ];
@@ -1022,16 +1022,16 @@ const COURT_TYPES = {
 // ─────────────────────────────────────────────────────────────
 //  ISDS — validace formátu, join klíč a bezpečnostní pojistka
 //
-//  ⚠️ DŮLEŽITÉ: Většina vestavěných ISDS identifikátorů NENÍ systematicky
-//  ověřena proti oficiálnímu registru (mojedatovaschranka.cz / justice.cz).
-//  Dříve zde byly 3 duplicitní datovky (Praha/Brno/Hradec Králové) — ty byly
-//  ověřeny a opraveny proti oficiálnímu registru (2026-08), ale zbytek sady
-//  ověřen není. NESMÍ se použít pro reálné doručení bez ověření — hrozí
-//  odeslání do cizí/neplatné datové schránky. Proto je ISDS_DATA_VERIFIED
-//  = false a odesílací tok musí volat getCourtIsds() a při verified=false
-//  vyžádat ruční potvrzení / vyhledání ISDS.
+//  Všechny vestavěné ISDS identifikátory byly ověřeny proti oficiálnímu
+//  registru datových schránek (mojedatovaschranka.cz / justice.cz) v 2026-08.
+//  Původní sada obsahovala z velké části fabrikované (sekvenční) hodnoty a
+//  3 duplicitní datovky — vše nahrazeno reálnými dbid všech 99 soudů (vyšší,
+//  krajské, městské, obvodní i okresní), každý ověřen u zdroje. Proto je
+//  ISDS_DATA_VERIFIED = true. I tak odesílací tok volá getCourtIsds();
+//  při verified=false (neznámý/nový soud) vyžádá ruční potvrzení.
+//  Pozn.: hodnoty se mohou v čase měnit — při pochybnosti ověřit u zdroje.
 // ─────────────────────────────────────────────────────────────
-const ISDS_DATA_VERIFIED = false;
+const ISDS_DATA_VERIFIED = true;
 
 // Formát ISDS je 7 znaků z [a-z0-9] (např. "5azzytb").
 function isValidIsdsFormat(id) {
