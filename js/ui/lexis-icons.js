@@ -1,259 +1,52 @@
+/* global window, document */
 /**
- * LexisEditor — Icon System
- * Runtime náhrada emoji ikon konzistentní inline-SVG sadou (Lucide styl).
- * Nemapované emoji zůstávají beze změny (žádné rozbité ikony).
- * Cílí na .icon-sq (ribbon) a .card-icon (úvodní dlaždice).
+ * lexis-icons.js — tahova ikonova sada LexisEditor (nahrazuje emoji).
+ * window.LexisIcons.get(id) vrati SVG; init nasadi ikony na QAT + [data-ic] sloty.
+ * window.LexisIcons.emojiToIcon(html) nahradi zname emoji inline ikonami (dialogy, panely).
  */
 (function () {
-    const V = (inner) =>
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
-        inner + '</svg>';
-
-    // Klíč = základní emoji (bez variačního selektoru). Hodnota = vnitřek SVG.
-    const P = {
-        '📄': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h4"/>',
-        '📜': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5"/>',
-        '📂': '<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z"/>',
-        '📁': '<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z"/>',
-        '📖': '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
-        '📚': '<path d="M4 19.5V5a2 2 0 0 1 2-2h1v18H6a2 2 0 0 1-2-1.5z"/><path d="M8 3h3v18H8z"/><path d="m13 4 4 .8-3 15.6-4-.8z"/>',
-        '📒': '<path d="M4 19.5V5a2 2 0 0 1 2-2h14v18H6a2 2 0 0 1-2-1.5z"/><path d="M8 3v18"/>',
-        '📋': '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 13h6"/><path d="M9 17h4"/>',
-        '📑': '<rect width="13" height="16" x="8" y="5" rx="2"/><path d="M4 17V5a2 2 0 0 1 2-2h9"/>',
-        '🗂': '<rect width="13" height="16" x="8" y="5" rx="2"/><path d="M4 17V5a2 2 0 0 1 2-2h9"/>',
-        '🔍': '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
-        '🔎': '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
-        '🕵': '<circle cx="10" cy="7" r="4"/><path d="M2 21a8 8 0 0 1 12.5-6.6"/><circle cx="17" cy="17" r="3"/><path d="m21 21-1.5-1.5"/>',
-        '🎙': '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
-        '🖍': '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
-        '🖊': '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/>',
-        '🖋': '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/>',
-        '✒': '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/>',
-        '✍': '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5z"/><path d="m15 5 4 4"/>',
-        '📝': '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-        '✨': '<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
-        '🧠': '<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15l-1.9-4.1L5.5 9l4.6-1.4z"/><path d="M19 14l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
-        '🌐': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/>',
-        '🛡': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-        '⚖': '<path d="M12 3v18"/><path d="M7 21h10"/><path d="M5 7h14"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/>',
-        '⚡': '<path d="M13 2 3 14h7l-1 8 10-12h-7z"/>',
-        '💡': '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
-        '🔗': '<path d="M9 12a5 5 0 0 1 5-5h3a5 5 0 0 1 0 10h-1"/><path d="M15 12a5 5 0 0 1-5 5H7a5 5 0 0 1 0-10h1"/>',
-        '📦': '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
-        '📊': '<path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/>',
-        '💹': '<path d="M3 3v18h18"/><path d="m7 15 3-4 3 2 4-6"/>',
-        '💾': '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>',
-        '🏛': '<path d="M3 22h18"/><path d="M6 18V11"/><path d="M10 18V11"/><path d="M14 18V11"/><path d="M18 18V11"/><path d="M12 2 3 8h18z"/>',
-        '🏢': '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 7h1M9 11h1M9 15h1M14 7h1M14 11h1M14 15h1"/>',
-        '🏭': '<path d="M2 20V10l6 4V10l6 4V5l6 3v12z"/><path d="M2 20h20"/>',
-        '🏠': '<path d="m3 10 9-7 9 7"/><path d="M5 9v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M9 21v-6h6v6"/>',
-        '🌙': '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
-        '☁': '<path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.6 1.5A3.5 3.5 0 0 0 6 18z"/>',
-        '🖨': '<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
-        '📧': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
-        '✉': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
-        '📨': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
-        '📮': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
-        '📤': '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 3v13"/><path d="m7 8 5-5 5 5"/>',
-        '📱': '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
-        '📸': '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3l2-3h8l2 3h3a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
-        '📆': '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
-        '📅': '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
-        '💬': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-        '🗨': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
-        '🔒': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-        '🔐': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-        '🔑': '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8-8"/><path d="m16 6 2 2"/><path d="m19 3 2 2"/>',
-        '📏': '<path d="M3 15 15 3l6 6L9 21z"/><path d="m7 11 2 2M11 7l2 2M15 3l2 2"/>',
-        '🔄': '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>',
-        '↩': '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/>',
-        '➡': '<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>',
-        '⬅': '<path d="M19 12H5"/><path d="m11 6-6 6 6 6"/>',
-        '⬆': '<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
-        '🔽': '<path d="m6 9 6 6 6-6"/>',
-        '🔼': '<path d="m6 15 6-6 6 6"/>',
-        '↔': '<path d="m18 8 4 4-4 4"/><path d="M2 12h20"/><path d="m6 8-4 4 4 4"/>',
-        '✅': '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
-        '❌': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-        'ℹ': '<circle cx="12" cy="12" r="9"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
-        '⏱': '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/>',
-        '⏰': '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M5 3 3 5M21 5l-2-2"/>',
-        '🕰': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-        '⏳': '<path d="M6 2h12M6 22h12"/><path d="M6 2c0 4 3 5 6 10 3-5 6-6 6-10M6 22c0-4 3-5 6-10 3 5 6 6 6 10"/>',
-        '🎨': '<circle cx="13.5" cy="6.5" r="1.3"/><circle cx="17.5" cy="10.5" r="1.3"/><circle cx="8.5" cy="7.5" r="1.3"/><circle cx="6.5" cy="12.5" r="1.3"/><path d="M12 2a10 10 0 0 0 0 20 2.5 2.5 0 0 0 2.5-2.5c0-.6-.2-1.1-.6-1.5-.4-.4-.6-.9-.6-1.5A2.5 2.5 0 0 1 15.3 14H17a5 5 0 0 0 5-5c0-4-4.5-7-10-7z"/>',
-        '🌈': '<path d="M22 17a10 10 0 0 0-20 0"/><path d="M18 17a6 6 0 0 0-12 0"/><path d="M14 17a2 2 0 0 0-4 0"/>',
-        '🎓': '<path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5"/>',
-        '📌': '<path d="M12 17v5"/><path d="M9 10.8V4h6v6.8l2 3.2H7z"/>',
-        '🔖': '<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
-        '🏷': '<path d="M12.6 2.6 21 11a2 2 0 0 1 0 2.8l-6.2 6.2a2 2 0 0 1-2.8 0L3.6 11.6A2 2 0 0 1 3 10.2V4a1 1 0 0 1 1-1h6.2a2 2 0 0 1 1.4.6z"/><circle cx="8" cy="8" r="1.2"/>',
-        '🖼': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
-        '❡': '<path d="M13 4v16"/><path d="M17 4v16"/><path d="M17 4H9.5a4.5 4.5 0 0 0 0 9H13"/>',
-        '🔤': '<path d="M4 7V5h16v2"/><path d="M9 20h6"/><path d="M12 5v15"/>',
-        '🔠': '<path d="M4 7V5h16v2"/><path d="M9 20h6"/><path d="M12 5v15"/>',
-        '🔡': '<path d="M4 7V5h16v2"/><path d="M9 20h6"/><path d="M12 5v15"/>',
-        '🔢': '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
-        '🔟': '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
-        '¹': '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
-        '🏁': '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
-        '🧹': '<path d="m7 21-4-4a2 2 0 0 1 0-3L14 3a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3L10 21z"/><path d="m9 12 4 4"/>',
-        '🧽': '<path d="m7 21-4-4a2 2 0 0 1 0-3L14 3a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3L10 21z"/><path d="m9 12 4 4"/>',
-        '🧼': '<path d="m7 21-4-4a2 2 0 0 1 0-3L14 3a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3L10 21z"/><path d="m9 12 4 4"/>',
-        '🧍': '<circle cx="12" cy="6" r="3"/><path d="M12 9v8"/><path d="m9 21 3-4 3 4"/>',
-        '▯': '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>',
-        '💰': '<circle cx="12" cy="12" r="9"/><path d="M12 6.5v11"/><path d="M14.7 9.3a2.4 2 0 0 0-2.7-1.3h-.6a2 2 0 0 0 0 4h1.2a2 2 0 0 1 0 4H12a2.4 2 0 0 1-2.7-1.3"/>',
-        '🤐': '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
-        '🏗': '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.7-.7-.7-2.7z"/>',
-        '➕': '<path d="M12 5v14"/><path d="M5 12h14"/>',
-        '✕': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-        '📎': '<path d="M21 8.5 12 17.5a3.5 3.5 0 0 1-5-5l9-9a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1.5 1.5 0 0 1-2-2l7.5-7.5"/>'
-    };
-
-    function baseKey(text) {
-        const t = (text || '').trim();
-        if (!t) return '';
-        // vezmi první „grafém" a odstraň variační selektor
-        const first = Array.from(t)[0] || '';
-        return first.replace(/️/g, '');
-    }
-
-    // Nahradí VEDOUCÍ emoji v textu prvku inline SVG ikonou (zachová zbytek obsahu).
-    // Pro panely: .clause-item, .panel-title apod.
-    function iconifyLeading(selectors) {
-        document.querySelectorAll(selectors).forEach((el) => {
-            if (el.dataset.leadIconified) return;
-            const node = el.firstChild;
-            if (!node || node.nodeType !== 3) return; // musí začínat textovým uzlem
-            const arr = Array.from(node.nodeValue);
-            let i = 0;
-            while (i < arr.length && /\s/.test(arr[i])) i++;
-            const first = arr[i] || '';
-            const key = first.replace(/️/g, '');
-            if (!key || !P[key]) return;
-            // přeskoč emoji + navazující variační/ZWJ znaky + jednu mezeru
-            let j = i + 1;
-            while (j < arr.length && /[️‍♀♂]/.test(arr[j])) j++;
-            if (arr[j] === ' ') j++;
-            node.nodeValue = arr.slice(0, i).join('') + arr.slice(j).join('');
-            const span = document.createElement('span');
-            span.className = 'lx-inline-icon';
-            span.innerHTML = V(P[key]);
-            el.insertBefore(span, el.firstChild);
-            el.dataset.leadIconified = '1';
-        });
-    }
-
-    function apply(root) {
-        const scope = root || document;
-        scope.querySelectorAll('.icon-sq, .card-icon').forEach((el) => {
-            if (el.dataset.iconified) return;
-            // Nediraj do prvků, které obsahují HTML (např. <b>B</b>) nebo čistý text/čísla.
-            if (el.children.length) return;
-            const key = baseKey(el.textContent);
-            if (key && P[key]) {
-                el.innerHTML = V(P[key]);
-                el.dataset.iconified = '1';
-                el.classList.add('has-svg-icon');
-            }
-        });
-        // Panely: vedoucí emoji v doložkách a titulcích sekcí.
-        iconifyLeading('.clause-item, .panel-title');
-    }
-
-    window.LexisIcons = { apply, iconifyLeading, MAP: P };
-
-    if (document.readyState !== 'loading') {
-        apply();
-    } else {
-        document.addEventListener('DOMContentLoaded', () => apply());
-    }
-    // Druhý průchod pro případný obsah vykreslený těsně po startu.
-    setTimeout(() => apply(), 500);
-})();
-
-/* --- Pravý icon rail: aktivní stav + viditelnost (napojení na existující panely) --- */
-(function () {
-    // rail tlačítko -> panel a podmínka „otevřeno"
-    const RAIL = [
-        { btn: 'rail-knihovna',  panel: 'sidebar',         open: (el) => !el.classList.contains('collapsed') },
-        { btn: 'rail-ai',        panel: 'ai-drawer',       open: (el) => el.classList.contains('open') },
-        { btn: 'rail-reference', panel: 'right-sidebar',   open: (el) => !el.classList.contains('collapsed') },
-        { btn: 'rail-revize',    panel: 'comment-sidebar', open: (el) => el.classList.contains('open') }
-    ];
-
-    function sync() {
-        RAIL.forEach((m) => {
-            const btn = document.getElementById(m.btn);
-            const panel = document.getElementById(m.panel);
-            if (!btn || !panel) return;
-            btn.classList.toggle('active', !!m.open(panel));
-        });
-    }
-
-    function updateRailVisibility() {
-        const rail = document.getElementById('lexis-rail');
-        const app = document.getElementById('app-container');
-        if (!rail) return;
-        const appVisible = app && getComputedStyle(app).display !== 'none';
-        rail.style.display = appVisible ? 'flex' : 'none';
-    }
-
-    function attach() {
-        const observed = new Set();
-        RAIL.forEach((m) => {
-            const panel = document.getElementById(m.panel);
-            if (panel && !observed.has(m.panel)) {
-                observed.add(m.panel);
-                new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
-            }
-        });
-        const app = document.getElementById('app-container');
-        if (app) new MutationObserver(updateRailVisibility).observe(app, { attributes: true, attributeFilter: ['style', 'class'] });
-        sync();
-        updateRailVisibility();
-    }
-
-    function boot() {
-        attach();
-        // panely/app-container mohou vzniknout až po initApp → pár opakování
-        let n = 0;
-        const iv = setInterval(() => { attach(); if (++n >= 6) clearInterval(iv); }, 500);
-    }
-
-    if (document.readyState !== 'loading') boot();
-    else document.addEventListener('DOMContentLoaded', boot);
-})();
-
-/* --- Klávesnicová přístupnost interaktivních div/span prvků (ribbon, taby, doložky) --- */
-(function () {
-    const SEL = '.btn-icon, .tab, .qa-btn, .clause-item, .context-menu-item';
-
-    function enhance(root) {
-        (root || document).querySelectorAll(SEL).forEach((el) => {
-            if (el.dataset.a11y) return;
-            const tag = el.tagName;
-            if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA') { el.dataset.a11y = '1'; return; }
-            if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
-            if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
-            el.dataset.a11y = '1';
-        });
-    }
-
-    // Delegovaná obsluha kláves — Enter / mezerník spustí klik.
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
-        const el = e.target && e.target.closest ? e.target.closest(SEL) : null;
-        if (!el) return;
-        const tag = el.tagName;
-        if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        e.preventDefault();
-        el.click();
+  'use strict';
+  var ICONS = {"ulozit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2.5\"/><path d=\"M8.5 4v5h7V4M8.5 20v-6h7v6\"/></svg>", "zpet": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4.5 9.5h10a5 5 0 0 1 0 10h-3M4.5 9.5l4-4M4.5 9.5l4 4\"/></svg>", "vpred": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19.5 9.5h-10a5 5 0 0 0 0 10h3M19.5 9.5l-4-4M19.5 9.5l-4 4\"/></svg>", "tisk": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7.5 9.5V4h9v5.5\"/><rect x=\"3.5\" y=\"9.5\" width=\"17\" height=\"7\" rx=\"2\"/><path d=\"M7.5 14h9v6h-9z\"/></svg>", "novy-dokument": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 3.5v5h5\"/><path d=\"M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z\"/></svg>", "hledat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"6\"/><path d=\"M15.4 15.4L20 20\"/></svg>", "profil-pravnika": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"8.5\" r=\"3.5\"/><path d=\"M5.5 20c1.3-3.4 3.8-5 6.5-5s5.2 1.6 6.5 5\"/></svg>", "uvodni-panel": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 11l8-6.5 8 6.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z\"/></svg>", "export-pdf": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 3.5v5h5\"/><path d=\"M19 12.5v-4l-5-5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h4\"/><path d=\"M17 15v6M14 18l3 3 3-3\"/></svg>", "e-mail": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5.5\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M3.6 6.8l8.4 6.2 8.4-6.2\"/></svg>", "ulozit-jako-sablonu": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"2.5\"/><path d=\"M8.5 4v5h7V4\"/><path d=\"M12 13v5M9.5 15.5h5\"/></svg>", "webovy-nahled": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M4 12h16M12 4c2.8 3.4 2.8 12.6 0 16M12 4c-2.8 3.4-2.8 12.6 0 16\"/></svg>", "indexovat-kb": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"12\" cy=\"6.5\" rx=\"7\" ry=\"2.8\"/><path d=\"M5 6.5v11c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8v-11\"/><path d=\"M5 12c0 1.6 3.1 2.8 7 2.8s7-1.2 7-2.8\"/></svg>", "api-status": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8.5 3v5.5M15.5 3v5.5\"/><path d=\"M6 8.5h12v3.5a6 6 0 0 1-12 0z\"/><path d=\"M12 18v3\"/></svg>", "cloud-sync": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7.5 18h8.8a4 4 0 0 0 .5-7.9A6 6 0 0 0 5.6 11.4 3.4 3.4 0 0 0 7.5 18z\"/></svg>", "export-docx": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 3.5v5h5\"/><path d=\"M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z\"/><path d=\"M8.5 13h7M8.5 16.5h4.5\"/></svg>", "bundle": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.5 8l8.5-4 8.5 4v8l-8.5 4-8.5-4z\"/><path d=\"M3.5 8l8.5 4 8.5-4M12 12v8\"/></svg>", "hromadne-generovani": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"6.5\" width=\"12\" height=\"14\" rx=\"2\"/><path d=\"M7.5 6.5v-3h13v14h-3\"/></svg>", "kopirovat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"11\" height=\"11\" rx=\"2\"/><path d=\"M5.5 15H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v.5\"/></svg>", "najit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"6\"/><path d=\"M15.4 15.4L20 20\"/></svg>", "nahradit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 9h11a4 4 0 0 1 0 8h-2M4 9l3.5-3.5M4 9l3.5 3.5\"/><path d=\"M20 17H9\"/></svg>", "diktovat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"3\" width=\"6\" height=\"10.5\" rx=\"3\"/><path d=\"M6 11.5a6 6 0 0 0 12 0M12 17.5V21\"/></svg>", "zvyraznit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20.5h16\"/><path d=\"M8.5 16.5l7.5-7.5-3-3-7.5 7.5v3z\"/></svg>", "radkovani": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.5 6h10.5M9.5 12h10.5M9.5 18h10.5\"/><path d=\"M4.5 5.5v13M2.8 7.2L4.5 5.5l1.7 1.7M2.8 16.8l1.7 1.7 1.7-1.7\"/></svg>", "odsazeni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h16M10 12h10M4 18h16\"/><path d=\"M4 10l3 2-3 2z\"/></svg>", "zarovnat-vlevo": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h16M4 10.5h10M4 15h16M4 19.5h10\"/></svg>", "zarovnat-na-stred": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h16M7 10.5h10M4 15h16M7 19.5h10\"/></svg>", "do-bloku": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h16M4 10.5h16M4 15h16M4 19.5h16\"/></svg>", "vlozit-obsah": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h3.5M4 11h3.5M4 16h3.5\"/><path d=\"M10.5 6H20M10.5 11H20M10.5 16h6\"/></svg>", "dnesni-datum": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"5.5\" width=\"16\" height=\"15\" rx=\"2\"/><path d=\"M4 10.5h16M8.5 3v5M15.5 3v5\"/></svg>", "titulni-strana": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"3.5\" width=\"14\" height=\"17\" rx=\"2\"/><path d=\"M9 8.5h6M8 13h8M8 16.5h5\"/></svg>", "poznamka-pod-carou": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 6h9M5 10h14M5 14h7\"/><path d=\"M4 18h16\"/><path d=\"M8.5 20.5v-2.5M7.5 19l1-1\"/></svg>", "legal-linker": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10.5 14a4 4 0 0 1 0-5.7l2-2a4 4 0 0 1 5.7 5.7l-1 1\"/><path d=\"M13.5 10a4 4 0 0 1 0 5.7l-2 2a4 4 0 0 1-5.7-5.7l1-1\"/></svg>", "gdpr-shield": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3.2l7 3v5.4c0 4.2-3 6.8-7 7.9-4-1.1-7-3.7-7-7.9V6.2z\"/><path d=\"M9.2 11.8l2 2 3.8-4\"/></svg>", "tabulka": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"14\" rx=\"2\"/><path d=\"M3.5 10h17M3.5 14.5h17M9.5 5v14M15 5v14\"/></svg>", "obrazek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"14\" rx=\"2\"/><circle cx=\"8.7\" cy=\"10\" r=\"1.7\"/><path d=\"M4.5 17l4.8-4 3.7 3 3-2.2 4 3.2\"/></svg>", "odkaz": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10.5 14a4 4 0 0 1 0-5.7l2-2a4 4 0 0 1 5.7 5.7l-1 1\"/><path d=\"M13.5 10a4 4 0 0 1 0 5.7l-2 2a4 4 0 0 1-5.7-5.7l1-1\"/></svg>", "zalozka": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 3.5h10v17l-5-4-5 4z\"/></svg>", "zahlavi": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"3.5\" width=\"16\" height=\"17\" rx=\"2\"/><path d=\"M4 9h16M7.5 6.2h6\"/></svg>", "zapati": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"3.5\" width=\"16\" height=\"17\" rx=\"2\"/><path d=\"M4 15h16M7.5 17.8h6\"/></svg>", "cislo-strany": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5.5\" y=\"3.5\" width=\"13\" height=\"17\" rx=\"2\"/><path d=\"M9 8.5h6M9 12h6\"/><path d=\"M10 17.5h4\"/></svg>", "soudni-poplatek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12.5 3.5H20V11l-8.6 8.6a1.4 1.4 0 0 1-2 0l-5.5-5.5a1.4 1.4 0 0 1 0-2z\"/><circle cx=\"16.4\" cy=\"7.1\" r=\"1.3\"/></svg>", "odmena-advokata": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5.5v14M7 19.5h10\"/><path d=\"M6.5 8.2l11-2.2\"/><path d=\"M3.5 14.5l3-6.5 3 6.5a3 3 0 0 1-6 0zM14.5 12.5l3-6.5 3 6.5a3 3 0 0 1-6 0z\"/></svg>", "lhutnik": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 3.5h10M7 20.5h10\"/><path d=\"M7.5 3.5v2.8c0 2.4 4.5 3.9 4.5 5.7s-4.5 3.3-4.5 5.7v2.8M16.5 3.5v2.8c0 2.4-4.5 3.9-4.5 5.7s4.5 3.3 4.5 5.7v2.8\"/></svg>", "uroky-z-prodleni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 19.5h16\"/><path d=\"M4.5 16l4.5-5.5 3.2 3 5-6.5\"/><path d=\"M13.5 7h3.7v3.7\"/></svg>", "blok-podpisu": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 19.5h16\"/><path d=\"M5.5 15.5c2.5-7 5-8.5 6.2-5.5s1.6 4.8 3.3 3.2\"/></svg>", "muj-podpis": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20.5l1-4L15 6.4l3 3L8 19.5z\"/><path d=\"M13.8 7.6l3 3\"/></svg>", "anonymizovat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12s3.6-5.6 9-5.6S21 12 21 12s-3.6 5.6-9 5.6S3 12 3 12z\"/><circle cx=\"12\" cy=\"12\" r=\"2.3\"/><path d=\"M4.5 20L19.5 4.5\"/></svg>", "kontrola-hierarchie": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 4.5v14.5h3.5\"/><path d=\"M8.5 4.5H20M11.5 11.5H20M14.5 19H20\"/></svg>", "terminologie": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 18l4.5-11 4.5 11M5.6 14.5h5.9\"/><path d=\"M15.5 18v-6.6a2.6 2.6 0 0 1 5 0V18M15.5 15h5\"/></svg>", "clanek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"3.5\" width=\"14\" height=\"17\" rx=\"2\"/><path d=\"M8.5 8h7M8.5 12h7M8.5 16h4.5\"/></svg>", "paragraf": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.4 7.4c0-1.7-1.1-2.9-2.6-2.9-1.6 0-2.7 1.1-2.7 2.5 0 3.4 6 3.2 6 7 0 1.4-1.1 2.6-2.7 2.6-1.5 0-2.6-1.1-2.6-2.7\"/><path d=\"M14.4 12.6c0 1.7-1.1 2.9-2.6 2.9-1.6 0-2.7-1.1-2.7-2.5\"/><path d=\"M9.6 16.6c0 1.4 1.1 2.9 2.7 2.9 1.5 0 2.6-1.2 2.6-2.6\"/></svg>", "citace": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.5 6.5c-2.6 1-4 3-4 5.4 0 1.9 1.2 3.1 2.8 3.1 1.5 0 2.6-1.1 2.6-2.5 0-1.3-.9-2.3-2.2-2.4.2-1.3 1.2-2.4 2.5-3z\"/><path d=\"M18 6.5c-2.6 1-4 3-4 5.4 0 1.9 1.2 3.1 2.8 3.1 1.5 0 2.6-1.1 2.6-2.5 0-1.3-.9-2.3-2.2-2.4.2-1.3 1.2-2.4 2.5-3z\"/></svg>", "judikatura": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.5 10L12 4.5l8.5 5.5\"/><path d=\"M6 10.5v8M9.8 10.5v8M14.2 10.5v8M18 10.5v8\"/><path d=\"M3.5 20.5h17\"/></svg>", "hledat-v-ares": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6\"/><path d=\"M15 15l5 5\"/><path d=\"M8 13v-4h5v4\"/></svg>", "fyzicka-osoba": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"7\" r=\"3\"/><path d=\"M12 10v7M12 17l-2.5 4M12 17l2.5 4M8.5 12.5h7\"/></svg>", "podnikatel": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"8.5\" width=\"17\" height=\"11\" rx=\"2\"/><path d=\"M9 8.5V6h6v2.5M3.5 13h17\"/></svg>", "firma": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20.5V8l6 3.5V8l6 3.5V5h4v15.5z\"/><path d=\"M4 20.5h16\"/></svg>", "pravni-moc": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"9.5\" r=\"5.5\"/><path d=\"M9.6 9.3l1.8 1.8 3.3-3.4\"/><path d=\"M8.5 20.5h7M12 15v5.5\"/></svg>", "motivy": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3.5a8.5 8.5 0 0 0 0 17c1.4 0 1.9-1 1.4-1.9s.1-1.9 1.4-1.9h1.9a3.8 3.8 0 0 0 3.8-3.8A8.5 8.5 0 0 0 12 3.5z\"/><circle cx=\"8.2\" cy=\"9\" r=\"1.1\"/><circle cx=\"12\" cy=\"7.2\" r=\"1.1\"/><circle cx=\"15.6\" cy=\"9.4\" r=\"1.1\"/></svg>", "barvy": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3.5s6 6.4 6 9.8a6 6 0 0 1-12 0c0-3.4 6-9.8 6-9.8z\"/></svg>", "vodoznak": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"5\" width=\"16\" height=\"14\" rx=\"2\"/><path d=\"M7.5 15.5l9-7\"/><path d=\"M7.5 11l4-3M12.5 16l4-3\"/></svg>", "barva-stranky": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6.5 11.5l6-6 6.5 6.5-6 6a1.4 1.4 0 0 1-2 0l-4.5-4.5a1.4 1.4 0 0 1 0-2z\"/><path d=\"M9.5 8.5l-2-2\"/><path d=\"M20 16c0 1.1-.7 2-1.8 2s-1.8-.9-1.8-2 1.8-3 1.8-3 1.8 1.9 1.8 3z\"/></svg>", "ohraniceni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"5\" width=\"16\" height=\"14\" rx=\"2\" stroke-dasharray=\"3 2.4\"/></svg>", "prohlizec-pdf": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M13.5 3.5v5h5\"/><path d=\"M18.5 11V8.5l-5-5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h3\"/><circle cx=\"15.5\" cy=\"16.5\" r=\"3.2\"/><path d=\"M17.9 18.9L20.5 21.5\"/></svg>", "import-zfo": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.5 8l8.5-4 8.5 4v8l-8.5 4-8.5-4z\"/><path d=\"M12 8.5v7M9 12.5l3 3 3-3\"/></svg>", "dorucenka": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14 3.5v5h5\"/><path d=\"M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z\"/><path d=\"M8.8 14.2l2 2 4.2-4.4\"/></svg>", "preposlat-klientovi": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"5.5\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M3.6 6.8l8.4 6.2 8.4-6.2\"/><path d=\"M14 18.5h6M17.5 16l2.5 2.5-2.5 2.5\"/></svg>", "vykazat-praci": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"13\" r=\"7\"/><path d=\"M12 9.5V13l2.4 1.6M9.5 3h5M12 3v3\"/></svg>", "smazat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4.5 6.5h15M9.5 6.5V4h5v2.5\"/><path d=\"M6.5 6.5l1 13h9l1-13\"/><path d=\"M10.5 10v6M13.5 10v6\"/></svg>", "ai-jiskra": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3l1.7 5.3 5.3 1.7-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z\"/><path d=\"M18.3 14.2l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6z\"/></svg>", "komentar": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5.5 5h13a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V15H5.5A1.5 1.5 0 0 1 4 13.5v-7A1.5 1.5 0 0 1 5.5 5z\"/><path d=\"M8 9h8M8 11.5h5\"/></svg>", "zmensit-odsazeni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6h16M10 12h10M4 18h16\"/><path d=\"M7 10l-3 2 3 2z\"/></svg>", "na-sirku": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"6.5\" width=\"18\" height=\"11\" rx=\"1.8\"/><path d=\"M7 10.5v3M17 10.5v3\"/></svg>", "jeden-sloupec": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8.5\" y=\"4\" width=\"7\" height=\"16\" rx=\"1.4\"/></svg>", "sledovat-zmeny": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20l1-3.5L14.5 6.5l2.5 2.5L7.5 19z\"/><path d=\"M13 8l2.5 2.5\"/><path d=\"M4 20l3.4-1\"/></svg>", "odmitnout": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M9 9l6 6M15 9l-6 6\"/></svg>", "prijmout": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M8.4 12.2l2.4 2.4 4.8-4.9\"/></svg>", "historie": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4.5 12a7.5 7.5 0 1 1 2.3 5.4\"/><path d=\"M4.5 12V8M4.5 12h4\"/><path d=\"M12 8.2V12l2.6 1.8\"/></svg>", "vycistit-metadata": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M7 20h11\"/><path d=\"M14.2 6l3.8 3.8-6.8 6.7H8L4.7 13.2z\"/><path d=\"M11 9.2l3.8 3.8\"/></svg>", "vycistit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15.5 4l4.5 4.5\"/><path d=\"M17.7 6.2L9 15l-3.6 4.6L10 16z\"/><path d=\"M5.4 19.6l-1.9 1.9\"/></svg>", "vysvetlit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 16a5.5 5.5 0 1 1 6 0v1.5H9z\"/><path d=\"M9.4 20h5.2M10.5 21.6h3\"/></svg>", "prelozit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.5 6h7M7 4.2V6M5.4 6c0 3.6-1.9 5.6-1.9 5.6M4.2 8.2c0 1.9 2.4 3.4 4.8 3.4\"/><path d=\"M11.8 20l3.6-9 3.6 9M13.2 16.7h4.4\"/></svg>", "dopsat-ai": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20l1-3.5L13.5 8l2.5 2.5L7.5 19z\"/><path d=\"M12 9.5l2.5 2.5\"/><path d=\"M17.5 3.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z\"/></svg>", "mobil": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"7\" y=\"3\" width=\"10\" height=\"18\" rx=\"2.5\"/><path d=\"M10.5 18.3h3\"/></svg>", "rezim-ribbon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"14\" rx=\"1.8\"/><path d=\"M3.5 9.5h17\"/><path d=\"M6.5 13h3M11 13h3M15.5 13h2\"/></svg>", "rezim-radek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"14\" rx=\"1.8\"/><path d=\"M3.5 9.2h17M6 13h12\"/></svg>", "rezim-papir": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"6\" y=\"3.5\" width=\"12\" height=\"17\" rx=\"1.8\"/><path d=\"M9 8h6M9 11h6M9 14h4\"/></svg>", "mrizka": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"1.8\"/><path d=\"M4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16\"/></svg>", "tmavy-rezim": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 13.6A8 8 0 1 1 10.4 4a6.5 6.5 0 0 0 9.6 9.6z\"/></svg>", "skenovat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 8V6.5a2 2 0 0 1 2-2H8M16 4.5h2a2 2 0 0 1 2 2V8M20 16v1.5a2 2 0 0 1-2 2h-2M8 19.5H6a2 2 0 0 1-2-2V16\"/><path d=\"M4 12h16\"/></svg>", "obsah": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M8.5 6h11M8.5 12h11M8.5 18h11\"/><circle cx=\"4.6\" cy=\"6\" r=\"1.1\"/><circle cx=\"4.6\" cy=\"12\" r=\"1.1\"/><circle cx=\"4.6\" cy=\"18\" r=\"1.1\"/></svg>", "pripnout": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 3.5h6l-1 5 3 3v1.6H7V11.5l3-3z\"/><path d=\"M12 13.1V20.5\"/></svg>", "onboarding": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 8.5l9-3.6 9 3.6-9 3.6z\"/><path d=\"M7 10.6v3.9c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-3.9\"/><path d=\"M21 8.5v5\"/></svg>", "prirucka": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 6.4C10 5 7.5 4.5 4.5 4.8v12c3-.3 5.5.2 7.5 1.7 2-1.5 4.5-2 7.5-1.7v-12C16.5 4.5 14 5 12 6.4z\"/><path d=\"M12 6.4v11.8\"/></svg>", "obnovit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19.5 8.5A8 8 0 0 0 5.6 6.4L4 8\"/><path d=\"M4 3.5V8h4.5\"/><path d=\"M4.5 15.5a8 8 0 0 0 13.9 2.1L20 16\"/><path d=\"M20 20.5V16h-4.5\"/></svg>", "nastaveni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 3.5v2.8M12 17.7v2.8M20.5 12h-2.8M6.3 12H3.5M18 6l-2 2M8 16l-2 2M18 18l-2-2M8 8L6 6\"/></svg>", "chyba": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><ellipse cx=\"12\" cy=\"13\" rx=\"4.3\" ry=\"5.3\"/><path d=\"M9.7 5.2A2.5 2.5 0 0 1 12 3.7a2.5 2.5 0 0 1 2.3 1.5\"/><path d=\"M12 8.2v9.8M7.7 13H3.6M16.3 13h4.1M4.6 8.6l3 1.4M19.4 8.6l-3 1.4M4.6 17.6l3-1.4M19.4 17.6l-3-1.4\"/></svg>", "zabezpeceni": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"10.2\" width=\"14\" height=\"9.8\" rx=\"2\"/><path d=\"M8 10.2V7a4 4 0 0 1 8 0v3.2\"/><circle cx=\"12\" cy=\"14.6\" r=\"1.3\"/><path d=\"M12 15.9v1.6\"/></svg>", "zamek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"10.4\" width=\"14\" height=\"9.6\" rx=\"2\"/><path d=\"M8 10.4V7a4 4 0 0 1 8 0v3.4\"/></svg>", "odemknout": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"10.4\" width=\"14\" height=\"9.6\" rx=\"2\"/><path d=\"M8 10.4V7a4 4 0 0 1 7.8-1.6\"/></svg>", "vlozit": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"5.5\" width=\"14\" height=\"14.5\" rx=\"2\"/><path d=\"M9 5.5V4.2A1.2 1.2 0 0 1 10.2 3h3.6A1.2 1.2 0 0 1 15 4.2V5.5z\"/><path d=\"M12 10v5M9.5 12.5l2.5 2.5 2.5-2.5\"/></svg>", "vyjmout": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"6.5\" cy=\"7\" r=\"2\"/><circle cx=\"6.5\" cy=\"17\" r=\"2\"/><path d=\"M8.3 8.2L20 18M8.3 15.8L20 6\"/></svg>", "klic": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"8\" cy=\"8\" r=\"3.5\"/><path d=\"M10.5 10.5L20 20M17 17l2-2M14 14l1.8-1.8\"/></svg>", "otisk": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5.5 8.5A8 8 0 0 1 18.5 8.5\"/><path d=\"M7 11.5a5 5 0 0 1 10 0v1.8\"/><path d=\"M9.5 11.5a2.5 2.5 0 0 1 5 0v2a6 6 0 0 0 .8 3\"/><path d=\"M12 11.5v3a9 9 0 0 0 1.2 4.6M7 13.5v.8a7 7 0 0 0 1 3.6\"/></svg>", "oko": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12s3.6-6 9-6 9 6 9 6-3.6 6-9 6-9-6-9-6z\"/><circle cx=\"12\" cy=\"12\" r=\"2.6\"/></svg>", "penize": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 7v10M9.8 9.4c0-1 1-1.6 2.2-1.6s2.2.6 2.2 1.5c0 2.1-4.4 1.4-4.4 3.5 0 1 1 1.7 2.2 1.7s2.2-.6 2.2-1.6\"/></svg>", "mlcenlivost": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5.5\" y=\"4\" width=\"13\" height=\"16\" rx=\"2\"/><path d=\"M9.3 13v-1.5a2.7 2.7 0 0 1 5.4 0V13\"/><rect x=\"8.5\" y=\"13\" width=\"7\" height=\"4.2\" rx=\"1\"/></svg>", "pridat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 8.2v7.6M8.2 12h7.6\"/></svg>", "bloky": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"8.3\" y=\"3.7\" width=\"7.4\" height=\"7.4\" rx=\"1.3\"/><rect x=\"3.7\" y=\"12.9\" width=\"7.4\" height=\"7.4\" rx=\"1.3\"/><rect x=\"12.9\" y=\"12.9\" width=\"7.4\" height=\"7.4\" rx=\"1.3\"/></svg>", "pole-promenne": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 4.5C6.6 4.5 7.2 8 5.2 9c-1 .5-1 1.5 0 2 2 1 1.4 4.5 3.8 4.5M15 4.5c2.4 0 1.8 3.5 3.8 4.5 1 .5 1 1.5 0 2-2 1-1.4 4.5-3.8 4.5\"/></svg>", "ai-robot": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4.5\" y=\"8\" width=\"15\" height=\"10.5\" rx=\"2.6\"/><path d=\"M12 5.2V8\"/><circle cx=\"12\" cy=\"4.2\" r=\"1.1\"/><circle cx=\"9.5\" cy=\"13\" r=\"1.1\"/><circle cx=\"14.5\" cy=\"13\" r=\"1.1\"/><path d=\"M3.5 12v3M20.5 12v3\"/></svg>", "mozek": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.2 5.4A2.7 2.7 0 0 0 5.6 8 2.8 2.8 0 0 0 4.8 13 2.9 2.9 0 0 0 9 18.4\"/><path d=\"M9.2 5.4A2.3 2.3 0 0 1 12 7.6v9.6a2.4 2.4 0 0 1-3 2.2\"/><path d=\"M14.8 5.4A2.7 2.7 0 0 1 18.4 8 2.8 2.8 0 0 1 19.2 13 2.9 2.9 0 0 1 15 18.4\"/><path d=\"M14.8 5.4A2.3 2.3 0 0 0 12 7.6\"/></svg>", "kontakty": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6.5 3.5H17a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6.5z\"/><path d=\"M6.5 3.5A2 2 0 0 0 4.5 5.5M6.5 20.5A2 2 0 0 1 4.5 18.5M4.5 5.5v13\"/><circle cx=\"11.5\" cy=\"10\" r=\"2.1\"/><path d=\"M8.3 15c.7-1.5 1.9-2.2 3.2-2.2s2.5.7 3.2 2.2\"/></svg>", "cislovani": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.5 6.5h10M9.5 12h10M9.5 17.5h10\"/><path d=\"M4.2 5.2L5.6 4.5V9.5M4 15h2.6l-2.4 3h2.6\"/></svg>", "pravopis": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3.8 17l3.1-8.4L10 17M5 14.3h4\"/><path d=\"M13 8.6v8.4M13 8.6h3.1a2.1 2.1 0 0 1 0 4.2H13M13 12.8h3.3a2.1 2.1 0 0 1 0 4.2H13\"/></svg>", "psat": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20l1-3.5L14.5 6.5l2.5 2.5L7.5 19z\"/><path d=\"M13 8l2.5 2.5\"/></svg>", "vahy": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4.5v15M7 19.5h10\"/><path d=\"M6 7.8l12-2.6\"/><path d=\"M3 14l3-6.2L9 14a3 3 0 0 1-6 0zM15 12l3-6.2 3 6.2a3 3 0 0 1-6 0z\"/></svg>", "dva-sloupce": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3.5\" y=\"4\" width=\"7.2\" height=\"16\" rx=\"1.3\"/><rect x=\"13.3\" y=\"4\" width=\"7.2\" height=\"16\" rx=\"1.3\"/></svg>", "info": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><path d=\"M12 11.2v4.6\"/><path d=\"M12 8.2h.01\"/></svg>", "knihy": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4.3\" y=\"4\" width=\"3.7\" height=\"16\" rx=\"0.8\"/><rect x=\"9.3\" y=\"4\" width=\"3.7\" height=\"16\" rx=\"0.8\"/><rect x=\"14.4\" y=\"4.2\" width=\"3.7\" height=\"15.6\" rx=\"0.8\" transform=\"rotate(9 16.25 12)\"/></svg>", "sablony": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"4\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.2\"/><rect x=\"13\" y=\"4\" width=\"7\" height=\"7\" rx=\"1.2\"/><rect x=\"4\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.2\"/><rect x=\"13\" y=\"13\" width=\"7\" height=\"7\" rx=\"1.2\"/></svg>", "varovani": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 4.2L3.2 19a1 1 0 0 0 .9 1.5h15.8a1 1 0 0 0 .9-1.5z\"/><path d=\"M12 10v4.2\"/><path d=\"M12 17.3h.01\"/></svg>", "nastroj": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.7 6.3a3.6 3.6 0 0 0-4.8 4.5l-5.4 5.4 2.3 2.3 5.4-5.4a3.6 3.6 0 0 0 4.5-4.8l-2.3 2.3-2-2z\"/></svg>", "graf": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 4v16h16\"/><rect x=\"7\" y=\"11.5\" width=\"2.6\" height=\"5.5\" rx=\"0.5\"/><rect x=\"11.7\" y=\"8\" width=\"2.6\" height=\"9\" rx=\"0.5\"/><rect x=\"16.4\" y=\"13.5\" width=\"2.6\" height=\"3.5\" rx=\"0.5\"/></svg>", "terc": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"4.5\"/><circle cx=\"12\" cy=\"12\" r=\"1.2\"/></svg>", "kufrik": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"7.5\" width=\"18\" height=\"12.5\" rx=\"2\"/><path d=\"M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5\"/><path d=\"M3 12.7h18\"/></svg>", "eu": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12.0\" cy=\"5.8\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15.1\" cy=\"6.6\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"17.4\" cy=\"8.9\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.2\" cy=\"12.0\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"17.4\" cy=\"15.1\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"15.1\" cy=\"17.4\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"12.0\" cy=\"18.2\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8.9\" cy=\"17.4\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"6.6\" cy=\"15.1\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"5.8\" cy=\"12.0\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"6.6\" cy=\"8.9\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"8.9\" cy=\"6.6\" r=\"0.7\" fill=\"currentColor\" stroke=\"none\"/></svg>"};
+  var QAT = {"qat-save": "ulozit", "qat-undo": "zpet", "qat-redo": "vpred", "qat-print": "tisk", "qat-new": "novy-dokument", "qat-find": "najit", "qat-docx": "export-docx", "qat-email": "e-mail", "qat-gdpr": "gdpr-shield", "qat-ai": "ai-jiskra", "qat-audit": "vahy", "qat-comment": "komentar", "qat-para": "paragraf"};
+  var EMOJI = {"✅": ["prijmout", "#4f8a3d"], "☑": ["prijmout", "#4f8a3d"], "❌": ["odmitnout", "#c0442e"], "⚠": ["varovani", "#b8791f"], "ℹ": ["info", null], "✍": ["psat", null], "✨": ["ai-jiskra", null], "🔍": ["najit", null], "🔎": ["najit", null], "📝": ["psat", null], "💾": ["ulozit", null], "🔒": ["zamek", null], "🔐": ["zabezpeceni", null], "🔓": ["odemknout", null], "🔑": ["klic", null], "💼": ["kufrik", null], "📄": ["novy-dokument", null], "📃": ["novy-dokument", null], "📑": ["obsah", null], "📜": ["obsah", null], "📧": ["e-mail", null], "✉": ["e-mail", null], "📨": ["e-mail", null], "📩": ["e-mail", null], "📤": ["e-mail", null], "🔧": ["nastroj", null], "⚙": ["nastaveni", null], "⏰": ["lhutnik", null], "⏳": ["lhutnik", null], "🕐": ["historie", null], "🕒": ["historie", null], "🕰": ["historie", null], "📊": ["graf", null], "📈": ["uroky-z-prodleni", null], "🎯": ["terc", null], "💡": ["vysvetlit", null], "📌": ["pripnout", null], "📎": ["odkaz", null], "🔗": ["odkaz", null], "🛡": ["gdpr-shield", null], "⚖": ["vahy", null], "🏛": ["judikatura", null], "💰": ["penize", null], "👤": ["profil-pravnika", null], "👥": ["profil-pravnika", null], "📅": ["dnesni-datum", null], "📆": ["dnesni-datum", null], "🖨": ["tisk", null], "📂": ["na-sirku", null], "📁": ["na-sirku", null], "🗑": ["smazat", null], "♻": ["obnovit", null], "🔄": ["obnovit", null], "📥": ["vlozit", null], "🧠": ["mozek", null], "🤖": ["ai-robot", null], "📚": ["knihy", null], "📖": ["prirucka", null], "🏗": ["bloky", null], "➕": ["pridat", null], "✂": ["vyjmout", null], "📋": ["kopirovat", null], "🔢": ["cislovani", null], "🔤": ["pravopis", null], "🌐": ["prelozit", null], "🌙": ["tmavy-rezim", null], "🏁": ["mrizka", null], "🎓": ["onboarding", null], "🐞": ["chyba", null], "📱": ["mobil", null], "👁": ["oko", null], "👆": ["otisk", null], "⚔": ["vahy", null], "🗳": ["pole-promenne", null], "🏆": ["prijmout", null], "🔋": ["api-status", null], "🔌": ["api-status", null], "💬": ["komentar", null], "🇪🇺": ["eu", null]};
+  function get(id){ return ICONS[id] || ''; }
+  function sizeSvg(svg, px){
+    return svg.replace('<svg ', '<svg width="'+px+'" height="'+px+'" style="display:block" ');
+  }
+  function applyQAT(){
+    Object.keys(QAT).forEach(function(btnId){
+      var el = document.getElementById(btnId); var ic = ICONS[QAT[btnId]];
+      if (el && ic) el.innerHTML = sizeSvg(ic, 17);
     });
-
-    function boot() {
-        enhance();
-        let n = 0;
-        const iv = setInterval(() => { enhance(); if (++n >= 6) clearInterval(iv); }, 500);
-    }
-    if (document.readyState !== 'loading') boot();
-    else document.addEventListener('DOMContentLoaded', boot);
+  }
+  function applySlots(root){
+    (root||document).querySelectorAll('[data-ic]').forEach(function(el){
+      var ic = ICONS[el.getAttribute('data-ic')]; if (!ic) return;
+      var px = parseInt(el.getAttribute('data-ic-size'),10) || 16;
+      el.innerHTML = sizeSvg(ic, px);
+    });
+  }
+  var EMOJI_RE = null;
+  function buildRe(){
+    var keys = Object.keys(EMOJI).sort(function(a,b){return b.length-a.length;});
+    var esc = keys.map(function(k){ return k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); });
+    EMOJI_RE = new RegExp('(' + esc.join('|') + ')\uFE0F?', 'g');
+  }
+  function emojiToIcon(html, px){
+    if (!html || typeof html !== 'string') return html;
+    if (!EMOJI_RE) buildRe();
+    px = px || 15;
+    return html.replace(EMOJI_RE, function(_m, ch){
+      var m = EMOJI[ch]; if (!m) return _m;
+      var svg = ICONS[m[0]]; if (!svg) return _m;
+      var style = 'display:inline-block;vertical-align:-2px' + (m[1] ? ';color:'+m[1] : '');
+      svg = svg.replace('<svg ', '<svg width="'+px+'" height="'+px+'" style="'+style+'" ');
+      return '<span class="e-ico">' + svg + '</span>';
+    });
+  }
+  function apply(){ applyQAT(); applySlots(document); }
+  window.LexisIcons = { get: get, icons: ICONS, applyQAT: applyQAT, applySlots: applySlots, apply: apply, sizeSvg: sizeSvg, emojiToIcon: emojiToIcon };
+  window.eIco = function(h){ return (h && typeof h === 'string') ? emojiToIcon(h) : h; };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+  else apply();
 })();

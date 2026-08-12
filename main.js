@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, systemPreferences, shell, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -162,6 +162,7 @@ function createWindow() {
         height: 850,
         titleBarStyle: 'hidden', // Moderní "frameless" vzhled pro Mac
         trafficLightPosition: { x: 15, y: 15 },
+        icon: path.join(__dirname, 'build', 'icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -175,7 +176,75 @@ function createWindow() {
 
 app.setName('LexisEditor');
 
+// Vlastní aplikační menu — aby se v liště (a v „O aplikaci") místo výchozího
+// „Electron" ukazovalo „LexisEditor" a menu bylo české. Pozn.: v čistě vývojovém
+// běhu (electron .) může macOS u úplně prvního menu stále zobrazit „Electron";
+// v ZABALENÉ aplikaci (productName: LexisEditor) je název správně všude.
+function buildAppMenu() {
+    const isMac = process.platform === 'darwin';
+    const template = [
+        ...(isMac ? [{
+            label: 'LexisEditor',
+            submenu: [
+                { role: 'about', label: 'O aplikaci LexisEditor' },
+                { type: 'separator' },
+                { role: 'services', label: 'Služby' },
+                { type: 'separator' },
+                { role: 'hide', label: 'Skrýt LexisEditor' },
+                { role: 'hideOthers', label: 'Skrýt ostatní' },
+                { role: 'unhide', label: 'Zobrazit vše' },
+                { type: 'separator' },
+                { role: 'quit', label: 'Ukončit LexisEditor' }
+            ]
+        }] : []),
+        {
+            label: 'Úpravy',
+            submenu: [
+                { role: 'undo', label: 'Zpět' },
+                { role: 'redo', label: 'Vpřed' },
+                { type: 'separator' },
+                { role: 'cut', label: 'Vyjmout' },
+                { role: 'copy', label: 'Kopírovat' },
+                { role: 'paste', label: 'Vložit' },
+                { role: 'selectAll', label: 'Vybrat vše' }
+            ]
+        },
+        {
+            label: 'Zobrazení',
+            submenu: [
+                { role: 'reload', label: 'Načíst znovu' },
+                { role: 'toggleDevTools', label: 'Vývojářské nástroje' },
+                { type: 'separator' },
+                { role: 'resetZoom', label: 'Skutečná velikost' },
+                { role: 'zoomIn', label: 'Zvětšit' },
+                { role: 'zoomOut', label: 'Zmenšit' },
+                { type: 'separator' },
+                { role: 'togglefullscreen', label: 'Celá obrazovka' }
+            ]
+        },
+        {
+            label: 'Okno',
+            submenu: [
+                { role: 'minimize', label: 'Minimalizovat' },
+                { role: 'zoom', label: 'Zvětšit okno' },
+                ...(isMac
+                    ? [{ type: 'separator' }, { role: 'front', label: 'Přenést vše dopředu' }]
+                    : [{ role: 'close', label: 'Zavřít' }])
+            ]
+        }
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 app.whenReady().then(() => {
+    // Vlastní ikona i ve vývoji (bez ní macOS ukazuje Electron ikonu v Docku)
+    if (process.platform === 'darwin' && app.dock) {
+        try { app.dock.setIcon(path.join(__dirname, 'build', 'icon.png')); } catch (e) {}
+    }
+    try {
+        app.setAboutPanelOptions({ applicationName: 'LexisEditor', applicationVersion: app.getVersion(), copyright: 'LexisEditor' });
+    } catch (e) {}
+    try { buildAppMenu(); } catch (e) {}
     createWindow();
 
     app.on('activate', function () {
@@ -228,6 +297,39 @@ function readLexisLocalToken() {
 }
 ipcMain.handle('get-lexislocal-token', () => readLexisLocalToken());
 ipcMain.on('get-lexislocal-token-sync', (event) => { event.returnValue = readLexisLocalToken(); });
+
+// ─── Licencování / entitlement (PŘIPRAVENO, ZATÍM NEAKTIVNÍ) ─────────────────
+// Aktivace: (1) vlož veřejný klíč do js/core/lexis-license-key.js,
+//           (2) přepni LICENSING_ENABLED = true. Pak app bere edici z licence
+//           místo výchozí 'full'. Detaily: docs/LICENCE_SYSTEM.md
+const { verifyLicense, tierToEditionId } = require('./js/core/lexis-license');
+const { LICENSE_PUBLIC_KEY_PEM } = require('./js/core/lexis-license-key');
+const LICENSING_ENABLED = false; // ← MASTER VYPÍNAČ (nechat false, dokud nebude prodej)
+const licensePath = path.join(app.getPath('userData'), 'lexis_license.json');
+
+function readLicenseStatus() {
+    if (!LICENSING_ENABLED) return { enabled: false, valid: false, tier: null, editionId: null, reason: 'disabled' };
+    let license = null;
+    try { if (fs.existsSync(licensePath)) license = JSON.parse(fs.readFileSync(licensePath, 'utf-8')); } catch (e) {}
+    const r = verifyLicense(license, LICENSE_PUBLIC_KEY_PEM);
+    return {
+        enabled: true,
+        valid: r.valid,
+        tier: r.tier,
+        editionId: r.valid ? tierToEditionId(r.tier) : null,
+        reason: r.reason,
+        expires: r.expires || null,
+        name: r.name || '',
+        seats: r.seats || 1
+    };
+}
+
+// Pro UI/nastavení (async) i pro synchronní volbu edice při startu rendereru.
+ipcMain.handle('get-license-status', () => readLicenseStatus());
+ipcMain.on('get-license-edition-sync', (event) => {
+    const st = readLicenseStatus();
+    event.returnValue = (st.enabled && st.valid && st.editionId) ? st.editionId : '';
+});
 
 // Start aplikace
 app.on('window-all-closed', function () {
@@ -313,22 +415,96 @@ ipcMain.handle('search-ares', async (event, ico) => {
 const templatesPath = path.join(app.getPath('userData'), 'lexis_templates.json');
 
 const defaultTemplates = {
-    kupni: { title: "Kupní smlouva", desc: "Šablona nemovitosti/věci movité", icon: "🤝", content: '<h1 class="ql-align-center">KUPNÍ SMLOUVA</h1><p><br></p><p>uzavřená ve smyslu ust. § 2079 a násl. zákona č. 89/2012 Sb., občanský zákoník</p><p><br></p><p><strong>I. Smluvní strany</strong></p><p>Prodávající: [JMÉNO]</p><p>Kupující: [JMÉNO]</p><p><br></p><p><strong>II. Předmět koupě</strong></p><p>Předmětem této smlouvy je...</p>' },
-    plnamoc: { title: "Plná moc", desc: "Zastoupení advokátem ve věci", icon: "✍️", content: '<h1 class="ql-align-center">PLNÁ MOC</h1><p><br></p><p>Já, níže podepsaný/á [JMÉNO/NÁZEV], r.č./IČO: [HODNOTA], bytem/sídlem [ADRESA]</p><p><br></p><p><strong>zmocňuji tímto</strong></p><p><br></p><p>advokáta Mgr. Jana Nováka, ev. č. ČAK 12345, sídlem Advokátní 123, 110 00 Praha 1, aby mě zastupoval ve všech právních věcech a činech...</p>' },
-    zaloba: { title: "Žaloba (Návrh)", desc: "Občanské soudní řízení", icon: "⚖️", content: '<h1 class="ql-align-center">ŽALOBA NA PLNĚNÍ</h1><p><br></p><p><strong>Okresnímu soudu v [MĚSTO]</strong></p><p>Ke sp. zn.: [SPIS_ZNACKA]</p><p><br></p><p><strong>Žalobce:</strong> [JMÉNO]</p><p><strong>Žalovaný:</strong> [JMÉNO]</p><p><br></p><p><strong>O zaplacení částky [ČÁSTKA] s příslušenstvím</strong></p><p><br></p><p>I.</p><p>Žalobce a žalovaný uzavřeli dne [DATUM] smlouvu...</p>' },
-    hlavicka: { title: "Hlavičkový papír", desc: "Firemní vizuál kanceláře", icon: "📝", content: '<div style="border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;"><h2 style="margin: 0; color: #1e293b;">Advokátní kancelář Lexis</h2><p style="margin: 0; font-size: 12px; color: #64748b;">Právní 123, 110 00 Praha 1 | IČO: 12345678</p></div><p><br></p>' }
+    "kupni": {
+        "title": "Kupní smlouva",
+        "desc": "Prodej věci movité / nemovité",
+        "icon": "🤝",
+        "content": "<h1 class=\"ql-align-center\">KUPNÍ SMLOUVA</h1><p><br></p><p class=\"ql-align-center\">uzavřená podle § 2079 a násl. zákona č. 89/2012 Sb., občanský zákoník, v platném znění</p><p><br></p><p><strong>I. Smluvní strany</strong></p><p><strong>Prodávající:</strong> [JMÉNO / NÁZEV], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA], bankovní spojení: [ÚČET]</p><p><strong>Kupující:</strong> [JMÉNO / NÁZEV], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA]</p><p><br></p><p><strong>II. Předmět koupě</strong></p><p>Předmětem této smlouvy je [POPIS PŘEDMĚTU KOUPĚ] (dále jen „předmět koupě“). Prodávající prohlašuje, že je výlučným vlastníkem předmětu koupě a že na něm neváznou žádná práva třetích osob.</p><p><br></p><p><strong>III. Kupní cena a platební podmínky</strong></p><p>Kupní cena činí [ČÁSTKA] Kč (slovy: [SLOVY]). Kupní cena je splatná do [POČET] dnů od podpisu této smlouvy na účet prodávajícího uvedený v čl. I.</p><p><br></p><p><strong>IV. Předání a nabytí vlastnictví</strong></p><p>Prodávající předá předmět koupě kupujícímu nejpozději dne [DATUM]. Vlastnické právo nabývá kupující [okamžikem úplného zaplacení kupní ceny / převzetím předmětu koupě].</p><p><br></p><p><strong>V. Závěrečná ustanovení</strong></p><p>Tato smlouva se vyhotovuje ve dvou stejnopisech, z nichž každá strana obdrží po jednom. Smlouva nabývá platnosti a účinnosti dnem podpisu obou smluvních stran.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;______________________</p><p>Prodávající&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Kupující</p>"
+    },
+    "plnamoc": {
+        "title": "Plná moc",
+        "desc": "Zastoupení advokátem ve věci",
+        "icon": "✍️",
+        "content": "<h1 class=\"ql-align-center\">PLNÁ MOC</h1><p><br></p><p>Já, níže podepsaný/á [JMÉNO / NÁZEV], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA] (dále jen „zmocnitel“),</p><p><br></p><p class=\"ql-align-center\"><strong>zmocňuji</strong></p><p><br></p><p>advokáta [TITUL JMÉNO], ev. č. ČAK [ČÍSLO], se sídlem [ADRESA] (dále jen „zmocněnec“),</p><p><br></p><p>aby mě zastupoval ve věci [OZNAČENÍ VĚCI], a to ve všech úkonech, řízeních a stupních, včetně řízení před soudy všech stupňů, správními orgány, exekutory a rozhodci. Zmocněnec je oprávněn přijímat doručované písemnosti, uzavírat smíry, vzdát se práva odvolání, podávat opravné prostředky, přijímat plnění a ustanovit si za sebe zástupce.</p><p><br></p><p>Tato plná moc se vztahuje i na úkony, s nimiž zákon spojuje zvláštní plnou moc.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________</p><p>Zmocnitel</p><p><br></p><p>Plnou moc v celém rozsahu přijímám.</p><p><br></p><p>______________________</p><p>Zmocněnec (advokát)</p>"
+    },
+    "zaloba": {
+        "title": "Žaloba na plnění",
+        "desc": "Občanské soudní řízení",
+        "icon": "⚖️",
+        "content": "<p><strong>Okresnímu soudu v [MĚSTO]</strong></p><p>[ADRESA SOUDU]</p><p><br></p><p><strong>Žalobce:</strong> [JMÉNO], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA], zast. [TITUL JMÉNO], advokátem, ev. č. ČAK [ČÍSLO], se sídlem [ADRESA]</p><p><strong>Žalovaný:</strong> [JMÉNO], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA]</p><p><br></p><h1 class=\"ql-align-center\">ŽALOBA</h1><p class=\"ql-align-center\">o zaplacení částky [ČÁSTKA] Kč s příslušenstvím</p><p><br></p><p class=\"ql-align-center\"><em>dvojmo</em><br><em>Přílohy dle textu</em><br><em>Soudní poplatek bude uhrazen na výzvu soudu</em></p><p><br></p><p><strong>I.</strong></p><p>Žalobce a žalovaný uzavřeli dne [DATUM] [OZNAČENÍ SMLOUVY / PRÁVNÍHO DŮVODU], na jejímž základě [POPIS SKUTKOVÉHO STAVU].</p><p><br></p><p><strong>Důkaz:</strong> [OZNAČENÍ DŮKAZŮ – listiny, výslech, znalecký posudek]</p><p><br></p><p><strong>II.</strong></p><p>Žalovaný svůj závazek ve výši [ČÁSTKA] Kč přes opakované výzvy neuhradil. Žalobce vyzval žalovaného k úhradě předžalobní výzvou ze dne [DATUM] ve smyslu § 142a o.s.ř.; dluh nebyl uhrazen ani do dnešního dne.</p><p><br></p><p><strong>III.</strong></p><p>S ohledem na výše uvedené žalobce navrhuje, aby soud vydal tento</p><p><br></p><p class=\"ql-align-center\"><strong>rozsudek:</strong></p><p><br></p><p>Žalovaný je povinen zaplatit žalobci částku [ČÁSTKA] Kč spolu s úrokem z prodlení ve výši [SAZBA] % ročně z této částky od [DATUM] do zaplacení, a to vše do tří dnů od právní moci tohoto rozsudku. Žalovaný je dále povinen nahradit žalobci náklady řízení k rukám jeho právního zástupce do tří dnů od právní moci tohoto rozsudku.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________</p><p>[JMÉNO ŽALOBCE]</p>"
+    },
+    "vyzva": {
+        "title": "Předžalobní výzva",
+        "desc": "Výzva k úhradě dle § 142a o.s.ř.",
+        "icon": "📨",
+        "content": "<p>[JMÉNO / NÁZEV VĚŘITELE], [ADRESA]</p><p><br></p><p><strong>Adresát (dlužník):</strong> [JMÉNO / NÁZEV], [ADRESA]</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><h1 class=\"ql-align-center\">PŘEDŽALOBNÍ VÝZVA K ÚHRADĚ</h1><p class=\"ql-align-center\">(výzva podle § 142a zákona č. 99/1963 Sb., občanský soudní řád)</p><p><br></p><p>Vážený/á [OSLOVENÍ],</p><p><br></p><p>na základě [OZNAČENÍ PRÁVNÍHO DŮVODU – např. faktury č. …, smlouvy ze dne …] Vám vznikl vůči mému klientovi / vůči mně dluh ve výši <strong>[ČÁSTKA] Kč</strong>, splatný dne [DATUM]. Tento dluh dosud nebyl uhrazen.</p><p><br></p><p>Vyzývám Vás proto, abyste dlužnou částku [ČÁSTKA] Kč, spolu s úrokem z prodlení, uhradil/a nejpozději do <strong>7 dnů</strong> od doručení této výzvy na účet č. [ÚČET], variabilní symbol [VS].</p><p><br></p><p>Nebude-li dluh v uvedené lhůtě uhrazen, budu nucen/a bez dalšího upozornění uplatnit nárok soudní cestou, čímž Vám vzniknou další náklady (soudní poplatek, náklady právního zastoupení, úroky z prodlení).</p><p><br></p><p>Věřím, že věc vyřešíte smírně a včas.</p><p><br></p><p>S pozdravem</p><p><br></p><p>______________________</p><p>[JMÉNO / TITUL]</p>"
+    },
+    "smlouvaodilo": {
+        "title": "Smlouva o dílo",
+        "desc": "Zhotovení díla dle § 2586",
+        "icon": "🛠️",
+        "content": "<h1 class=\"ql-align-center\">SMLOUVA O DÍLO</h1><p><br></p><p class=\"ql-align-center\">uzavřená podle § 2586 a násl. zákona č. 89/2012 Sb., občanský zákoník</p><p><br></p><p><strong>I. Smluvní strany</strong></p><p><strong>Objednatel:</strong> [JMÉNO / NÁZEV], IČO: [IČO], sídlem [ADRESA]</p><p><strong>Zhotovitel:</strong> [JMÉNO / NÁZEV], IČO: [IČO], sídlem [ADRESA]</p><p><br></p><p><strong>II. Předmět díla</strong></p><p>Zhotovitel se zavazuje provést pro objednatele na svůj náklad a nebezpečí dílo: [POPIS DÍLA], a to řádně a včas. Objednatel se zavazuje dílo převzít a zaplatit cenu díla.</p><p><br></p><p><strong>III. Doba a místo plnění</strong></p><p>Zhotovitel provede dílo v termínu od [DATUM] do [DATUM]. Místem plnění je [MÍSTO].</p><p><br></p><p><strong>IV. Cena díla a platební podmínky</strong></p><p>Cena díla činí [ČÁSTKA] Kč [bez DPH / včetně DPH]. Cena je splatná na základě faktury se splatností [POČET] dnů po předání a převzetí díla.</p><p><br></p><p><strong>V. Předání a převzetí, odpovědnost za vady</strong></p><p>O předání a převzetí díla bude sepsán předávací protokol. Zhotovitel poskytuje na dílo záruku v délce [POČET] měsíců. Práva z vadného plnění se řídí § 2615 a násl. občanského zákoníku.</p><p><br></p><p><strong>VI. Smluvní pokuta</strong></p><p>V případě prodlení zhotovitele s předáním díla je objednatel oprávněn požadovat smluvní pokutu ve výši [SAZBA] % z ceny díla za každý den prodlení.</p><p><br></p><p><strong>VII. Závěrečná ustanovení</strong></p><p>Smlouva je vyhotovena ve dvou stejnopisech. Měnit ji lze pouze písemnými dodatky. Vztahy neupravené touto smlouvou se řídí občanským zákoníkem.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;______________________</p><p>Objednatel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Zhotovitel</p>"
+    },
+    "najemni": {
+        "title": "Nájemní smlouva (byt)",
+        "desc": "Nájem bytu dle § 2235",
+        "icon": "🏠",
+        "content": "<h1 class=\"ql-align-center\">SMLOUVA O NÁJMU BYTU</h1><p><br></p><p class=\"ql-align-center\">uzavřená podle § 2235 a násl. zákona č. 89/2012 Sb., občanský zákoník</p><p><br></p><p><strong>I. Smluvní strany</strong></p><p><strong>Pronajímatel:</strong> [JMÉNO], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA]</p><p><strong>Nájemce:</strong> [JMÉNO], r.č.: [RČ], bytem [ADRESA]</p><p><br></p><p><strong>II. Předmět nájmu</strong></p><p>Pronajímatel přenechává nájemci k zajištění bytových potřeb byt č. [ČÍSLO] o velikosti [DISPOZICE] a výměře [VÝMĚRA] m2, nacházející se na adrese [ADRESA] (dále jen „byt“).</p><p><br></p><p><strong>III. Doba nájmu</strong></p><p>Nájem se sjednává na dobu [určitou od [DATUM] do [DATUM] / neurčitou od [DATUM]].</p><p><br></p><p><strong>IV. Nájemné a služby</strong></p><p>Nájemné činí [ČÁSTKA] Kč měsíčně. Zálohy na služby spojené s užíváním bytu činí [ČÁSTKA] Kč měsíčně. Nájemné a zálohy jsou splatné vždy do [DEN] dne příslušného kalendářního měsíce na účet č. [ÚČET].</p><p><br></p><p><strong>V. Jistota (kauce)</strong></p><p>Nájemce složil pronajímateli jistotu ve výši [ČÁSTKA] Kč. Jistota bude vrácena při skončení nájmu po odečtení případných dlužných částek.</p><p><br></p><p><strong>VI. Práva a povinnosti</strong></p><p>Nájemce je povinen užívat byt řádně a v souladu s účelem nájmu, provádět běžnou údržbu a drobné opravy. Pronajímatel zajišťuje nájemci nerušené užívání bytu.</p><p><br></p><p><strong>VII. Závěrečná ustanovení</strong></p><p>Smlouva je vyhotovena ve dvou stejnopisech. Neupravené vztahy se řídí občanským zákoníkem.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;______________________</p><p>Pronajímatel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nájemce</p>"
+    },
+    "odstoupeni": {
+        "title": "Odstoupení od smlouvy",
+        "desc": "Jednostranné ukončení dle § 2001",
+        "icon": "🚪",
+        "content": "<p>[JMÉNO / NÁZEV ODESÍLATELE], [ADRESA]</p><p><br></p><p><strong>Adresát:</strong> [JMÉNO / NÁZEV], [ADRESA]</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><h1 class=\"ql-align-center\">ODSTOUPENÍ OD SMLOUVY</h1><p><br></p><p>Dne [DATUM] jsme uzavřeli [OZNAČENÍ SMLOUVY] (dále jen „smlouva“).</p><p><br></p><p>Vzhledem k tomu, že [POPIS DŮVODU – např. podstatné porušení smlouvy, prodlení delší než …, vady plnění], čímž došlo k naplnění důvodu pro odstoupení podle [§ 2002 / § 2106 / ujednání smlouvy] občanského zákoníku,</p><p><br></p><p class=\"ql-align-center\"><strong>tímto od výše uvedené smlouvy odstupuji.</strong></p><p><br></p><p>Odstoupením se smlouva od počátku ruší. Vyzývám Vás proto k vrácení vzájemně poskytnutých plnění, zejména [SPECIFIKACE], a to do [POČET] dnů od doručení tohoto odstoupení na účet č. [ÚČET].</p><p><br></p><p>S pozdravem</p><p><br></p><p>______________________</p><p>[JMÉNO]</p>"
+    },
+    "uznanidluhu": {
+        "title": "Uznání dluhu",
+        "desc": "Uznání se splátkovým kalendářem, § 2053",
+        "icon": "📑",
+        "content": "<h1 class=\"ql-align-center\">UZNÁNÍ DLUHU A DOHODA O SPLÁTKÁCH</h1><p><br></p><p class=\"ql-align-center\">uzavřené podle § 2053 a § 1546 zákona č. 89/2012 Sb., občanský zákoník</p><p><br></p><p><strong>Věřitel:</strong> [JMÉNO / NÁZEV], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA]</p><p><strong>Dlužník:</strong> [JMÉNO / NÁZEV], r.č. / IČO: [HODNOTA], bytem / sídlem [ADRESA]</p><p><br></p><p><strong>I.</strong></p><p>Dlužník tímto výslovně uznává co do důvodu i výše svůj dluh vůči věřiteli ve výši <strong>[ČÁSTKA] Kč</strong>, který vznikl z titulu [OZNAČENÍ PRÁVNÍHO DŮVODU] a byl splatný dne [DATUM].</p><p><br></p><p><strong>II.</strong></p><p>Dlužník se zavazuje uhradit uznaný dluh věřiteli v pravidelných měsíčních splátkách ve výši [ČÁSTKA] Kč, splatných vždy do [DEN] dne v měsíci, počínaje [DATUM], na účet č. [ÚČET].</p><p><br></p><p><strong>III.</strong></p><p>V případě prodlení dlužníka s úhradou byť jediné splátky se stává splatným celý zbytek dluhu najednou (ztráta výhody splátek).</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;______________________</p><p>Věřitel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dlužník</p>"
+    },
+    "odvolani": {
+        "title": "Odvolání proti rozsudku",
+        "desc": "Opravný prostředek dle § 201 o.s.ř.",
+        "icon": "📤",
+        "content": "<p><strong>Krajskému soudu v [MĚSTO]</strong></p><p>prostřednictvím <strong>Okresního soudu v [MĚSTO]</strong></p><p><br></p><p><strong>Ke sp. zn.: [SPIS_ZNACKA]</strong></p><p><br></p><p><strong>Odvolatel (žalobce / žalovaný):</strong> [JMÉNO], bytem / sídlem [ADRESA], zast. [TITUL JMÉNO], advokátem</p><p><br></p><h1 class=\"ql-align-center\">ODVOLÁNÍ</h1><p class=\"ql-align-center\">proti rozsudku Okresního soudu v [MĚSTO] ze dne [DATUM], č. j. [SPIS_ZNACKA]</p><p><br></p><p class=\"ql-align-center\"><em>dvojmo</em></p><p><br></p><p><strong>I.</strong></p><p>Rozsudkem uvedeným v záhlaví soud [STRUČNÝ VÝROK NAPADENÉHO ROZSUDKU]. Rozsudek byl odvolateli doručen dne [DATUM]. Odvolání je podáváno včas, ve lhůtě 15 dnů podle § 204 odst. 1 o.s.ř.</p><p><br></p><p><strong>II. Rozsah a důvody odvolání</strong></p><p>Odvolatel napadá rozsudek v celém rozsahu / ve výroku [OZNAČENÍ]. Odvolání se opírá o odvolací důvody podle § 205 odst. 2 o.s.ř., zejména [např. nesprávné právní posouzení věci, nedostatečně zjištěný skutkový stav, vadné hodnocení důkazů].</p><p><br></p><p>[PODROBNÁ ARGUMENTACE ODVOLATELE]</p><p><br></p><p><strong>III. Návrh</strong></p><p>Odvolatel navrhuje, aby odvolací soud napadený rozsudek [změnil tak, že … / zrušil a věc vrátil soudu prvního stupně k dalšímu řízení] a přiznal odvolateli náhradu nákladů řízení před soudy obou stupňů.</p><p><br></p><p>V [MĚSTO] dne [DATUM]</p><p><br></p><p>______________________</p><p>[JMÉNO ODVOLATELE]</p>"
+    },
+    "hlavicka": {
+        "title": "Hlavičkový papír",
+        "desc": "Firemní vizuál kanceláře",
+        "icon": "📝",
+        "content": "<div style=\"border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 20px;\"><h2 style=\"margin: 0; color: #1e293b;\">Advokátní kancelář [NÁZEV]</h2><p style=\"margin: 0; font-size: 12px; color: #64748b;\">[ADRESA] | IČO: [IČO] | tel.: [TELEFON] | e-mail: [E-MAIL] | ev. č. ČAK: [ČÍSLO]</p></div><p><br></p>"
+    }
 };
 
 ipcMain.handle('get-templates', () => {
     try {
         if (fs.existsSync(templatesPath)) {
             const rawData = fs.readFileSync(templatesPath, 'utf-8');
-            return JSON.parse(rawData);
+            // Sloučit s výchozími: nové vestavěné vzory se objeví i u starších uložených souborů,
+            // uživatelské úpravy mají přednost.
+            return { ...defaultTemplates, ...JSON.parse(rawData) };
         }
     } catch (e) {
         console.error('Chyba při čtení šablon:', e);
     }
     return defaultTemplates;
+});
+
+ipcMain.handle('get-template-content', (event, type) => {
+    try {
+        let templates = { ...defaultTemplates };
+        if (fs.existsSync(templatesPath)) {
+            try { templates = { ...defaultTemplates, ...JSON.parse(fs.readFileSync(templatesPath, 'utf-8')) }; } catch (e) {}
+        }
+        const tpl = templates[type];
+        if (!tpl) return { title: '', content: '' };
+        if (typeof tpl === 'string') return { title: '', content: tpl };
+        return { title: tpl.title || '', content: tpl.content || '' };
+    } catch (e) {
+        console.error('Chyba při čtení obsahu šablony:', e);
+        return { title: '', content: '' };
+    }
 });
 
 ipcMain.handle('save-template', (event, type, content) => {

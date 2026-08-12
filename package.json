@@ -14,6 +14,7 @@
     "dist": "npm version patch --no-git-tag-version && electron-builder",
     "test": "jest",
     "test:e2e": "playwright test",
+    "test:smoke": "playwright test tests/e2e/smoke.spec.js",
     "test:all": "npm run test && npm run test:e2e",
     "isds-test": "node scripts/isds-test.js"
   },
@@ -23,6 +24,8 @@
       "output": "dist"
     },
     "mac": {
+      "identity": null,
+      "notarize": false,
       "category": "public.app-category.productivity",
       "target": [
         "zip",

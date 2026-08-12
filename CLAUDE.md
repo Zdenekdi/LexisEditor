@@ -95,3 +95,101 @@ Seřazeno podle priority. Backendové položky (LexisLocal) jsou v CLAUDE.md tam
 
   Dřív vytažené moduly: `js/core/lexis-lock.js` (scrypt zámek), `js/core/lexis-zfo.js` (PKCS#7/CMS),
   plus testy `lock`, `zfo`, `isdsInbox`, `isdsOutbox`, `contacts`, `lexis-link-security`.
+
+---
+
+## Nasazení / build (body 3 a 4)
+
+- [x] **Startovací sada českých vzorů.** `defaultTemplates` v `main.js` rozšířeno na 10
+  vzorů (kupní smlouva, plná moc, žaloba, předžalobní výzva § 142a o.s.ř., smlouva o dílo
+  § 2586, nájemní smlouva bytu § 2235, odstoupení, uznání dluhu § 2053, odvolání § 201
+  o.s.ř., hlavičkový papír) s placeholdery `[JMÉNO]`, `[ČÁSTKA]`, `[DATUM]`, `[MĚSTO]`…
+- [x] **Opraven rozbitý load šablon.** Renderer volal `getTemplateContent`, které NEBYLO
+  v `preload.js` ani v `main.js` → kliknutí na vzor otevřelo prázdný dokument. Doplněn IPC
+  `get-template-content` (vrací `{title, content}`) + expozice v preloadu + úprava
+  `openStartDocument` (nastaví i titul dle vzoru). `get-templates` nově slučuje vestavěné
+  vzory s uloženými (`{...defaultTemplates, ...saved}`) — nové vzory se objeví i starším
+  uživatelům, jejich úpravy mají přednost.
+- [x] **Build integrita: ikony opraveny.** `build/icon.png` i `build/background.png` byly
+  JPEGy přejmenované na `.png` → přeuloženy jako skutečné PNG 1024×1024.
+- [x] **`RELEASE_CHECKLIST.md`** — postup buildu/vydání. POZOR: `npm run dist` zvyšuje patch
+  verzi (`npm version patch`); auto-update na macOS potřebuje podpis (bod 1).
+
+### Bez dev účtů / bez podpisu (přidáno)
+- [x] **Build bez podpisu:** `build.mac.identity=null` + `notarize=false`; `release.yml`
+  má `CSC_IDENTITY_AUTO_DISCOVERY=false`. `INSTALL_UNSIGNED.md` = návod pro betatestery
+  (macOS pravý klik → Otevřít / `xattr -dr com.apple.quarantine`, Windows SmartScreen).
+- [x] **CI:** `.github/workflows/ci.yml` (node --check nad main/preload/js + `npm test`).
+- [x] **Token:** ověřeno, že editor posílá `X-API-Token` na všech voláních backendu
+  (`getLexisLocalConnection` + ai-provider) → funguje i s vynuceným tokenem na backendu.
+
+### Cenové vrstvy — hybrid (rozhodnuto)
+- [x] **Mapování vrstev na edice** (`lexis-edition.js`, pole `tier`): Free=`core`,
+  Pro=`legal` (core+legal), Firm=`full` (core+business+legal). Ověřeno gatingem
+  (`allowed()`): free vidí jen Core, pro přidá legal, firm přidá business.
+- [x] **Přerovnané tagy:** Článek/Paragraf/Znak § přesunuty do Core (zdarma) — paid
+  hranice nesahá do běžného psaní. Datovky, lhůty, tarify, judikatura, Dopis Online,
+  E-podpis = `legal` (Pro); hromadná gen./kampaně, time/výkazy = `business` (Firm).
+  Kontrola struktury/Pojmy/Citace zůstávají placené. Detail v `docs/Architektura_edice_a_znacka.md` §7.
+- [ ] **Zbývá (samostatný krok, licenční rozhodnutí):** entitlement (jak se pozná
+  zaplacená vrstva; dnes default `full`=vše), skrýt vs. upsell u neplacených funkcí,
+  výchozí edice per build.
+
+### Licencování / entitlement (PŘIPRAVENO, NEAKTIVNÍ)
+- [x] **Offline validátor licencí** (Ed25519): `js/core/lexis-license.js` (+ `lexis-license-key.js`
+  = veřejný klíč, prázdný = neaktivní). Podpis nad kanonickým payloadem, kontrola tier/expirace/grace.
+  Testy `tests/unit/license.test.js` (tamper, expired, grace, wrong-key, perpetual).
+- [x] **Nástroje** `tools/license/generate-keypair.js` + `issue-license.js` (privátní klíč a licence
+  jsou v `.gitignore`).
+- [x] **Napojení (za vypínačem):** `main.js` `LICENSING_ENABLED=false` + IPC `get-license-status`
+  / `get-license-edition-sync`; `preload.js` `getLicenseStatus`/`licenseEdition`; `lexis-edition.js`
+  bere licenci s nejvyšší prioritou (prázdné → výchozí `full`). Ověřeno: default zůstává `full`.
+- Aktivace a MoR napojení: `docs/LICENCE_SYSTEM.md`.
+
+### Redesign UI (dle Claude Design předlohy „LexisEditor Redesign")
+- [x] **Designový základ:** nová paleta (teplý papír + jantar) jako CSS tokeny v `:root`
+  + `body.dark-mode` (světlá i tmavá), font **Source Serif 4**, rozšířená sada tokenů
+  (povrchy, texty, jantarové tinty, invertované tlačítko, poloměry, stíny, mono labely).
+  Úvodní obrazovka přebarvená (launcher).
+- [x] **Přepínač režimů shellu (turn 1+2) — krok 1:** `js/core/lexis-shell.js` — tři režimy
+  `ribbon|single|paper` přes `body[data-shell]`, čip ve stavovém řádku (2a) s nabídkou
+  (světlá/tmavá), klávesy ⌘⌥1/2/3 + ⌘⌥D, stav v localStorage (`lexis_shell`), výchozí
+  `ribbon` = beze změny. Efekty single/paper zatím základní (schování `.tool-groups-container`
+  / `.ribbon-tabs`).
+- [x] **Jedna lišta (1c) — krok 2:** plovoucí formátovací lišta při výběru textu
+  (`.lx-float` v lexis-shell.js): B/I/U přes Quill + § Odstavec/Citace zákona/Přepsat s AI
+  (formatLegal/insertCitation/toggleAIDrawer). Jen v režimu single/paper, světlá i tmavá.
+- [x] **Papír (1e) — krok 3:** plovoucí spodní dok (`#lexis-paper-dock`): Zeptat se LexisAI
+  (toggleAIDrawer) · B/I (Quill) · § (formatLegal) · Doložka (popover 6 doložek → insertClause)
+  · Audit (runFinalAudit) · Odeslat (openDatovkaDialog). Jen v režimu paper, světlá i tmavá.
+  Plovoucí výběrová lišta omezena na režim single.
+- [x] **⌘K paleta (2c) + horní příkazová lišta (single) + záložka Zobrazení (2b) — krok 4:**
+  `window.LexisCmdK` (⌘K/Ctrl+K) — grupy Režim rozhraní/Zobrazení/Akce, filtr, klávesy;
+  příkazové pole `#lx-cmdfield` v title-baru (jen single); skupina Režim rozhraní v tab-view.
+  **Systém shellu KOMPLETNÍ** (3 režimy × 3 místa přepínače).
+- [x] **Sjednocení barev:** 177 studených hex v CSS namapováno na teplou paletu (žádné
+  modré/šedé zbytky v hlavních komponentách); vybrané inline barvy ve status-baru.
+- [x] **Kompletní reskin barev (2 pásy):** ~970 studených hex (modré/šedé/fialové/zelené/
+  červené) v index.html, css i **všech JS rendererech** (nedávné dokumenty, doručené, dialogy,
+  datovka…) namapováno na teplou paletu — celá appka vč. dynamického obsahu je koherentní.
+- [ ] **Zbývá (přestavba obrazovek — k rozhodnutí):**
+  přestavba obrazovek (úvodní 3a, LexisAI panel 3c, záhlaví/zápatí 3d, datovky 4a,
+  zámek 4b, hledání+komentáře 4c, historie verzí 4d, kampaň 3e, mobil 5).
+
+### Vlastní ikona aplikace
+- [x] **Nová ikona** (redesign: tmavý teplý squircle, serifové „L" + jantarový „§", 1024×1024
+  s průhlednými rohy) → `build/icon.png` (electron-builder) i `logo.png` (úvodní obrazovka).
+- [x] **Napojení i ve vývoji:** `main.js` — `icon:` v BrowserWindow + `app.dock.setIcon(...)`
+  na macOS ve `whenReady` (bez toho Electron ukazuje vlastní ikonu v Docku při `electron .`).
+  Zdroj ikony (HTML) lze snadno předělat (velikost §, akcent, světlá varianta).
+
+### Zámek aplikace (4b) + nález chyby
+- [x] **Startup zámek přebarven do 4b:** čistý SVG zámek (bez 🛡️ emoji), titul „Dokumenty
+  jsou zamčené", podtitul o lokálních datech, invertované tlačítko, zelená tečka + Mac tip
+  bez emoji. Světlá i tmavá (ikona přes `--btn-primary-bg/text`). Hook `requestStartupUnlock()`
+  zachován; na security flow nesaháno.
+- [ ] **NÁLEZ — duplicitní `id="lock-screen"`** v index.html (řádek ~47 startup zámek +
+  ~1587 runtime „glass" zámek s heslem/Touch ID). `getElementById` vrací první → druhý (fialový
+  s heslem) se přes `lockScreen.showLockScreen()` nemusí zobrazit správně. **K rozhodnutí:**
+  sjednotit na jeden zámek nebo přejmenovat ID (vyžaduje pochopení obou flow + živý test).
+  Fialový blok B jsem zatím nechal (security-kritický, nesahat naslepo).

@@ -126,11 +126,11 @@
             if (window.electronAPI && window.electronAPI.requestTouchID) {
                 const success = await window.electronAPI.requestTouchID();
                 if (success) {
-                    document.getElementById('lock-screen').style.display = 'none';
+                    document.getElementById('startup-lock-screen').style.display = 'none';
                 }
             } else {
                 // Fallback for browser
-                document.getElementById('lock-screen').style.display = 'none';
+                document.getElementById('startup-lock-screen').style.display = 'none';
             }
         };
 

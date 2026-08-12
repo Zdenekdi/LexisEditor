@@ -48,10 +48,10 @@
         const col = (label, name) => `
                 <div>
                     <p style="margin-bottom: 40px;">V ${place} dne .............................</p>
-                    <p style="border-top: 1px solid #cbd5e1; padding-top: 8px; margin: 0;">___________________________________<br><b>${label}</b><br>${name}</p>
+                    <p style="border-top: 1px solid #ddd6cb; padding-top: 8px; margin: 0;">___________________________________<br><b>${label}</b><br>${name}</p>
                 </div>`;
         return `
-            <div style="margin-top: 40px; font-family: 'Inter', sans-serif; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 13px; line-height: 1.5; color: #1e293b;">
+            <div style="margin-top: 40px; font-family: 'Inter', sans-serif; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 13px; line-height: 1.5; color: #2b2926;">
                 ${col(leftLabel, leftName)}
                 ${col(rightLabel, rightName)}
             </div>

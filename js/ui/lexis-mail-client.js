@@ -111,26 +111,26 @@
         overlay.id = 'lmc-overlay';
         overlay.style = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
         overlay.innerHTML =
-            '<div style="background:#fff; border-radius:14px; max-width:560px; width:100%; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.3); font-family:inherit;">' +
+            eIco('<div style="background:#fff; border-radius:14px; max-width:560px; width:100%; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.3); font-family:inherit;">' +
                 '<div style="font-size:16px; font-weight:700; margin-bottom:4px;">📧 E-mail klientovi</div>' +
-                '<div style="font-size:12px; color:#64748b; margin-bottom:14px;">Připraví přílohu (PDF) a předvyplní e-mail. Nic se neodešle — otevře se okno pošty ke kontrole.</div>' +
+                '<div style="font-size:12px; color:#77716a; margin-bottom:14px;">Připraví přílohu (PDF) a předvyplní e-mail. Nic se neodešle — otevře se okno pošty ke kontrole.</div>' +
                 '<label style="font-size:12px; font-weight:600;">Klient (z adresáře)</label>' +
-                '<select id="lmc-client" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px;">' +
+                '<select id="lmc-client" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px;">' +
                     '<option value="">— vyberte klienta —</option>' + options +
                 '</select>' +
                 '<label style="font-size:12px; font-weight:600;">Předmět</label>' +
-                '<input id="lmc-subject" value="' + esc(draft0.subject) + '" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px;">' +
+                '<input id="lmc-subject" value="' + esc(draft0.subject) + '" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px;">' +
                 '<label style="font-size:12px; font-weight:600;">Zpráva</label>' +
-                '<textarea id="lmc-body" rows="8" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-family:inherit; resize:vertical;">' + esc(draft0.body) + '</textarea>' +
+                '<textarea id="lmc-body" rows="8" style="width:100%; padding:8px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px; font-family:inherit; resize:vertical;">' + esc(draft0.body) + '</textarea>' +
                 '<label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:14px;">' +
                     '<input type="checkbox" id="lmc-attach" checked> Přiložit aktuální dokument jako PDF (' + esc(attName) + ')' +
                 '</label>' +
-                '<div id="lmc-status" style="font-size:12px; color:#64748b; min-height:16px; margin-bottom:10px;"></div>' +
+                '<div id="lmc-status" style="font-size:12px; color:#77716a; min-height:16px; margin-bottom:10px;"></div>' +
                 '<div style="display:flex; justify-content:flex-end; gap:8px;">' +
-                    '<button id="lmc-cancel" style="border:1px solid #cbd5e1; background:#fff; border-radius:8px; padding:8px 14px; cursor:pointer;">Zrušit</button>' +
-                    '<button id="lmc-go" style="border:none; background:#2563eb; color:#fff; border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:600;">Připravit e-mail</button>' +
+                    '<button id="lmc-cancel" style="border:1px solid #ddd6cb; background:#fff; border-radius:8px; padding:8px 14px; cursor:pointer;">Zrušit</button>' +
+                    '<button id="lmc-go" style="border:none; background:#9a5b22; color:#fff; border-radius:8px; padding:8px 14px; cursor:pointer; font-weight:600;">Připravit e-mail</button>' +
                 '</div>' +
-            '</div>';
+            '</div>');
         document.body.appendChild(overlay);
         var $ = function (s) { return overlay.querySelector(s); };
         var setStatus = function (m) { var el = $('#lmc-status'); if (el) el.textContent = m || ''; };

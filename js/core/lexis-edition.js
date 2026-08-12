@@ -14,17 +14,19 @@
 
 (function () {
     const EDITIONS = {
-        full:     { id: 'full',     brandName: 'LexisEditor',  supportEmail: 'podpora@lexiseditor.cz',  packs: ['core', 'business', 'legal'] },
-        legal:    { id: 'legal',    brandName: 'Lexis',        supportEmail: 'podpora@lexiseditor.cz',  packs: ['core', 'legal'] },
-        business: { id: 'business', brandName: 'Nexus Editor', supportEmail: 'podpora@nexus-editor.cz', packs: ['core', 'business'] },
-        core:     { id: 'core',     brandName: 'Nexus Editor', supportEmail: 'podpora@nexus-editor.cz', packs: ['core'] }
+        full:     { id: 'full',     tier: 'firm', brandName: 'LexisEditor',  supportEmail: 'podpora@lexiseditor.cz',  packs: ['core', 'business', 'legal'] },
+        legal:    { id: 'legal',    tier: 'pro',  brandName: 'Lexis',        supportEmail: 'podpora@lexiseditor.cz',  packs: ['core', 'legal'] },
+        business: { id: 'business', tier: 'firm', brandName: 'Nexus Editor', supportEmail: 'podpora@nexus-editor.cz', packs: ['core', 'business'] },
+        core:     { id: 'core',     tier: 'free', brandName: 'Nexus Editor', supportEmail: 'podpora@nexus-editor.cz', packs: ['core'] }
     };
     const DEFAULT_ID = 'full'; // dnešní chování = všechny balíčky
 
     function resolveEditionId() {
         try {
             if (typeof window !== 'undefined') {
-                if (window.LEXIS_EDITION && EDITIONS[window.LEXIS_EDITION]) return window.LEXIS_EDITION;
+                // 0) Ověřená licence má nejvyšší prioritu (prázdné = licencování neaktivní → přeskočí se).
+            if (window.electronAPI && window.electronAPI.licenseEdition && EDITIONS[window.electronAPI.licenseEdition]) return window.electronAPI.licenseEdition;
+            if (window.LEXIS_EDITION && EDITIONS[window.LEXIS_EDITION]) return window.LEXIS_EDITION;
                 const search = (window.location && window.location.search) || '';
                 const m = search.match(/[?&]edition=([a-z]+)/i);
                 if (m && EDITIONS[m[1].toLowerCase()]) return m[1].toLowerCase();

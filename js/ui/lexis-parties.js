@@ -67,7 +67,7 @@
         ov.style = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
         const card = document.createElement('div');
         card.style = `background:#fff; border-radius:14px; box-shadow:0 20px 40px -10px rgba(0,0,0,0.35); width:100%; max-width:${w || 560}px; max-height:88vh; overflow:auto; padding:22px;`;
-        card.innerHTML = inner;
+        card.innerHTML = eIco(inner);
         ov.appendChild(card);
         ov.addEventListener('mousedown', e => { if (e.target === ov) ov.remove(); });
         document.body.appendChild(ov);
@@ -85,19 +85,19 @@
 
         const { ov, card } = overlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h2 style="margin:0; font-size:16px; color:#0f172a;">👤 Vložit stranu do dokumentu</h2>
-                <button id="pt-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:16px; color:#2b2926;">👤 Vložit stranu do dokumentu</h2>
+                <button id="pt-close" style="border:none; background:#edeae4; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
             <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center;">
-                <div style="display:flex; background:#f1f5f9; border-radius:8px; padding:3px;">
+                <div style="display:flex; background:#edeae4; border-radius:8px; padding:3px;">
                     <button id="pt-tab-contacts" class="pt-tab" style="border:none; background:#fff; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; font-weight:700;">📇 Kontakty</button>
                     <button id="pt-tab-courts" class="pt-tab" style="border:none; background:transparent; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">⚖️ Soudy</button>
                 </div>
-                <select id="pt-role" style="margin-left:auto; padding:6px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;">
+                <select id="pt-role" style="margin-left:auto; padding:6px; border:1px solid #ddd6cb; border-radius:8px; font-size:12px;">
                     ${ROLES.map(r => `<option>${esc(r)}</option>`).join('')}
                 </select>
             </div>
-            <input id="pt-search" placeholder="Hledat…" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+            <input id="pt-search" placeholder="Hledat…" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:8px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
             <div id="pt-list" style="max-height:52vh; overflow:auto;"></div>`, 560);
 
         let source = 'contacts';
@@ -118,23 +118,23 @@
             const f = norm(searchEl.value);
             let rows = '';
             if (source === 'courts') {
-                if (courts.length === 0) { listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; padding:14px; text-align:center;">Registr soudů není načten.</div>'; return; }
+                if (courts.length === 0) { listEl.innerHTML = eIco('<div style="font-size:12px; color:#a09a92; padding:14px; text-align:center;">Registr soudů není načten.</div>'); return; }
                 const matched = courts.filter(c => !f || norm(c.nazev).includes(f) || norm(c.mesto).includes(f) || norm(c.zkratka).includes(f)).slice(0, 300);
                 rows = matched.map(c => `
-                    <div class="pt-item" data-t="court" data-i="${courts.indexOf(c)}" style="padding:8px 6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:12px;">
-                        <div style="font-weight:700; color:#0f172a;">${esc(c.nazev)}</div>
-                        <div style="color:#64748b;">${esc([c.adresa, c.mesto].filter(Boolean).join(', '))}</div>
+                    <div class="pt-item" data-t="court" data-i="${courts.indexOf(c)}" style="padding:8px 6px; border-bottom:1px solid #edeae4; cursor:pointer; font-size:12px;">
+                        <div style="font-weight:700; color:#2b2926;">${esc(c.nazev)}</div>
+                        <div style="color:#77716a;">${esc([c.adresa, c.mesto].filter(Boolean).join(', '))}</div>
                     </div>`).join('');
             } else {
-                if (contacts.length === 0) { listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; padding:14px; text-align:center;">V adresáři nejsou žádné kontakty.</div>'; return; }
+                if (contacts.length === 0) { listEl.innerHTML = eIco('<div style="font-size:12px; color:#a09a92; padding:14px; text-align:center;">V adresáři nejsou žádné kontakty.</div>'); return; }
                 const matched = contacts.filter(k => !f || norm(k.jmeno).includes(f) || norm(k.ic).includes(f) || norm(k.mesto).includes(f)).slice(0, 300);
                 rows = matched.map(k => `
-                    <div class="pt-item" data-t="contact" data-id="${esc(k.id)}" style="padding:8px 6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:12px;">
-                        <div style="font-weight:700; color:#0f172a;">${esc(k.jmeno || 'Neznámý')}</div>
-                        <div style="color:#64748b;">${esc([k.ic ? 'IČO ' + k.ic : '', k.mesto].filter(Boolean).join(' · '))}</div>
+                    <div class="pt-item" data-t="contact" data-id="${esc(k.id)}" style="padding:8px 6px; border-bottom:1px solid #edeae4; cursor:pointer; font-size:12px;">
+                        <div style="font-weight:700; color:#2b2926;">${esc(k.jmeno || 'Neznámý')}</div>
+                        <div style="color:#77716a;">${esc([k.ic ? 'IČO ' + k.ic : '', k.mesto].filter(Boolean).join(' · '))}</div>
                     </div>`).join('');
             }
-            listEl.innerHTML = rows || '<div style="font-size:12px; color:#94a3b8; padding:14px; text-align:center;">Nic nenalezeno.</div>';
+            listEl.innerHTML = eIco(rows || '<div style="font-size:12px; color:#a09a92; padding:14px; text-align:center;">Nic nenalezeno.</div>');
             listEl.querySelectorAll('.pt-item').forEach(el => el.onclick = () => {
                 const role = roleEl.value;
                 let html = '';

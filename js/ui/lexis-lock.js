@@ -43,14 +43,15 @@ class LexisLock {
         el.style.display = 'flex';
         this._unlocked = false;
 
-        // Zobraz biometrickou sekci pokud je dostupná a povolená
+        // Touch ID nabídni VŽDY, když ho zařízení podporuje (heslo/PIN zůstává jako
+        // záloha) — ať funguje out-of-the-box bez schované volby v nastavení.
         const touchIdSection = document.getElementById('lock-touchid-section');
         if (touchIdSection) {
-            if (this._touchIdAvailable && this._config?.touchIdEnabled) {
+            if (this._touchIdAvailable) {
                 touchIdSection.style.display = 'block';
                 const label = document.getElementById('lock-touchid-label');
                 if (label) label.textContent = this._biometricName;
-                // Automaticky spusť ověření po 400ms
+                // Automaticky spusť ověření po 400ms (macOS rovnou ukáže Touch ID dialog)
                 setTimeout(() => this.tryTouchId(), 400);
             } else {
                 touchIdSection.style.display = 'none';
@@ -116,16 +117,16 @@ class LexisLock {
 
             if (result.success) {
                 if (btn) { btn.classList.remove('scanning'); btn.classList.add('success'); }
-                if (icon) icon.textContent = '✅';
+                if (icon) icon.innerHTML = this._lockIcon('prijmout', '#7aa869');
                 if (label) label.textContent = 'Ověřeno!';
                 setTimeout(() => this.hideLockScreen(), 600);
             } else {
                 if (btn) { btn.classList.remove('scanning'); btn.classList.add('error'); }
-                if (icon) icon.textContent = '❌';
+                if (icon) icon.innerHTML = this._lockIcon('odmitnout', '#cf7060');
                 if (label) label.textContent = result.error || `${this._biometricName} selhalo`;
                 setTimeout(() => {
                     if (btn) { btn.classList.remove('error'); }
-                    if (icon) icon.textContent = '👆';
+                    if (icon) icon.innerHTML = this._lockIcon('otisk', '#e0b45f');
                     if (label) label.textContent = this._biometricName;
                 }, 2000);
             }
@@ -221,6 +222,12 @@ class LexisLock {
         tick();
     }
 
+    _lockIcon(id, color) {
+        if (!window.LexisIcons) return '';
+        return window.LexisIcons.sizeSvg(window.LexisIcons.get(id), 40)
+            .replace('style="display:block"', 'style="display:block;color:' + color + '"');
+    }
+
     togglePasswordVisibility() {
         const inp = document.getElementById('lock-password-input');
         if (!inp) return;
@@ -298,7 +305,7 @@ class LexisLock {
 
             // Zvýrazni password sekci
             const p1 = document.getElementById('sec-new-password');
-            if (p1) { p1.focus(); p1.style.borderColor = '#6366f1'; setTimeout(() => { p1.style.borderColor = '#e2e8f0'; }, 2000); }
+            if (p1) { p1.focus(); p1.style.borderColor = 'var(--accent)'; setTimeout(() => { p1.style.borderColor = '#e0dbd3'; }, 2000); }
         }
     }
 
@@ -319,20 +326,20 @@ class LexisLock {
         const hint = document.getElementById('sec-password-hint');
 
         if (!p1) {
-            if (hint) { hint.textContent = '⚠️ Zadejte heslo.'; hint.style.color = '#f87171'; }
+            if (hint) { hint.textContent = '⚠️ Zadejte heslo.'; hint.style.color = '#cf7060'; }
             return;
         }
         if (p1.length < 4) {
-            if (hint) { hint.textContent = '⚠️ Heslo musí mít alespoň 4 znaky.'; hint.style.color = '#f87171'; }
+            if (hint) { hint.textContent = '⚠️ Heslo musí mít alespoň 4 znaky.'; hint.style.color = '#cf7060'; }
             return;
         }
         if (p1 !== p2) {
-            if (hint) { hint.textContent = '⚠️ Hesla se neshodují.'; hint.style.color = '#f87171'; }
+            if (hint) { hint.textContent = '⚠️ Hesla se neshodují.'; hint.style.color = '#cf7060'; }
             return;
         }
 
         if (!window.electronAPI) {
-            if (hint) { hint.textContent = '⚠️ Electron API není dostupné.'; hint.style.color = '#f87171'; }
+            if (hint) { hint.textContent = '⚠️ Electron API není dostupné.'; hint.style.color = '#cf7060'; }
             return;
         }
 
@@ -345,7 +352,7 @@ class LexisLock {
 
         if (result.success) {
             this._config = await window.electronAPI.lockGetConfig();
-            if (hint) { hint.textContent = '✅ Heslo bylo nastaveno.'; hint.style.color = '#10b981'; }
+            if (hint) { hint.textContent = '✅ Heslo bylo nastaveno.'; hint.style.color = '#5a8a4a'; }
 
             // Aktualizuj stav "heslo nastaveno"
             const hasPassEl = document.getElementById('sec-has-password');
@@ -361,14 +368,14 @@ class LexisLock {
 
             setTimeout(() => { if (hint) hint.textContent = ''; }, 3000);
         } else {
-            if (hint) { hint.textContent = `❌ Chyba: ${result.error}`; hint.style.color = '#f87171'; }
+            if (hint) { hint.textContent = `❌ Chyba: ${result.error}`; hint.style.color = '#cf7060'; }
         }
     }
 
     // ── TOAST NOTIFICATION ────────────────────────────────────
 
     _showToast(msg, type = 'info') {
-        const colors = { info: '#6366f1', success: '#10b981', warn: '#f59e0b', error: '#ef4444' };
+        const colors = { info: 'var(--accent)', success: '#5a8a4a', warn: '#d9a441', error: '#c0553f' };
         const toast = document.createElement('div');
         toast.style.cssText = `
             position:fixed;bottom:24px;right:24px;z-index:99998;

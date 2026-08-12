@@ -44,8 +44,8 @@
             if (!f.subject && item) f.subject = item.sender || item.senderId || '';
 
             var row = function (label, id, val) {
-                return '<label style="font-size:12px; font-weight:700; color:#334155;">' + label + '</label>' +
-                    '<input id="' + id + '" value="' + esc(val || '') + '" style="width:100%; box-sizing:border-box; padding:8px; margin:3px 0 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">';
+                return '<label style="font-size:12px; font-weight:700; color:#4a453f;">' + label + '</label>' +
+                    '<input id="' + id + '" value="' + esc(val || '') + '" style="width:100%; box-sizing:border-box; padding:8px; margin:3px 0 10px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">';
             };
 
             var ov = document.createElement('div');
@@ -53,20 +53,20 @@
             var card = document.createElement('div');
             card.style = 'background:#fff; border-radius:14px; box-shadow:0 20px 40px -10px rgba(0,0,0,0.35); width:100%; max-width:520px; max-height:88vh; overflow:auto; padding:22px;';
             card.innerHTML =
-                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
-                    '<h2 style="margin:0; font-size:16px; color:#0f172a;">↩️ Odpověď na datovou zprávu</h2>' +
-                    '<button id="rpi-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>' +
+                eIco('<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
+                    '<h2 style="margin:0; font-size:16px; color:#2b2926;">↩️ Odpověď na datovou zprávu</h2>' +
+                    '<button id="rpi-close" style="border:none; background:#edeae4; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>' +
                 '</div>' +
-                '<div style="font-size:11px; color:#64748b; margin-bottom:12px;">Náležitosti jsou vytažené z přijaté zprávy — zkontrolujte a doplňte. Prázdná pole se do hlavičky nedají.</div>' +
+                '<div style="font-size:11px; color:#77716a; margin-bottom:12px;">Náležitosti jsou vytažené z přijaté zprávy — zkontrolujte a doplňte. Prázdná pole se do hlavičky nedají.</div>' +
                 row('Adresát / subjekt', 'rpi-subject', f.subject) +
                 row('Spisová značka', 'rpi-spzn', f.spzn) +
                 row('Číslo jednací (č. j.)', 'rpi-cj', f.cj) +
                 row('Věc', 'rpi-vec', f.vec) +
                 row('IČO', 'rpi-ico', f.ico) +
                 '<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">' +
-                    '<button id="rpi-cancel" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">Zrušit</button>' +
-                    '<button id="rpi-create" style="padding:9px 16px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Vytvořit odpověď</button>' +
-                '</div>';
+                    '<button id="rpi-cancel" style="padding:9px 14px; border:1px solid #ddd6cb; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">Zrušit</button>' +
+                    '<button id="rpi-create" style="padding:9px 16px; border:none; background:#9a5b22; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Vytvořit odpověď</button>' +
+                '</div>');
             ov.appendChild(card);
             ov.addEventListener('mousedown', function (e) { if (e.target === ov) ov.remove(); });
             document.body.appendChild(ov);

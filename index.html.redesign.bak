@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LexisEditor</title>
+    
+    <!-- Libraries (lokálně přibalené — aplikace běží i offline, bez CDN) -->
+    <link href="css/vendor/quill.snow.css" rel="stylesheet">
+    <script src="js/vendor/quill.js"></script>
+    <script>
+        // Pojistka pro knihovny s CommonJS exportem v prostředí Electronu.
+        window.temp_module = window.module;
+        window.module = undefined;
+    </script>
+    <script src="js/vendor/diff-match-patch.js"></script>
+    <script src="js/vendor/mammoth.browser.min.js"></script>
+    <script src="js/vendor/purify.min.js"></script>
+    <script>
+        if (window.temp_module !== undefined) {
+            window.module = window.temp_module;
+            delete window.temp_module;
+        } else {
+            delete window.module;
+        }
+    </script>
+    
+    <link rel="stylesheet" href="css/lexis-style.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600&family=Inter:wght@300;400;500;600&family=Lora:ital,wght@0,400;0,700;1,400&family=Roboto+Slab&display=swap');
+
+        .active-mic .icon-sq {
+            animation: pulse-mic 1.5s infinite;
+            border-color: #ef4444 !important;
+        }
+
+        @keyframes pulse-mic {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body id="main-body">
+
+    <!-- Biometrický Zámek (v1.7.22) -->
+    <div id="lock-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:99999; display:none; align-items:center; justify-content:center; flex-direction:column; font-family:'Inter',sans-serif;">
+        <div style="background: #f8fafc; padding: 40px; border-radius: 24px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;">
+            <div style="font-size:48px; margin-bottom:24px;">🛡️</div>
+            <div style="font-weight:700; font-size:22px; color:#1e293b; margin-bottom:12px;">Soukromí je aktivní</div>
+            <div style="color:#64748b; margin-bottom:32px; text-align:center; max-width:320px; line-height:1.6; font-size: 14px;">
+                Pro otevření editoru a přístup k dokumentům se prosím ověřte.
+            </div>
+            <button id="unlock-btn" onclick="requestStartupUnlock()" style="padding:14px 32px; background:#2563eb; color:white; border:none; border-radius:14px; font-weight:600; cursor:pointer; box-shadow:0 10px 20px rgba(37,99,235,0.2); transition: all 0.2s; font-size: 15px;">
+                Odemknout prstem ☝️
+            </button>
+            <div style="margin-top: 40px; padding: 15px; background: #fff; border-radius: 12px; border: 1px dashed #e2e8f0; max-width: 300px; text-align: center;">
+                <span style="font-size:11px; color:#94a3b8; display:block;">
+                    💡 <b>Tip pro Mac:</b> Pokud uvidíte šedé systémové okno, klikněte na <b>"Vždy povolit"</b>. Už se pak nikdy neobjeví a zůstane jen tento rychlý Touch ID zámek.
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Úvodní Rozcestník -->
+    <div id="start-screen">
+        <div class="start-container">
+            <div class="start-version" id="app-version-start">v...</div>
+            <img class="start-logo-img" src="logo.png" style="width: 96px; height: 96px; border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.2); margin-bottom: 15px;">
+            <div class="start-title" style="letter-spacing: -1px; font-weight: 800; color: var(--word-blue); margin-top: 10px;">LEXIS EDITOR</div>
+            <div class="start-subtitle">Prémiové právní prostředí s umělou inteligencí</div>
+            
+            <div style="margin: 30px 0; height: 1px; background: linear-gradient(to right, transparent, var(--border), transparent); width: 100%;"></div>
+
+            <div class="start-grid" id="templates-grid">
+                <div class="start-card primary" onclick="openStartDocument('blank')" style="border-top: 4px solid var(--word-blue);">
+                    <div class="card-icon" style="color: var(--word-blue)">📄</div>
+                    <div class="card-title">Nový dokument</div>
+                    <div class="card-desc">Čistý list s právním formátováním</div>
+                </div>
+                <div class="start-card" onclick="openStartDocument('file')" style="border-top: 4px solid var(--accent);">
+                    <div class="card-icon" style="color: var(--accent)">📂</div>
+                    <div class="card-title">Otevřít dokument</div>
+                    <div class="card-desc">Z disku, PDF nebo Datové schránky</div>
+                </div>
+                <div class="start-card" onclick="startAppWithContent('')" style="border-top: 4px solid #64748b;">
+                    <div class="card-icon">📖</div>
+                    <div class="card-title">Příručka</div>
+                    <div class="card-desc">Jak používat LexisLink a AI Audit</div>
+                </div>
+            </div>
+            
+            <!-- Dokumenty & Složka Spisy -->
+            <div style="display: flex; gap: 20px; width: 100%; max-width: 900px; margin-top: 30px; flex-wrap: wrap; text-align: left;">
+                <!-- Nedávné dokumenty -->
+                <div id="recent-docs-section" style="flex: 1.2; min-width: 340px; background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;">
+                            <span>📂</span> Nedávné dokumenty
+                        </h3>
+                        <div id="recent-filters" style="display: flex; gap: 6px;">
+                            <button class="filter-btn active" onclick="filterRecentDocs('all')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #cbd5e1; background: #2563eb; cursor: pointer; color: white; transition: all 0.2s; font-family: 'Inter', sans-serif;">Vše</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('draft')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #64748b; transition: all 0.2s; font-family: 'Inter', sans-serif;">✍️ Rozpracované</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('ai')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #7c3aed; transition: all 0.2s; font-family: 'Inter', sans-serif;">✨ AI</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('review')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #ea580c; transition: all 0.2s; font-family: 'Inter', sans-serif;">🔍 Ke kontrole</button>
+                            <button class="filter-btn" onclick="filterRecentDocs('final')" style="padding: 5px 12px; font-size: 11px; font-weight: 600; border-radius: 20px; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; color: #16a34a; transition: all 0.2s; font-family: 'Inter', sans-serif;">✅ Hotové</button>
+                        </div>
+                    </div>
+                    <div id="recent-docs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 5px;">
+                        <!-- Dynamicky generované záznamy -->
+                    </div>
+                </div>
+
+                <!-- Složka Spisy (LexisLocal) -->
+                <div id="inbox-docs-section" style="flex: 0.8; min-width: 300px; background: linear-gradient(135deg, #ffffff, #f8fafc); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px;">
+                            <span>📥</span> Spisy & Doručená pošta
+                        </h3>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <button onclick="window.lexisUI.parseTestDocument()" style="background: #e2e8f0; border: none; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #475569; transition: background 0.2s;">➕ Test</button>
+                            <button onclick="window.lexisUI.fetchInbox()" style="background: none; border: none; font-size: 12px; cursor: pointer; color: var(--word-blue);">🔄</button>
+                        </div>
+                    </div>
+                    <div id="inbox-docs-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 5px;">
+                        <!-- Dynamicky generované zprávy/spisy -->
+                        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 30px 0;">Žádné nové spisy ke zpracování.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 40px; font-size: 11px; color: #94a3b8; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;">
+                Powered by LexisLocal AI Engine
+            </div>
+        </div>
+    </div>
+
+    <!-- Interaktivní Loader -->
+    <div id="loader-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <div id="loader-text" style="font-size: 16px; font-weight: 600; color: #1e293b; font-family: 'Inter', sans-serif;">Příprava dokumentu...</div>
+    </div>
+
+    <!-- Obal pro samotnou aplikaci (výchozí skrytý) -->
+    <div id="app-container" style="display: none; height: 100vh; flex-direction: column;">
+
+    <div class="ribbon">
+        <div class="title-bar">
+            <div class="autosave-toggle">
+                <div class="toggle-pill"></div>
+                <span>AutoSave</span>
+            </div>
+            <div class="quick-access">
+                <div id="qat-save" class="qa-btn" onclick="saveDocument()" title="Uložit (Cmd+S)">💾</div>
+                <div id="qat-undo" class="qa-btn" onclick="exec('undo')" title="Zpět (Cmd+Z)">↩️</div>
+                <div id="qat-redo" class="qa-btn" onclick="exec('redo')" title="Vpřed (Cmd+Shift+Z)">↪️</div>
+                <div id="qat-print" class="qa-btn" onclick="window.print()" title="Tisk" style="display:none;">🖨️</div>
+                <div id="qat-new" class="qa-btn" onclick="openStartDocument('blank')" title="Nový dokument" style="display:none;">📄</div>
+                <div class="qa-btn" onclick="showQATMenu(event)" title="Přizpůsobit">▾</div>
+            </div>
+
+            <div class="doc-title-center">
+                LexisEditor - <span id="window-doc-title">Nepojmenovaný dokument</span>
+                <span id="doc-status-badge" class="status-pill status-draft" onclick="lexisUI.toggleStatusDropdown(event)">✍️ Rozpracované</span>
+                <span id="doc-deadline-badge" class="status-pill" style="display:none; cursor: pointer; margin-left: 8px; font-weight: 700; background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;" onclick="lexisUI.showDeadlineInfo()">⏰ Lhůta: Za 15 dní</span>
+                <div id="status-dropdown" class="status-dropdown-menu">
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('draft')">✍️ Rozpracované</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('ai')">✨ Generované AI</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('review')">🔍 Ke kontrole</div>
+                    <div class="status-dropdown-item" onclick="lexisUI.setDocumentStatus('final')">✅ Hotové</div>
+                </div>
+            </div>
+
+            <div class="title-right-tools">
+                <div class="qa-btn" title="Hledat v dokumentu" onclick="showFindReplace()">🔍</div>
+                <div class="qa-btn" title="Profil právníka" onclick="showProfileModal()">👤</div>
+            </div>
+        </div>
+        
+        <div class="ribbon-tabs">
+            <div class="tab" onclick="switchTab('tab-file')" id="tab-file-btn" data-i18n="tab_file">Soubor</div>
+            <div class="tab active" onclick="switchTab('tab-home')" data-i18n="tab_home">Domů</div>
+            <div class="tab" onclick="switchTab('tab-insert')" data-i18n="tab_insert">Vložit</div>
+            <div class="tab" onclick="switchTab('tab-legal')" data-i18n="tab_legal">Právní nástroje</div>
+            <div class="tab" onclick="switchTab('tab-revize')" data-i18n="tab_revize">Revize</div>
+            <div class="tab" onclick="switchTab('tab-lexisai')" style="color: #c4b5fd; font-weight: 700;">LexisAI</div>
+            <div class="tab" onclick="switchTab('tab-view')" data-i18n="tab_view">Zobrazení</div>
+            <div class="tab" onclick="switchTab('tab-help')">Nápověda</div>
+        </div>
+
+        <div id="tab-file" class="tool-groups-container">
+            <div class="tool-group" style="border-right: 2px solid var(--border); padding-right: 15px; margin-right: 15px;">
+                <div class="icons">
+                    <div class="btn-icon" onclick="goToStartScreen()"><div class="icon-sq">🏠</div>Úvodní panel</div>
+                </div>
+                <div class="group-label">Rozcestník</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="window.print()"><div class="icon-sq">📄</div>Export PDF</div>
+                    <div class="btn-icon" onclick="sendViaEmail()"><div class="icon-sq">📧</div>E-mail</div>
+                    <div class="btn-icon" onclick="saveAsTemplateDialog()"><div class="icon-sq">💾</div>Uložit jako Šablonu</div>
+                    <div class="btn-icon" onclick="exportWebPreview()"><div class="icon-sq">🌐</div>Webový náhled</div>
+                    <div class="btn-icon" onclick="indexCurrentDocument()" style="background:rgba(124,58,237,0.1);"><div class="icon-sq">🧠</div>Indexovat KB</div>
+                </div>
+                <div class="group-label">Dokument</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showHelpTip('connect')"><div class="icon-sq">🔗</div>API Status</div>
+                </div>
+                <div class="group-label">LexisConnect</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="syncCloud('Dropbox')"><div class="icon-sq">📦</div>Dropbox</div>
+                    <div class="btn-icon" onclick="syncCloud('Google Drive')"><div class="icon-sq">📂</div>Drive</div>
+                    <div class="btn-icon" onclick="syncCloud('OneDrive')"><div class="icon-sq">☁️</div>OneDrive</div>
+                </div>
+                <div class="group-label">Cloud Sync</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="exportToDocx()"><div class="icon-sq">💾</div>DOCX</div>
+                    <div class="btn-icon" onclick="exportToBundle()"><div class="icon-sq" style="color:#2563eb;">📦</div>Bundle</div>
+                    <div class="btn-icon" onclick="openMailToClient()" title="Připraví přílohu (PDF) a předvyplní e-mail klientovi z adresáře"><div class="icon-sq" style="color:#2563eb;">📧</div>E-mail klientovi</div>
+                    <div class="btn-icon" data-pack="business" onclick="startMailMerge()"><div class="icon-sq">📑</div>Hromadné gen.</div>
+                </div>
+                <div class="group-label">Export & Automatizace</div>
+            </div>
+        </div>
+
+        <div id="tab-home" class="tool-groups-container active">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="document.execCommand('copy')"><div class="icon-sq">📋</div>Kopírovat</div>
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Najít</div>
+                    <div id="dictation-btn" class="btn-icon" onclick="toggleDictation()"><div class="icon-sq">🎙️</div>Diktovat</div>
+                </div>
+                <div class="group-label">Úpravy & Schránka</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <select id="font-family" class="combo-box" onchange="applyFont(this.value)">
+                        <option value="Lora">Lora (Serif)</option>
+                        <option value="Inter">Inter (Sans)</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Roboto Slab">Roboto Slab</option>
+                    </select>
+                    <select id="font-size" class="combo-box" onchange="applySize(this.value)">
+                        <option value="12px">12</option>
+                        <option value="14px">14</option>
+                        <option value="16px" selected>16</option>
+                        <option value="18px">18</option>
+                        <option value="24px">24</option>
+                    </select>
+                    <div class="btn-icon" onclick="exec('bold')"><div class="icon-sq"><b>B</b></div></div>
+                    <div class="btn-icon" onclick="exec('italic')"><div class="icon-sq"><i>I</i></div></div>
+                    <div class="btn-icon" onclick="exec('underline')"><div class="icon-sq"><u>U</u></div></div>
+                    <input type="color" id="font-color" onchange="applyColor(this.value)" style="width:30px; height:30px; border:none; padding:0; cursor:pointer;">
+                    <div class="btn-icon" onclick="applyHighlight('#ffff00')"><div class="icon-sq" style="background:#ffff00; color:#000;">🖍️</div></div>
+                </div>
+                <div class="group-label">Písmo & Efekty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setLineHeight('1.0')"><div class="icon-sq">1.0</div></div>
+                    <div class="btn-icon" onclick="setLineHeight('1.5')"><div class="icon-sq">1.5</div></div>
+                    <div class="btn-icon" onclick="indent(1)"><div class="icon-sq">➡️</div></div>
+                    <div class="btn-icon" onclick="indent(-1)"><div class="icon-sq">⬅️</div></div>
+                </div>
+                <div class="group-label">Odstavec & Řádkování</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="exec('align', 'left')"><div class="icon-sq">⬅️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'center')"><div class="icon-sq">⬆️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'right')"><div class="icon-sq">➡️</div></div>
+                    <div class="btn-icon" onclick="exec('align', 'justify')"><div class="icon-sq">↔️</div></div>
+                </div>
+                <div class="group-label">Zarovnání</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap:5px;">
+                    <button class="style-btn" onclick="applyStyle('h1')" style="font-weight:700; border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Nadpis 1</button>
+                    <button class="style-btn" onclick="applyStyle('h2')" style="font-weight:600; border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Nadpis 2</button>
+                    <button class="style-btn" onclick="applyStyle('p')" style="border:1px solid #e2e8f0; padding:5px 10px; border-radius:4px; cursor:pointer;">Normální</button>
+                </div>
+                <div class="group-label">Rychlé styly</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔍</div>Najít</div>
+                    <div class="btn-icon" onclick="showFindReplace()"><div class="icon-sq">🔄</div>Nahradit</div>
+                </div>
+                <div class="group-label">Úpravy</div>
+            </div>
+            <div class="tool-group" style="background: rgba(37,99,235,0.05); border: 1px dashed rgba(37,99,235,0.2); border-radius: 8px; margin-left: 5px; padding: 2px 6px;">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="business" onclick="logTime()"><div class="icon-sq">⏱️</div>Vykázat práci</div>
+                </div>
+                <div class="group-label" style="color: var(--word-blue); font-weight: 600;">Time-tracking</div>
+            </div>
+        </div>
+
+        <div id="tab-insert" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="openPdfViewer()"><div class="icon-sq">📄</div>Prohlížeč PDF</div>
+                    <div class="btn-icon" data-pack="legal" onclick="importZfo()"><div class="icon-sq">📦</div>Import ZFO</div>
+                </div>
+                <div class="group-label">Dokumenty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertTOC()"><div class="icon-sq">📖</div>Vložit Obsah</div>
+                    <div class="btn-icon" onclick="insertCurrentDate()"><div class="icon-sq">📆</div>Dnešní datum</div>
+                    <div class="btn-icon" onclick="insertTitlePage()"><div class="icon-sq">🗂️</div>Titulní str.</div>
+                    <div class="btn-icon" onclick="insertFootnote()"><div class="icon-sq"><sup>1</sup></div>Poznámka</div>
+                    <div class="btn-icon" data-pack="legal" onclick="lexisUI.convertCitationsToLinks()"><div class="icon-sq">🔗</div>Legal Linker</div>
+                    <div class="btn-icon" onclick="lexisUI.anonymizeDocument()" style="background:rgba(22,163,74,0.1);"><div class="icon-sq">🛡️</div>GDPR Shield</div>
+                </div>
+                <div class="group-label">Stránky & Obsah</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="legal" onclick="insertClause('pravni_moc')"><div class="icon-sq">🖋️</div>Právní moc</div>
+                    <div class="btn-icon" onclick="insertSubjectHeader('person')"><div class="icon-sq">🧍</div>Fyzická osoba</div>
+                    <div class="btn-icon" onclick="insertSubjectHeader('entrepreneur')"><div class="icon-sq">🏢</div>Podnikatel</div>
+                    <div class="btn-icon" onclick="insertSubjectHeader('company')"><div class="icon-sq">🏭</div>Firma</div>
+                    <div class="btn-icon" onclick="insertFootnote()"><div class="icon-sq">🦶</div>Poznámka</div>
+                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📊</div>Tabulka</div>
+                    <div class="btn-icon" onclick="generateToC()"><div class="icon-sq">📜</div>Obsah</div>
+                </div>
+                <div class="group-label">Prvky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="searchAres()" style="background:rgba(37,99,235,0.1);"><div class="icon-sq">🔎</div>Hledat ARES</div>
+                </div>
+                <div class="group-label">Subjekty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertTable()"><div class="icon-sq">📊</div>Tabulka</div>
+                    <div class="btn-icon" onclick="insertIllustration()"><div class="icon-sq">🖼️</div>Ilustrace</div>
+                </div>
+                <div class="group-label">Objekty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertImage()"><div class="icon-sq">📸</div>Obrázek</div>
+                    <div class="btn-icon" onclick="insertLink()"><div class="icon-sq">🔗</div>Odkaz</div>
+                    <div class="btn-icon" onclick="insertBookmark()"><div class="icon-sq">🔖</div>Záložka</div>
+                </div>
+                <div class="group-label">Propojení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="editHeader()"><div class="icon-sq">🔼</div>Záhlaví</div>
+                    <div class="btn-icon" onclick="editFooter()"><div class="icon-sq">🔽</div>Zápatí</div>
+                    <div class="btn-icon" onclick="insertPageNumber()"><div class="icon-sq">🔟</div>Číslo str.</div>
+                </div>
+                <div class="group-label">Záhlaví & Zápatí</div>
+            </div>
+        </div>
+
+        <div id="tab-design" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="customAlert('Změna motivu...')"><div class="icon-sq">🎨</div>Motivy</div>
+                    <div class="btn-icon" onclick="customAlert('Paleta barev...')"><div class="icon-sq">🌈</div>Barvy</div>
+                </div>
+                <div class="group-label">Vzhled</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; margin-left:10px;">
+                        <span>Vodoznak:</span>
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <select onchange="applyWatermark()" class="combo-box" id="watermark-select">
+                                <option value="NONE">Žádný</option>
+                                <option value="DRAFT">DRAFT</option>
+                                <option value="ORIGINÁL">ORIGINÁL</option>
+                                <option value="SOUKROMÉ">SOUKROMÉ</option>
+                            </select>
+                            <input type="color" id="watermark-color" value="#e2e8f0" onchange="applyWatermark()" style="width:24px; height:24px; border:none; padding:0; background:transparent; cursor:pointer;" title="Barva vodoznaku">
+                            <button class="icon-sq-mini" onclick="document.getElementById('wm-image-input').click()" title="Obrázkový vodoznak (logo)">🖼️</button>
+                            <input type="file" id="wm-image-input" accept="image/*" style="display:none" onchange="applyImageWatermark(this)">
+                        </div>
+                    </div>
+                    <div class="btn-icon" onclick="customAlert('Barva stránky...')"><div class="icon-sq">🧼</div>Barva str.</div>
+                    <div class="btn-icon" onclick="customAlert('Ohraničení stránky...')"><div class="icon-sq">🖼️</div>Ohraničení</div>
+                </div>
+                <div class="group-label">Pozadí stránky</div>
+            </div>
+        </div>
+
+        <div id="tab-legal" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="legal" onclick="calculateFee()"><div class="icon-sq">🏷️</div>Poplatek</div>
+                    <div class="btn-icon" data-pack="legal" onclick="calculateTariff()"><div class="icon-sq">⚖️</div>Odměna</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openDeadlineCalc()"><div class="icon-sq">⏳</div>Lhůtník</div>
+                    <div class="btn-icon" data-pack="legal" onclick="calculateInterests()"><div class="icon-sq">💹</div>Úroky</div>
+                </div>
+                <div class="group-label">Soudy & Výpočty</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertSignatureBlock()"><div class="icon-sq">✒️</div>Blok podpisů</div>
+                    <div class="btn-icon" onclick="insertMySignature()"><div class="icon-sq">✍️</div>Můj podpis</div>
+                    <div class="btn-icon" onclick="anonymizeSelection()"><div class="icon-sq">🛡️</div>Anonym</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="checkHierarchy()"><div class="icon-sq">📏</div>Kontrola</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="checkTerminology()"><div class="icon-sq">🔠</div>Pojmy</div>
+                </div>
+                <div class="group-label">Validace & Bezpečí</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertArticle()"><div class="icon-sq">📑</div>Článek</div>
+                    <div class="btn-icon" onclick="insertParagraph()"><div class="icon-sq">❡</div>Paragraf</div>
+                </div>
+                <div class="group-label">Právní číslování</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="business legal" onclick="insertCitation()"><div class="icon-sq">💬</div>Citace</div>
+                    <div class="btn-icon" onclick="insertSectionSign()"><div class="icon-sq">⚖️</div>Znak §</div>
+                </div>
+                <div class="group-label">Rychlé prvky</div>
+            </div>
+            <div class="tool-group" data-pack="legal">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="legal" onclick="lookupCaseLaw()"><div class="icon-sq">🏛️</div>Judikatura</div>
+                    <div class="btn-icon" data-pack="legal" onclick="autoLinkLaws()"><div class="icon-sq">🔗</div>Odkazovat zákony</div>
+                </div>
+                <div class="group-label">Rešerše</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="business legal" onclick="openPostDialog()"><div class="icon-sq">✉️</div>Dopis Online</div>
+                    <div class="btn-icon" data-pack="business legal" onclick="signDigital()"><div class="icon-sq">🔑</div>E-podpis</div>
+                    <div class="btn-icon" data-pack="business" onclick="startMailMerge()" style="background: rgba(37,99,235,0.08); border: 1px solid #bfdbfe;"><div class="icon-sq">📨</div>Kampaň</div>
+                    <div class="btn-icon" onclick="openContacts()" style="background: rgba(16,185,129,0.08); border: 1px solid #a7f3d0;"><div class="icon-sq">📒</div>Adresář</div>
+                </div>
+                <div class="group-label">Distribuce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" data-pack="business" onclick="logTime()"><div class="icon-sq">⏰</div>Zapsat úkon</div>
+                    <div class="btn-icon" data-pack="business" onclick="exportTimesheet()"><div class="icon-sq">📤</div>Exportovat</div>
+                </div>
+                <div class="group-label">Evidence práce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="lockScreen.openSecuritySettings()" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);">
+                        <div class="icon-sq">🔐</div>Zabezpečení
+                    </div>
+                    <div class="btn-icon" onclick="lockScreen.lockNow()" style="background:rgba(15,23,42,0.06);border:1px solid rgba(15,23,42,0.15);">
+                        <div class="icon-sq">🔒</div>Zamknout
+                    </div>
+                </div>
+                <div class="group-label">Bezpečnost</div>
+            </div>
+        </div>
+
+        <div id="tab-layout" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setMargins('normal')"><div class="icon-sq">↔️</div>Normální</div>
+                    <div class="btn-icon" onclick="setMargins('narrow')"><div class="icon-sq">↔️</div>Úzké</div>
+                    <div class="btn-icon" onclick="setMargins('wide')"><div class="icon-sq">↔️</div>Široké</div>
+                </div>
+                <div class="group-label">Okraje</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setOrientation('portrait')"><div class="icon-sq">📄</div>Na výšku</div>
+                    <div class="btn-icon" onclick="setOrientation('landscape')"><div class="icon-sq">📂</div>Na šířku</div>
+                </div>
+                <div class="group-label">Orientace</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="setColumns(1)"><div class="icon-sq">▯</div>Jeden</div>
+                    <div class="btn-icon" onclick="setColumns(2)"><div class="icon-sq">▯▯</div>Dva</div>
+                </div>
+                <div class="group-label">Sloupce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="lexisUI.customAlert('↩️ <b>Zalamování textu</b><br><br>Automatické zalamování slov na konci řádků je trvale aktivní pro zachování standardního vzhledu tiskové strany A4.')"><div class="icon-sq">↩️</div>Zalomit</div>
+                    <div class="btn-icon" onclick="lexisUI.customAlert('🔢 <b>Právnické číslování řádků</b><br><br>Číslování řádků pro soudní podání a žaloby se automaticky vygeneruje při exportu do formátu PDF nebo při tisku dokumentu podle nastavené šablony.')"><div class="icon-sq">🔢</div>Řádky</div>
+                </div>
+                <div class="group-label">Uspořádání</div>
+            </div>
+        </div>
+
+
+        <div id="tab-reference" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertTOC()"><div class="icon-sq">📑</div>Obsah</div>
+                    <div class="btn-icon" onclick="generateTableOfAuthorities()"><div class="icon-sq">🏛️</div>Rejstřík citací</div>
+                </div>
+                <div class="group-label">Rejstříky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="insertFootnote()"><div class="icon-sq">¹</div>Poznámka</div>
+                </div>
+                <div class="group-label">Citace</div>
+            </div>
+        </div>
+
+        <div id="tab-revize" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" id="track-changes-btn" onclick="toggleTrackChanges()"><div class="icon-sq">🕵️</div>Sledovat změny</div>
+                    <div class="btn-icon" onclick="acceptAll()"><div class="icon-sq">✅</div>Přijmout vše</div>
+                    <div class="btn-icon" onclick="rejectAll()"><div class="icon-sq">❌</div>Odmítnout vše</div>
+                </div>
+                <div class="group-label">Sledování změn</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="compareVersions()"><div class="icon-sq">⚖️</div>Srovnat</div>
+                    <div class="btn-icon" onclick="showHistory()"><div class="icon-sq">🕰️</div>Historie verzí</div>
+                    <div class="btn-icon" onclick="toggleCommentDrawer(true)"><div class="icon-sq">🗨️</div>Komentáře</div>
+                </div>
+                <div class="group-label">Verze & Kontrola</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="runFinalAudit()"><div class="icon-sq">🕵️‍♂️</div>Prověřit text</div>
+                    <div class="btn-icon" onclick="scrubMetadata()"><div class="icon-sq">🧽</div>Vyčistit metadata</div>
+                    <div class="btn-icon" onclick="clearHighlights()"><div class="icon-sq">🧹</div>Vyčistit</div>
+                </div>
+                <div class="group-label">Závěrečná kontrola</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="lexisUI.customAlert('🔤 <b>Kontrola pravopisu</b><br><br>Integrovaná offline kontrola českého pravopisu a právní terminologie je aktivní. Chybná slova jsou v textu jemně červeně podtržena.')"><div class="icon-sq">🔤</div>Pravopis</div>
+                    <div class="btn-icon" onclick="lexisUI.customAlert('📚 <b>Právní Tezaurus</b><br><br>Tezaurus a vyhledávání synonym pro odborné právní pojmy je k dispozici. Označte slovo a klikněte na AI asistent pro návrh vhodnějších synonym.')"><div class="icon-sq">📚</div>Tezaurus</div>
+                </div>
+                <div class="group-label">Jazyk</div>
+            </div>
+        </div>
+
+        <div id="tab-lexisai" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleAIDrawer(true)"><div class="icon-sq">✨</div>AI Bridge</div>
+                    <div class="btn-icon" onclick="askAIAboutSelection()"><div class="icon-sq">🔍</div>Analyzovat</div>
+                    <div class="btn-icon" onclick="rewriteSelection()"><div class="icon-sq">📝</div>Přepsat</div>
+                    <div class="btn-icon" onclick="explainSelection()"><div class="icon-sq">💡</div>Vysvětlit</div>
+                    <div class="btn-icon" onclick="translateSelection()"><div class="icon-sq">🌐</div>Přeložit</div>
+                </div>
+                <div class="group-label">Analýza a úpravy výběru</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="checkLegalRisks()"><div class="icon-sq">🛡️</div>Hledat rizika</div>
+                    <div class="btn-icon" onclick="summarizeDocument()"><div class="icon-sq">📋</div>Shrnutí</div>
+                    <div class="btn-icon" onclick="generateClause()"><div class="icon-sq">✍️</div>Nová doložka</div>
+                    <div class="btn-icon" onclick="continueWriting()"><div class="icon-sq">⚡</div>Dopsat AI</div>
+                </div>
+                <div class="group-label">Celý dokument a tvorba</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="openLexisLink()"><div class="icon-sq">📱</div>LexisLink Remote</div>
+                </div>
+                <div class="group-label">Propojení</div>
+            </div>
+        </div>
+
+        <div id="tab-view" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" id="view-btn-reading" onclick="setViewMode('reading')"><div class="icon-sq">📖</div>Čtení</div>
+                    <div class="btn-icon" id="view-btn-print" onclick="setViewMode('print')"><div class="icon-sq">🖨️</div>Tisk</div>
+                    <div class="btn-icon" id="view-btn-web" onclick="setViewMode('web')"><div class="icon-sq">🌐</div>Web</div>
+                </div>
+                <div class="group-label">Zobrazení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleRuler()"><div class="icon-sq">📏</div>Pravítko</div>
+                    <div class="btn-icon" onclick="toggleGrid()"><div class="icon-sq">🏁</div>Mřížka</div>
+                </div>
+                <div class="group-label">Pomůcky</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleSidebar('sidebar')"><div class="icon-sq">⬅️</div>Levý panel</div>
+                    <div class="btn-icon" onclick="toggleSidebar('right-sidebar')"><div class="icon-sq">➡️</div>Pravý panel</div>
+                </div>
+                <div class="group-label">Panely</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Tmavý režim</div>
+                </div>
+                <div class="group-label">Režim</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Velikost:</span>
+                        <select onchange="applyPaper(this.value)" class="combo-box">
+                            <option value="a4">A4 (210x297)</option>
+                            <option value="letter">Letter (8.5x11)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Orientace:</span>
+                        <select onchange="applyOrientation(this.value)" class="combo-box">
+                            <option value="portrait">Na výšku</option>
+                            <option value="landscape">Na šířku</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Formát papíru</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Lupa:</span>
+                        <select onchange="applyZoom(this.value)" class="combo-box">
+                            <option value="0.75">75%</option>
+                            <option value="1" selected>100%</option>
+                            <option value="1.25">125%</option>
+                            <option value="1.5">150%</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Zvětšení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Okraje (mm):</span>
+                        <input type="number" id="margin-val" value="40" onchange="updateMargins()" style="width:50px; border:1px solid #ddd; padding:2px;">
+                    </div>
+                </div>
+                <div class="group-label">Vzhled stránky</div>
+            </div>
+        </div>
+
+        <div id="tab-help" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showHelpTip('redlining')"><div class="icon-sq">🕵️</div>Jak revidovat?</div>
+                    <div class="btn-icon" onclick="showHelpTip('blackline')"><div class="icon-sq">⚖️</div>Jak srovnat?</div>
+                    <div class="btn-icon" onclick="showHelpTip('connect')"><div class="icon-sq">🔗</div>LexisConnect</div>
+                    <div class="btn-icon" onclick="showHelpTip('scan')"><div class="icon-sq">📸</div>Jak skenovat?</div>
+                    <div class="btn-icon" onclick="showHelpTip('clauses')"><div class="icon-sq">📚</div>Knihovna</div>
+                    <div class="btn-icon" onclick="showHelpTip('toc')"><div class="icon-sq">📜</div>Generování obsahu</div>
+                    <div class="btn-icon" onclick="showHelpTip('qat-guide')"><div class="icon-sq">📌</div>Rychlý přístup</div>
+                    <div class="btn-icon" onclick="runSelfDiagnostic()" style="background:rgba(239,68,68,0.1);"><div class="icon-sq">🛡️</div>Self-Test</div>
+                    <div class="btn-icon" onclick="startOnboarding()" style="background:rgba(37,99,235,0.1);"><div class="icon-sq">🎓</div>Průvodce</div>
+                </div>
+                <div class="group-label">Návody</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showHelpTip('user-guide')"><div class="icon-sq">📖</div>Uživatelská příručka</div>
+                    <div class="btn-icon" onclick="openLexisLink()"><div class="icon-sq">📱</div>LexisLink Remote</div>
+                </div>
+                <div class="group-label">Podpora</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="showHelpTip('updates')"><div class="icon-sq">🔄</div>Aktualizace</div>
+                    <div class="btn-icon" onclick="showHelpTip('about')"><div class="icon-sq">ℹ️</div>O aplikaci</div>
+                </div>
+                <div class="group-label">Systém</div>
+            </div>
+        </div>
+
+        <div id="tab-settings" class="tool-groups-container">
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="resetFactoryTemplates()"><div class="icon-sq">🔄</div>Tovární Šablony</div>
+                </div>
+                <div class="group-label">Záchrana</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Poskytovatel:</span>
+                        <select id="ai-provider" onchange="updateAIProviderDefaults()" class="combo-box">
+                            <option value="lexislocal">LexisLocal (Offline Swarm)</option>
+                            <option value="apfel">Apple Intelligence (apfel)</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="openai">OpenAI (Cloud)</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="lmstudio">LM Studio (Local)</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Model:</span>
+                        <input type="text" id="ai-model" value="apple-intelligence" onchange="saveAISettings()" class="combo-box" style="width:80px">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Auto-Zámek:</span>
+                        <select id="lock-timeout-select" onchange="lexisUI.updateLockTimeout(this.value)" class="combo-box">
+                            <option value="60000">1 minuta</option>
+                            <option value="300000" selected>5 minut</option>
+                            <option value="600000">10 minut</option>
+                            <option value="1800000">30 minut</option>
+                            <option value="3600000">1 hodina</option>
+                            <option value="0">Vypnuto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">AI Engine</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Endpoint:</span>
+                        <input type="text" id="ai-endpoint" value="http://localhost:11434/api/generate" onchange="saveAISettings()" class="combo-box" style="width:180px">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>API Klíč:</span>
+                        <input type="password" id="ai-apikey" value="" onchange="saveAISettings()" class="combo-box" style="width:100px">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Záložní AI:</span>
+                        <input type="checkbox" id="ai-offline-fallback" checked onchange="saveAISettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                </div>
+                <div class="group-label">Připojení</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Živé Lhůty:</span>
+                        <input type="checkbox" id="settings-live-deadline-scan" checked onchange="lexisUI.saveFeatureSettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px; align-items:center; justify-content:center;">
+                        <span>Sledovat Spisy:</span>
+                        <input type="checkbox" id="settings-desktop-file-watcher" checked onchange="lexisUI.saveFeatureSettings()" style="width:16px; height:16px; cursor:pointer;">
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Cíl Odkazů:</span>
+                        <select id="settings-legal-link-target" onchange="lexisUI.saveFeatureSettings()" class="combo-box">
+                            <option value="zakonyprolidi">Zákony pro lidi</option>
+                            <option value="google">Google</option>
+                            <option value="disabled">Vypnuto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label">Volitelné Funkce</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 15px;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span data-i18n="setting_lang">Jazyk:</span>
+                        <select id="app-lang" onchange="changeLanguage(this.value)" class="combo-box">
+                            <option value="cs">Čeština</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="group-label" data-i18n="group_localization">Lokalizace</div>
+            </div>
+            <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="searchAres()"><div class="icon-sq">🏢</div>ARES</div>
+                    <div class="btn-icon" onclick="insertParty()"><div class="icon-sq">👤</div>Vložit stranu</div>
+                    <div class="btn-icon" onclick="insertLetterhead()"><div class="icon-sq">📄</div>Vložit hlavičku</div>
+                    <div class="btn-icon" data-pack="legal" onclick="createReplyFromDocument()"><div class="icon-sq">↩️</div>Odpovědět</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openDatovkaDialog()"><div class="icon-sq">📨</div>Datovky</div>
+                    <div class="btn-icon" data-pack="legal" onclick="openIsdsSettings()"><div class="icon-sq">⚙️</div>Nastavení DS</div>
+                    <div class="btn-icon" onclick="openKeyBackup()"><div class="icon-sq">🔐</div>Záloha klíče</div>
+                    <div class="btn-icon" onclick="openFeedback()"><div class="icon-sq">🐞</div>Nahlásit chybu</div>
+                </div>
+                <div class="group-label" data-i18n="group_connectivity">Konektivita</div>
+                <div class="tool-group">
+                <div class="icons">
+                    <div class="btn-icon" onclick="toggleDarkMode()"><div class="icon-sq">🌙</div>Noční režim</div>
+                    <div class="btn-icon" onclick="syncCloud('Lexis Cloud E2EE')"><div class="icon-sq">☁️</div>Auto-Cloud</div>
+                </div>
+                <div class="group-label" data-i18n="group_advanced">Pokročilé</div>
+            </div>
+        </div>
+            <div class="tool-group">
+                <div class="group-label">Automatizace verzí</div>
+                <div style="padding: 5px; display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-size: 11px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="autosave-toggle" onchange="toggleAutoSave(this.checked)"> Auto-save
+                    </label>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="number" id="autosave-interval" value="5" min="1" max="60" 
+                               style="width: 40px; padding: 2px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px;"
+                               onchange="updateAutoSaveInterval(this.value)"> <span style="font-size: 10px;">min</span>
+                    </div>
+                </div>
+            </div>
+            <div class="tool-group">
+                <div class="group-label">Integrace (Evolio/Zapier)</div>
+                <div style="padding: 5px; display: flex; flex-direction: column; gap: 8px;">
+                    <input type="text" id="webhook-url" placeholder="https://..." 
+                           style="width: 120px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px;"
+                           onchange="saveIntegrationSettings()">
+                    <span style="font-size: 9px; color: #94a3b8;">Webhook URL</span>
+                </div>
+            </div>
+            <div class="tool-group">
+                <div class="icons" style="gap: 10px; align-items: center;">
+                    <div style="display:flex; flex-direction:column; gap:4px; font-size:11px;">
+                        <span>Licenční klíč:</span>
+                        <div style="display:flex; gap:5px; align-items: center;">
+                            <input type="text" id="license-key" placeholder="XXXX-XXXX-XXXX-XXXX" class="combo-box" style="width:120px" onchange="lexisUI.activateLicense(this.value)">
+                            <span id="license-status-badge" style="padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #ef4444; color: white; white-space: nowrap;">Neaktivní</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="group-label">Seat Management</div>
+            </div>
+        </div>
+    </div>
+
+
+
+
+    <!-- Custom Context Menu -->
+    <div id="editor-context-menu" class="custom-context-menu" style="min-width: 220px;">
+        <div class="context-menu-item" onclick="exec('copy')"><span class="icon">📋</span> Kopírovat <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+C</span></div>
+        <div class="context-menu-item" onclick="exec('paste')"><span class="icon">📥</span> Vložit <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+V</span></div>
+        <div class="context-menu-item" onclick="exec('cut')"><span class="icon">✂️</span> Vyjmout <span style="margin-left:auto; font-size:10px; color:#94a3b8;">Cmd+X</span></div>
+        
+        <div class="context-menu-sep"></div>
+        
+        <div style="display: flex; padding: 5px 10px; gap: 5px; justify-content: space-around; border-bottom: 1px solid #f1f5f9;">
+            <div class="btn-icon-sq" onclick="exec('bold')" title="Tučné"><b>B</b></div>
+            <div class="btn-icon-sq" onclick="exec('italic')" title="Kurzíva"><i>I</i></div>
+            <div class="btn-icon-sq" onclick="exec('underline')" title="Podtržené"><u>U</u></div>
+            <div class="btn-icon-sq" onclick="exec('strike')" title="Přeškrtnuté"><s>S</s></div>
+        </div>
+
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="exec('list', 'bullet')"><span class="icon">•</span> Odrážky</div>
+        <div class="context-menu-item" onclick="exec('list', 'ordered')"><span class="icon">1.</span> Číslování</div>
+        
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="exec('align', '')"><span class="icon">≡</span> Zarovnat doleva</div>
+        <div class="context-menu-item" onclick="exec('align', 'center')"><span class="icon">↔</span> Zarovnat na střed</div>
+        <div class="context-menu-item" onclick="exec('align', 'justify')"><span class="icon">≣</span> Zarovnat do bloku</div>
+
+        <div class="context-menu-sep"></div>
+
+        <div class="context-menu-item" onclick="askAIAboutSelection()"><span class="icon">✨</span> LexisAI: Analyzovat</div>
+        <div class="context-menu-item" onclick="anonymizeSelection()"><span class="icon">🛡️</span> Anonymizovat</div>
+        <div class="context-menu-item" onclick="makePlaceholder()"><span class="icon"><b>[ ]</b></span> Vytvořit pole</div>
+        
+        <div class="context-menu-sep"></div>
+        
+        <div class="context-menu-item" onclick="showFindReplace()"><span class="icon">🔍</span> Najít v dokumentu</div>
+    </div>
+
+    <!-- QAT Customization Menu -->
+    <div id="qat-custom-menu" class="qat-custom-menu">
+        <div class="context-menu-item" onclick="toggleQATItem('qat-save')"><span class="qat-item-check" id="check-qat-save">✓</span> Uložit</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-undo')"><span class="qat-item-check" id="check-qat-undo">✓</span> Zpět</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-redo')"><span class="qat-item-check" id="check-qat-redo">✓</span> Vpřed</div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-print')"><span class="qat-item-check" id="check-qat-print"></span> Tisk</div>
+        <div class="context-menu-item" onclick="toggleQATItem('qat-new')"><span class="qat-item-check" id="check-qat-new"></span> Nový dokument</div>
+    </div>
+
+    <!-- QAT Pinning Menu -->
+    <div id="qat-pin-menu" class="qat-custom-menu">
+        <div class="context-menu-item" id="qat-pin-action-btn" onclick="lexisUI.executeQATPinAction()"><span class="icon">📌</span> Přidat na panel Rychlý přístup</div>
+    </div>
+    
+    <div id="sidebar-tab" class="sidebar-side-tab" onclick="toggleSidebar('sidebar')">
+        <span>📚 KNIHOVNA</span>
+    </div>
+    <div id="reference-tab" class="reference-side-tab" onclick="toggleSidebar('right-sidebar')">
+        <span>📖 REFERENCE</span>
+    </div>
+    <div class="ai-side-tab" id="ai-tab" onclick="toggleAIDrawer()">
+        <span>✨ LEXIS AI</span>
+    </div>
+    <div class="comment-side-tab" id="comment-tab" onclick="toggleCommentDrawer()">
+        <span>💬 REVIZE</span>
+    </div>
+
+    <div class="workspace">
+            <!-- Left Sidebar -->
+            <div class="side-panels collapsed" id="sidebar">
+                <!-- Obsah sidebaru (Doložky, Generátory) -->
+                <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--border); background: var(--ribbon-bg);">
+                    <span style="font-weight: 700; font-size: 11px; color: var(--text-title); text-transform: uppercase; letter-spacing: 0.5px;">📚 KNIHOVNA A DOLOŽKY</span>
+                    <span style="cursor: pointer; font-size: 14px; color: #94a3b8; font-weight: bold; transition: color 0.2s;" onclick="toggleSidebar('sidebar')" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">✕</span>
+                </div>
+                <div class="panel-section" id="document-outline-section">
+                    <div class="panel-title">📖 Osnova dokumentu</div>
+                    <div id="document-outline-list" style="display: flex; flex-direction: column; gap: 4px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Napište nadpisy (Nadpis 1, 2) pro zobrazení osnovy.</div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">📚 Knihovna doložek</div>
+                    <div class="category-header">Obchodní právo</div>
+                    <div class="clause-item" onclick="insertClause('arbitration')">⚖️ Rozhodčí doložka</div>
+                    <div class="clause-item" onclick="insertClause('prorogation')">🏛️ Prorogační doložka</div>
+                    <div class="clause-item" onclick="insertClause('interest')">💰 Smluvní pokuta</div>
+                    
+                    <div class="category-header">Ochrana dat & IT</div>
+                    <div class="clause-item" onclick="insertClause('gdpr')">🛡️ GDPR ustanovení</div>
+                    <div class="clause-item" onclick="insertClause('confidentiality')">🤐 Mlčenlivost (NDA)</div>
+                    
+                    <div class="category-header">Vlastní doložky</div>
+                    <div id="custom-clauses-container" style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;"></div>
+                    <div class="clause-item" onclick="saveSelectedAsClause()" style="border-style: dashed; color: var(--accent);">➕ Uložit vybrané...</div>
+                </div>
+
+                
+                <div class="panel-section" id="active-deadlines-section">
+                    <div class="panel-title">⏰ Aktivní lhůty</div>
+                    <div id="deadlines-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Lhůty se načtou dynamicky -->
+                        <div style="font-size: 11px; color: #94a3b8; text-align: center; padding: 10px; font-style: italic;">Žádné aktivní lhůty ke sledování.</div>
+                    </div>
+                </div>
+
+                <div class="panel-section" id="detected-deadlines-section" style="display:none; background: #fffbeb; border: 1px solid #fde68a;">
+                    <div class="panel-title" style="color: #92400e;">💡 Nalezena lhůta v textu!</div>
+                    <div id="detected-list" style="padding: 5px;"></div>
+                </div>
+
+                <div class="panel-section" id="court-hearings-section" style="display:none; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <div class="panel-title" style="color: #166534;">⚖️ Soudní jednání (InfoJednání)</div>
+                    <div id="hearings-list" style="padding: 5px;"></div>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">🏗️ Generátory</div>
+                    <div class="clause-item" onclick="openPoweOfAttorneyDialog()" style="background: var(--word-blue); color: white; border: none;">🖋️ <b>Nová Plná moc</b></div>
+                </div>
+
+                <!-- Placeholder Manager Section -->
+                <div class="panel-section" id="placeholder-section">
+                    <div class="panel-title">🗳️ POLE & PROMĚNNÉ</div>
+                    <div id="placeholders-list" style="padding: 5px 0;">
+                        <p style="font-size: 11px; color: #64748b; font-style: italic;">Žádná pole [ ] nebyla detekována. Označte text a zvolte 'Vytvořit pole' v menu.</p>
+                    </div>
+                </div>
+
+                <!-- Footnotes Section -->
+                <div class="panel-section" id="footnote-section">
+                    <div class="panel-title">📖 POZNÁMKY POD ČAROU</div>
+                    <div id="footnotes-list" style="padding: 5px 0;">
+                        <p style="font-size: 11px; color: #64748b; font-style: italic;">Žádné poznámky pod čarou.</p>
+                    </div>
+                </div>
+
+
+                <!-- Audit & Linter Section (v2.0 Phase 2) -->
+                <div class="panel-section" id="audit-section">
+                    <div class="panel-title" style="display:flex; align-items:center;">
+                        🔎 PRÁVNÍ LINTER <span id="audit-count-badge">0</span>
+                    </div>
+                    <div id="audit-list" style="padding: 5px 0;">
+                        <p style="font-size: 11px; color: #64748b; font-style: italic; text-align: center;">Žádné chyby nenalezeny. Spusťte hloubkovou kontrolu.</p>
+                    </div>
+                    <button onclick="runFinalAudit()" style="width:100%; padding:8px; background:white; border:1px solid var(--word-blue); color:var(--word-blue); border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-bottom:5px;" onmouseover="this.style.background='var(--word-blue)'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='var(--word-blue)';">⚡ Hloubkový audit</button>
+                    <button onclick="runLogicAudit()" style="width:100%; padding:8px; background:white; border:1px solid #f59e0b; color:#d97706; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='#f59e0b'; this.style.color='white';" onmouseout="this.style.background='white'; this.style.color='#d97706';">🧠 Kontrola logiky (AI)</button>
+                </div>
+
+                <div class="panel-section">
+                    <div class="panel-title">🕒 Historie verzí</div>
+                    <div id="history-list" style="max-height: 200px; overflow-y: auto;"></div>
+                </div>
+            </div>
+
+            <!-- Center Editor -->
+            <div class="editor-scroll">
+                <div id="split-workspace" style="display: flex; gap: 20px; width: 100%; max-width: 100%; justify-content: center; align-items: flex-start;">
+                    <!-- PDF Viewer Pane -->
+                    <div id="pdf-viewer-pane" style="display: none; width: 50%; min-width: 450px; height: calc(100vh - 180px); background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); flex-direction: column; overflow: hidden; position: sticky; top: 10px;">
+                        <div class="pdf-viewer-header" style="padding: 12px 16px; background: var(--word-blue); color: white; display: flex; justify-content: space-between; align-items: center; font-family: system-ui, sans-serif;">
+                            <span style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">📋 Integrovaný PDF Prohlížeč</span>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <button onclick="importCurrentPdfText()" style="background: rgba(255,255,255,0.25); border: none; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.35)'" onmouseout="this.style.background='rgba(255,255,255,0.25)'" title="Vloží vyextrahovaný text přímo do dokumentu">✨ Importovat text</button>
+                                <button onclick="generateReplyFromPdf()" style="background: #10b981; border: none; color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold; transition: background 0.2s;" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'" title="Vygeneruje profesionální šablonu odpovědi s č.j. a nastavením hlídače lhůt">📝 Vytvořit odpověď</button>
+                                <span onclick="closePdfViewer()" style="cursor: pointer; font-weight: bold; font-size: 14px; padding: 2px 8px; background: rgba(0,0,0,0.2); border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.3)'" onmouseout="this.style.background='rgba(0,0,0,0.2)'">✕</span>
+                            </div>
+                        </div>
+                        <iframe id="pdf-frame" style="width: 100%; height: 100%; border: none; background: white;"></iframe>
+                    </div>
+
+                    <div id="editor-wrapper">
+                        <div class="page-header" id="header-area" contenteditable="true">
+                            <div>Advokátní kancelář Lexis</div>
+                            <div style="text-align: right;">Spis: 2024/005/ZD</div>
+                        </div>
+                        <div id="editor" spellcheck="true">
+                            <h1>SMLOUVA O DÍLO</h1>
+                            <p><b>I. Smluvní strany</b></p>
+                            <p>Zhotovitel: [JMÉNO], IČO: [IČO]</p>
+                            <p>Objednatel: [JMÉNO], IČO: [IČO]</p>
+                            <p><b>II. Předmět smlouvy</b></p>
+                            <p>Předmětem této smlouvy je závazek zhotovitele provést pro objednatele dílo spočívající v...</p>
+                        </div>
+                        <!-- Živý náhled poznámek pod čarou na konci stránky -->
+                        <div id="footnotes-preview-area" style="margin: 0 40mm; padding: 10px 0; border-top: 1px solid #cbd5e1; display: none;">
+                            <div style="font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">Poznámky pod čarou:</div>
+                            <div id="footnotes-preview-list" style="font-size: 11px; color: #1e293b; line-height: 1.4;"></div>
+                        </div>
+                        <div class="page-footer" id="footer-area" contenteditable="true">
+                            <div>www.lexiseditor.cz</div>
+                            <div style="text-align: right;">Strana 1 z 1</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar -->
+            <div class="right-panels collapsed" id="right-sidebar">
+                <div class="sidebar-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--border); background: var(--ribbon-bg);">
+                    <span style="font-weight: 700; font-size: 11px; color: var(--text-title); text-transform: uppercase; letter-spacing: 0.5px;">📖 REFERENCE</span>
+                    <span style="cursor: pointer; font-size: 14px; color: #94a3b8; font-weight: bold; transition: color 0.2s;" onclick="toggleSidebar('right-sidebar')" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">✕</span>
+                </div>
+                <div class="panel-section" style="padding: 15px;">
+                    <div class="panel-title">📚 Referenční materiály</div>
+                    <div class="clause-item" style="cursor:default; background:#f8fafc;">
+                        <small>NS 23 Cdo 456/2021:</small><br>
+                        "Zhotovitel odpovídá za vady díla..."
+                    </div>
+                </div>
+            </div>
+
+    <!-- Comment Drawer -->
+    <div id="comment-sidebar" class="ai-drawer">
+        <div class="ai-header" style="background: linear-gradient(to right, #f59e0b, #d97706);">
+            <span style="font-weight: 700; letter-spacing: 0.5px;">💬 KOMENTÁŘE A REVIZE</span>
+            <span class="ai-header-close" onclick="toggleCommentDrawer(false)">✕</span>
+        </div>
+        <div id="comments-list" style="padding: 20px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex-grow: 1;">
+            <div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:20px;">Žádné komentáře</div>
+        </div>
+    </div>
+    </div>
+    
+    <div class="ai-overlay" id="ai-overlay" onclick="toggleAIDrawer(false)"></div>
+    <div class="ai-drawer" id="ai-drawer">
+        <div class="ai-header">
+            <span id="ai-header-text" style="font-weight: 700; letter-spacing: 0.5px;">⚖️ LEGAL TOOLBOX</span>
+            <span class="ai-header-close" onclick="toggleAIDrawer(false)">✕</span>
+        </div>
+        
+        <!-- Main Sidebar Tabs (Fáze 10) -->
+        <div style="display:flex; background:var(--word-blue); border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div class="main-sidebar-tab active" onclick="switchSidebarTab('ai')" id="tab-sb-ai">🤖 AI</div>
+            <div class="main-sidebar-tab" onclick="switchSidebarTab('clauses')" id="tab-sb-clauses">📚 Doložky</div>
+            <div class="main-sidebar-tab" onclick="switchSidebarTab('templates')" id="tab-sb-templates">📋 Šablony</div>
+        </div>
+
+        <!-- AI Sub-Tabs (Visible only when AI tab is active) -->
+        <div id="ai-subtabs" style="display:flex; background:#f8fafc; border-bottom:1px solid #eee;">
+            <div class="ai-tab active" onclick="switchAITab('chat', this)" id="tab-ai-chat">Chat</div>
+            <div class="ai-tab" onclick="switchAITab('research', this)" id="tab-ai-research">Rešerše</div>
+            <div class="ai-tab" onclick="switchAITab('summary', this)" id="tab-ai-summary">Shrnutí</div>
+            <div class="ai-tab" onclick="switchAITab('kb', this)" id="tab-ai-kb" style="color:var(--ai-color)">🧠 Znalosti</div>
+            <div class="ai-tab" onclick="switchAITab('sovereignty', this)" id="tab-ai-sovereignty" style="color:#003399">🇪🇺 Suverenita</div>
+        </div>
+
+        <div class="ai-body" id="ai-output" style="padding:15px; flex-grow: 1; overflow-y: auto;">
+            Dobrý den, jsem váš právní agent. Vyberte si nástroj nebo se mě na něco zeptejte.
+        </div>
+
+        <!-- Clause Library View -->
+        <div id="clause-library-view" style="display:none; padding:15px; flex-grow: 1; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h4 style="margin:0; font-size:13px; color:var(--word-blue);">Knihovna doložek</h4>
+                <button onclick="saveCurrentSelectionAsClause()" style="padding:4px 8px; font-size:10px; background:#16a34a; color:white; border:none; border-radius:4px; cursor:pointer;">+ Přidat označené</button>
+            </div>
+            <div id="clauses-list" style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Clauses will be here -->
+            </div>
+        </div>
+
+        <!-- Dynamic Template View -->
+        <div id="template-vars-view" style="display:none; padding:15px; flex-grow: 1; overflow-y: auto;">
+            <div style="margin-bottom:15px;">
+                <h4 style="margin:0; font-size:13px; color:var(--word-blue);">Dynamické vyplňování</h4>
+                <p style="font-size:11px; color:#64748b;">Napište do textu {{název}} a zde se objeví formulář.</p>
+            </div>
+            <button onclick="scanForVariables()" style="width:100%; padding:8px; background:var(--word-blue); color:white; border:none; border-radius:4px; margin-bottom:15px; cursor:pointer;">🔍 Skenovat proměnné</button>
+            <div id="variables-form" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- Form inputs will be here -->
+            </div>
+        </div>
+
+        <!-- LexisLocal Swarm Controls (Dynamic) -->
+        <div id="lexislocal-selectors-container" style="display: none; padding: 10px 15px; background: #f8fafc; border-top: 1px solid #eee; border-bottom: 1px solid #eee; gap: 8px; flex-direction: column;">
+            <div style="display: flex; gap: 8px; width: 100%;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 0.5px;">🤖 AGENT SWARMU:</span>
+                    <select id="lexislocal-agent" class="combo-box" style="width: 100%; padding: 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                        <option value="resersnik">📚 Rešeršník</option>
+                        <option value="spisovatel">📝 Spisovatel</option>
+                        <option value="stylista">✍️ Stylista</option>
+                        <option value="kontrolor">⚖️ Kontrolor</option>
+                        <option value="sekretarka">⏰ Sekretářka</option>
+                    </select>
+                </div>
+                <div id="lexislocal-model-box" style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 9px; font-weight: 800; color: #475569; letter-spacing: 0.5px;">🧠 MODEL:</span>
+                    <select id="lexislocal-model" class="combo-box" style="width: 100%; padding: 6px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                        <option value="llama3">llama3</option>
+                        <option value="mistral">mistral</option>
+                        <option value="lia">lia</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- ARES & ISIR Lustrace (Lokální) -->
+        <div id="ares-lookup-container" style="padding: 10px 15px; background: #fffbeb; border-top: 1px solid #fef08a; border-bottom: 1px solid #fef08a; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 9px; font-weight: 800; color: #b45309; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
+                <span>🔍</span> LUSTRACE SUBJEKTU (ARES & ISIR)
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <input type="text" id="ares-ico-input" placeholder="Zadejte IČO..." style="flex: 1; padding: 5px; font-size: 11px; border: 1px solid #fcd34d; border-radius: 4px; background: white;" onkeydown="if(event.key==='Enter') window.lexisUI.insertAresData()">
+                <button onclick="window.lexisUI.insertAresData()" style="padding: 5px 10px; font-size: 10px; font-weight: 700; color: white; background: #d97706; border: none; border-radius: 4px; cursor: pointer; transition: background 0.2s;">Ověřit</button>
+            </div>
+        </div>
+
+        <!-- AI Input Area -->
+        <div id="ai-input-container" style="padding: 15px; border-top: 1px solid #eee; display: flex; gap: 8px;">
+            <input type="text" id="ai-prompt" placeholder="Zeptejte se AI..." 
+                   style="flex-grow: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+            <button onclick="sendAIQuery()" style="background: var(--word-blue); color: white; border: none; padding: 0 12px; border-radius: 4px; cursor: pointer;">
+                ➤
+            </button>
+        </div>
+        <div style="padding: 0 15px 10px; font-size: 10px; color: #94a3b8; line-height: 1.4;">
+            ⚠️ Výstupy AI jsou orientační pomůcka, <b>ne právní rada</b>. Před použitím vždy ověřte fakta, citace i lhůty.
+        </div>
+
+        <!-- Action Buttons (Conditional) -->
+        <div id="ai-actions" style="padding: 0 15px 15px 15px; display: none; gap: 8px; flex-wrap: wrap;">
+            <!-- Will be populated by JS -->
+        </div>
+        
+        <style>
+            .ai-tab { flex: 1; padding: 10px; text-align: center; font-size: 11px; font-weight: 700; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; text-transform: uppercase; }
+            .ai-tab.active { color: var(--word-blue); border-bottom: 2px solid var(--word-blue); background: white; }
+            .ai-tab:hover:not(.active) { background: #f1f5f9; }
+
+            .main-sidebar-tab { flex: 1; padding: 12px; text-align: center; font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.7); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
+            .main-sidebar-tab.active { color: white; border-bottom: 3px solid var(--accent); background: rgba(255,255,255,0.1); }
+            .main-sidebar-tab:hover:not(.active) { color: white; background: rgba(255,255,255,0.05); }
+
+            .clause-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; cursor: pointer; transition: all 0.2s; position: relative; }
+            .clause-item:hover { border-color: var(--word-blue); background: #f1f5f9; transform: translateX(3px); }
+            .clause-text-preview { font-size: 11px; color: #475569; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; margin-bottom: 5px; }
+            .clause-meta { font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 700; }
+            .clause-delete { position: absolute; top: 5px; right: 5px; color: #ef4444; font-size: 14px; display: none; }
+            .clause-item:hover .clause-delete { display: block; }
+        </style>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-group">
+            <span id="page-count">Strana 1 z 1</span>
+        </div>
+        <div class="status-divider">|</div>
+        <div class="status-group" id="status-words-group">
+            <span data-i18n="status_words">Slova:</span> <span id="word-cnt">0</span>
+            <span class="status-subdivider">|</span>
+            <span data-i18n="status_chars">Znaky:</span> <span id="char-cnt">0</span>
+            <span class="status-subdivider">|</span>
+            <span class="status-ns-label"><span data-i18n="status_ns">Normostrany:</span> <span id="ns-cnt">0.00</span></span>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <div id="update-status" style="margin-right:15px; font-weight:bold; color:#3b82f6; display:none; cursor:pointer; padding:2px 8px; border-radius:4px;"></div>
+        <div id="app-version-status" style="margin-right:15px; font-size:11px; color:#64748b;">LexisEditor <span id="dynamic-ver">...</span></div>
+        <div class="status-group" id="status-ai-group"><span>✨ AI: Aktivní</span></div>
+        <div class="status-group" id="status-save-group"><span id="save-status">✓ Uloženo</span></div>
+        <div class="status-group" id="status-sync-group">
+            <span id="sync-status" style="margin-left: 15px; color: #10b981; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;" onclick="lexisUI.triggerCloudSync()" title="Data jsou uložena šifrovaně lokálně na tomto počítači">
+                <span id="sync-icon">💾</span> <span id="sync-text">Uloženo lokálně</span>
+            </span>
+        </div>
+    </div>
+
+    </div> <!-- Konec app-container -->
+
+    <!-- SDK & UI Modules -->
+    <script src="js/core/lexis-edition.js"></script>
+    <script src="js/core/lexis-legal-calc.js"></script>
+    <script src="js/core/lexis-legal-docs.js"></script>
+    <script src="js/core/lexis-legal-linker.js"></script>
+    <script src="js/core/lexis-validators.js"></script>
+    <script src="js/providers/ai-provider.js"></script>
+    <script src="js/core/court-data.js"></script>
+    <script src="js/core/court-registry.js"></script>
+    <script src="js/core/lexis-contacts.js"></script>
+    <script src="js/core/lexis-mail-draft.js"></script>
+    <script src="js/core/lexis-merge.js"></script>
+    <script src="js/core/lexis-storage.js"></script>
+    <script src="js/core/lexis-core.js"></script>
+    <script src="js/ui/lexis-ui.js"></script>
+    <script src="js/ui/lexis-ui-1.js"></script>
+    <script src="js/ui/lexis-ui-2.js"></script>
+    <script src="js/ui/lexis-ui-3.js"></script>
+    <script src="js/ui/lexis-ui-4.js"></script>
+    <script src="js/ui/lexis-ui-5.js"></script>
+    <script src="js/ui/lexis-ui-6.js"></script>
+    <script src="js/ui/lexis-dialogs.js"></script>
+    <script src="js/core/lexis-calendar.js"></script>
+    <script src="js/ui/lexis-actions.js"></script>
+    <script src="js/ui/lexis-datovka.js"></script>
+    <script src="js/ui/lexis-reply.js"></script>
+    <script src="js/ui/lexis-reply-inbox.js"></script>
+    <script src="js/ui/lexis-parties.js"></script>
+    <script src="js/ui/lexis-letterhead.js"></script>
+    <script src="js/ui/lexis-isds-settings.js"></script>
+    <script src="js/ui/lexis-keybackup.js"></script>
+    <script src="js/ui/lexis-feedback.js"></script>
+    <script src="js/ui/lexis-find-replace.js"></script>
+    <script src="js/ui/lexis-forward-client.js"></script>
+    <script src="js/ui/lexis-mail-client.js"></script>
+
+    <script src="js/renderer-bootstrap.js"></script>
+
+    <!-- Floating Exit Button for Reading Mode -->
+    <div id="reading-mode-exit-btn" onclick="setViewMode('normal')">
+        <span>✕</span> <span>Ukončit режim čtení</span>
+    </div>
+
+    <!-- Header / Footer Editor Modal -->
+    <div id="hf-modal-overlay" class="hf-modal-overlay" style="display:none;" onclick="if(event.target===this)lexisUI.closeHFModal()">
+        <div class="hf-modal">
+            <div class="hf-modal-header">
+                <span style="font-size:20px;">🔼</span>
+                <h3 id="hf-modal-title">Editor záhlaví</h3>
+                <div class="hf-modal-close" onclick="lexisUI.closeHFModal()">✕</div>
+            </div>
+            <div class="hf-modal-tabs">
+                <div class="hf-modal-tab active" id="hf-tab-layout" onclick="lexisUI.switchHFTab('layout')">📐 Rozložení</div>
+                <div class="hf-modal-tab" id="hf-tab-style" onclick="lexisUI.switchHFTab('style')">🎨 Styl</div>
+                <div class="hf-modal-tab" id="hf-tab-templates" onclick="lexisUI.switchHFTab('templates')">📋 Šablony</div>
+            </div>
+            <div class="hf-modal-body">
+                <!-- Tab: Rozložení -->
+                <div id="hf-panel-layout">
+                    <div class="hf-preview-label">Tři sloupce záhlaví</div>
+                    <div class="hf-columns">
+                        <div class="hf-col">
+                            <div class="hf-col-label">⬅ Vlevo</div>
+                            <textarea class="hf-col-textarea" id="hf-left" placeholder="Název firmy&#10;Adresa&#10;IČO: 123456" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('left')">
+                                🖼️ Vložit logo
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-left" />
+                        </div>
+                        <div class="hf-col">
+                            <div class="hf-col-label">⬌ Střed</div>
+                            <textarea class="hf-col-textarea" id="hf-center" placeholder="Nadpis dokumentu&#10;nebo prázdné" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('center')">
+                                🖼️ Vložit obrázek
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-center" />
+                        </div>
+                        <div class="hf-col">
+                            <div class="hf-col-label">➡ Vpravo</div>
+                            <textarea class="hf-col-textarea" id="hf-right" placeholder="Č.j.: 2025/001&#10;Datum: {DATUM}&#10;Strana: {STRANA}" oninput="lexisUI.updateHFPreview()"></textarea>
+                            <div class="hf-img-btn" onclick="lexisUI.pickHFImage('right')">
+                                🖼️ Vložit obrázek
+                            </div>
+                            <img class="hf-img-preview" id="hf-img-right" />
+                        </div>
+                    </div>
+
+                    <div class="hf-options-row">
+                        <label class="hf-option-label">
+                            <input type="checkbox" id="hf-show-line" checked onchange="lexisUI.updateHFPreview()"> Čára pod záhlavím
+                        </label>
+                        <label class="hf-option-label">
+                            Výška:
+                            <select class="hf-select" id="hf-height" onchange="lexisUI.updateHFPreview()">
+                                <option value="normal">Normální</option>
+                                <option value="compact">Kompaktní</option>
+                                <option value="tall">Vysoké</option>
+                            </select>
+                        </label>
+                        <label class="hf-option-label">
+                            Velikost písma:
+                            <select class="hf-select" id="hf-fontsize" onchange="lexisUI.updateHFPreview()">
+                                <option value="10px">Malé (10px)</option>
+                                <option value="11px" selected>Normální (11px)</option>
+                                <option value="13px">Větší (13px)</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="hf-live-preview">
+                        <div class="hf-live-preview-label">Živý náhled</div>
+                        <div class="hf-live-preview-content" id="hf-preview-content">
+                            <div id="hf-preview-left">—</div>
+                            <div id="hf-preview-center">—</div>
+                            <div id="hf-preview-right">—</div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:11px; color:#94a3b8; background:#f8fafc; border-radius:8px; padding:10px 14px;">
+                        💡 <b>Proměnné:</b> <code>{DATUM}</code> = dnešní datum, <code>{STRANA}</code> = číslo stránky, <code>{TITULEK}</code> = název dokumentu
+                    </div>
+                </div>
+
+                <!-- Tab: Styl -->
+                <div id="hf-panel-style" style="display:none;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px;">
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva pozadí záhlaví:
+                            <input type="color" id="hf-bg-color" value="#ffffff" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva textu:
+                            <input type="color" id="hf-text-color" value="#334155" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Barva čáry:
+                            <input type="color" id="hf-line-color" value="#cbd5e1" style="width:60px; height:32px; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer;" onchange="lexisUI.updateHFPreview()">
+                        </label>
+                        <label class="hf-option-label" style="flex-direction:column; align-items:flex-start; gap:6px;">
+                            Rodina písma:
+                            <select class="hf-select" id="hf-font-family" onchange="lexisUI.updateHFPreview()">
+                                <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                                <option value="'Times New Roman', serif">Times New Roman</option>
+                                <option value="Arial, sans-serif">Arial</option>
+                                <option value="'Calibri', sans-serif">Calibri</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Tab: Šablony -->
+                <div id="hf-panel-templates" style="display:none;">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px;" id="hf-templates-grid">
+                        <div onclick="lexisUI.applyHFTemplate('advokatura')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">⚖️</div>
+                            <div style="font-weight:700; font-size:13px;">Advokátní kancelář</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Název AK vlevo, č.j. a datum vpravo</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('urad')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">🏛️</div>
+                            <div style="font-weight:700; font-size:13px;">Úřední dokument</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Logo vlevo, název uprostřed, datum vpravo</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('soud')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">⚔️</div>
+                            <div style="font-weight:700; font-size:13px;">Soudní podání</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Sp. zn. vlevo, soud uprostřed</div>
+                        </div>
+                        <div onclick="lexisUI.applyHFTemplate('smlouva')" style="border:2px solid #e2e8f0; border-radius:12px; padding:16px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#3b82f6'" onmouseout="this.style.borderColor='#e2e8f0'">
+                            <div style="font-size:20px; margin-bottom:8px;">📝</div>
+                            <div style="font-weight:700; font-size:13px;">Smlouva</div>
+                            <div style="font-size:11px; color:#64748b; margin-top:4px;">Čistý styl bez záhlaví, jen číslo strany</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="hf-modal-footer">
+                <button class="hf-btn hf-btn-secondary" onclick="lexisUI.closeHFModal()">Zrušit</button>
+                <button class="hf-btn hf-btn-save-tpl" onclick="lexisUI.saveHFAsTemplate()">💾 Uložit jako šablonu</button>
+                <button class="hf-btn hf-btn-primary" onclick="lexisUI.applyHFChanges()">✅ Použít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Wizard Modal -->
+    <div id="campaign-overlay" class="campaign-overlay" style="display:none;" onclick="if(event.target===this)lexisUI.closeCampaign()">
+        <div class="campaign-modal">
+            <div class="campaign-header">
+                <span style="font-size:24px;">📨</span>
+                <div>
+                    <h3>Hromadná kampaň (Mail Merge)</h3>
+                    <div style="font-size:12px; opacity:0.75; margin-top:2px;">Odeslání dokumentu na více adresátů najednou</div>
+                </div>
+                <div class="campaign-header-close" onclick="lexisUI.closeCampaign()">✕</div>
+            </div>
+
+            <!-- Stepper -->
+            <div class="campaign-stepper">
+                <div class="campaign-step active" id="cstep-1">
+                    <div class="campaign-step-num">1</div>
+                    <div class="campaign-step-label">Proměnné</div>
+                </div>
+                <div class="campaign-step-line" id="cline-1"></div>
+                <div class="campaign-step" id="cstep-2">
+                    <div class="campaign-step-num">2</div>
+                    <div class="campaign-step-label">Adresáti</div>
+                </div>
+                <div class="campaign-step-line" id="cline-2"></div>
+                <div class="campaign-step" id="cstep-3">
+                    <div class="campaign-step-num">3</div>
+                    <div class="campaign-step-label">Náhled</div>
+                </div>
+                <div class="campaign-step-line" id="cline-3"></div>
+                <div class="campaign-step" id="cstep-4">
+                    <div class="campaign-step-num">4</div>
+                    <div class="campaign-step-label">Odeslání</div>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="campaign-body" id="campaign-body"><!-- rendered by JS --></div>
+
+            <!-- Footer -->
+            <div class="campaign-footer">
+                <div style="font-size:12px; color:#64748b;" id="campaign-footer-info">Krok 1 ze 4</div>
+                <div class="campaign-footer-right">
+                    <button class="campaign-btn campaign-btn-back" id="campaign-btn-back" onclick="lexisUI.campaignBack()" style="display:none;">← Zpět</button>
+                    <button class="campaign-btn campaign-btn-next" id="campaign-btn-next" onclick="lexisUI.campaignNext()">Další →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden image pickers for HF editor -->
+    <input type="file" id="hf-img-input-left" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('left', this)">
+    <input type="file" id="hf-img-input-center" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('center', this)">
+    <input type="file" id="hf-img-input-right" accept="image/*" style="display:none" onchange="lexisUI.onHFImagePicked('right', this)">
+    <!-- Hidden CSV picker for campaign -->
+    <input type="file" id="campaign-csv-input" accept=".csv,.txt" style="display:none" onchange="lexisUI.onCampaignCsvPicked(this)">
+    <!-- Hidden CSV picker for contacts bulk import -->
+    <input type="file" id="contacts-csv-input" accept=".csv,.txt" style="display:none" onchange="lexisUI.onContactsCsvPicked(this)">
+
+    <!-- =============================================
+         ADRESÁŘ KONTAKTŮ
+         ============================================= -->
+    <div id="contacts-modal-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.6);backdrop-filter:blur(8px);z-index:20000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lexisUI.closeContacts()">
+        <div style="background:white;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,0.25);width:1000px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#0f172a,#1e293b);color:white;padding:20px 28px;display:flex;align-items:center;gap:14px;">
+                <span style="font-size:26px;">📒</span>
+                <div style="flex-grow:1;">
+                    <div style="font-size:17px;font-weight:800;letter-spacing:-0.3px;">Adresář kontaktů</div>
+                    <div style="font-size:11px;opacity:0.6;margin-top:2px;">Správa příjemců, klientů a institucxí</div>
+                </div>
+                <button onclick="document.getElementById('contacts-csv-input').click()" style="padding:8px 16px;border-radius:8px;background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">📅 Hromadný import CSV</button>
+                <button onclick="lexisUI.openContactForm()" style="padding:8px 16px;border-radius:8px;background:#10b981;color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;margin-right:8px;">+ Nový kontakt</button>
+                <button onclick="lexisUI.closeContacts()" style="background:transparent;border:none;color:rgba(255,255,255,0.6);font-size:22px;cursor:pointer;line-height:1;">&#x2715;</button>
+            </div>
+
+            <!-- Toolbar -->
+            <div style="padding:14px 24px;border-bottom:1px solid #e2e8f0;display:flex;gap:10px;align-items:center;background:#f8fafc;flex-wrap:wrap;">
+                <div class="court-search-box" style="flex:1;min-width:200px;margin-bottom:0;">
+                    <input type="text" class="court-search-input" id="contacts-search" placeholder="🔍 Hledat kontakt..." oninput="lexisUI.renderContactsList()">
+                </div>
+                <div id="contacts-group-filter" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+                <select id="contacts-type-filter" onchange="lexisUI.renderContactsList()" style="padding:7px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;cursor:pointer;">
+                    <option value="">Všechny typy</option>
+                    <option value="fyzicka">Fyzické osoby</option>
+                    <option value="pravnicka">Právnické osoby</option>
+                    <option value="organ">Orgány / Úřady</option>
+                    <option value="soud">Soudy</option>
+                </select>
+            </div>
+
+            <!-- Table -->
+            <div style="flex:1;overflow:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:#f1f5f9;position:sticky;top:0;z-index:1;">
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Jméno / Název</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Adresa</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Datová schránka</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">E-mail / Tel</th>
+                            <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Skupiny</th>
+                            <th style="padding:10px 16px;text-align:center;font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;border-bottom:2px solid #e2e8f0;">Akce</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contacts-table-body">
+                        <tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">⏳ Načítám kontakty...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding:14px 24px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;justify-content:space-between;align-items:center;">
+                <div id="contacts-count" style="font-size:12px;color:#64748b;"></div>
+                <button onclick="lexisUI.closeContacts()" style="padding:9px 22px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:13px;font-weight:600;cursor:pointer;color:#334155;">Zavřít</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORMULÁŘ nového / editovaného kontaktu -->
+    <div id="contact-form-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(8px);z-index:21000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lexisUI.closeContactForm()">
+        <div style="background:white;border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,0.25);width:560px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.25s ease;">
+            <div style="background:linear-gradient(135deg,#10b981,#059669);color:white;padding:18px 24px;display:flex;align-items:center;gap:12px;">
+                <span style="font-size:22px;">📝</span>
+                <h3 id="contact-form-title" style="font-size:16px;font-weight:800;flex-grow:1;margin:0;">Nový kontakt</h3>
+                <button onclick="lexisUI.closeContactForm()" style="background:transparent;border:none;color:rgba(255,255,255,0.7);font-size:20px;cursor:pointer;">&#x2715;</button>
+            </div>
+            <div style="padding:22px 24px;overflow-y:auto;flex-grow:1;">
+                <input type="hidden" id="cf-id">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">JMÉNO / NÁZEV *</label>
+                        <input type="text" id="cf-jmeno" placeholder="JUDr. Jan Novák / Advokátní kancelář ..." style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">TYP</label>
+                        <select id="cf-typ" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white;">
+                            <option value="fyzicka">Fyzická osoba</option>
+                            <option value="pravnicka">Právnická osoba</option>
+                            <option value="organ">Úřad / Orgán</option>
+                            <option value="soud">Soud</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">ÍČO</label>
+                        <input type="text" id="cf-ic" placeholder="12345678" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">ADRESA (ulice, č.p.)</label>
+                        <input type="text" id="cf-adresa" placeholder="Václavské náměstí 1" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">MĚSTO</label>
+                        <input type="text" id="cf-mesto" placeholder="Praha 1" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">PSČ</label>
+                        <input type="text" id="cf-psc" placeholder="110 00" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">DATOVÁ SCHRÁNKA (ID)</label>
+                        <input type="text" id="cf-isds" placeholder="abc123x" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;font-family:monospace;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">E-MAIL</label>
+                        <input type="email" id="cf-email" placeholder="novak@ak.cz" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">TELEFON</label>
+                        <input type="tel" id="cf-tel" placeholder="+420 777 123 456" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">SKUPINY (oddělené čárkou)</label>
+                        <input type="text" id="cf-skupiny" placeholder="klienti, soudy, protistrany" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="grid-column:1/-1;">
+                        <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">POZNÁMKA</label>
+                        <textarea id="cf-poznamka" rows="2" placeholder="Volné pole..." style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;resize:vertical;box-sizing:border-box;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div style="padding:16px 24px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="lexisUI.closeContactForm()" style="padding:9px 20px;border-radius:8px;background:white;border:1px solid #e2e8f0;font-size:13px;font-weight:600;cursor:pointer;color:#334155;">Zrušit</button>
+                <button onclick="lexisUI.saveContactForm()" style="padding:9px 22px;border-radius:8px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">✅ Uložit kontakt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================
+         LOCK SCREEN — Obrazovka zámku
+         ============================================= -->
+    <div id="lock-screen" style="position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 40%,#0f172a 100%);"></div>
+        <div style="position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%);top:-100px;left:-100px;animation:orbFloat1 8s ease-in-out infinite;"></div>
+        <div style="position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,0.1) 0%,transparent 70%);bottom:-80px;right:-80px;animation:orbFloat2 10s ease-in-out infinite;"></div>
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:24px;animation:slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1);">
+            <div style="text-align:center;">
+                <div style="width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 14px;box-shadow:0 12px 40px rgba(99,102,241,0.4);">⚖️</div>
+                <div style="font-size:24px;font-weight:900;color:white;letter-spacing:-0.5px;">LexisEditor</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.45);margin-top:4px;">Aplikace je uzamčena</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.06);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:32px 36px;width:340px;display:flex;flex-direction:column;gap:18px;box-shadow:0 24px 60px rgba(0,0,0,0.4);">
+                <div id="lock-touchid-section" style="display:none;text-align:center;">
+                    <button id="lock-touchid-btn" onclick="lockScreen.tryTouchId()"
+                        style="width:80px;height:80px;border-radius:50%;border:2px solid rgba(99,102,241,0.5);background:rgba(99,102,241,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:38px;margin:0 auto 12px;transition:all 0.3s;">
+                        <span id="lock-touchid-icon">👆</span>
+                    </button>
+                    <div id="lock-touchid-label" style="font-size:13px;color:rgba(255,255,255,0.7);">Touch ID</div>
+                    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;">
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></div>
+                        <div style="font-size:11px;color:rgba(255,255,255,0.3);">nebo</div>
+                        <div style="flex:1;height:1px;background:rgba(255,255,255,0.12);"></div>
+                    </div>
+                </div>
+                <div id="lock-password-section">
+                    <label style="display:block;font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.5px;margin-bottom:8px;">HESLO / PIN</label>
+                    <div style="position:relative;">
+                        <input type="password" id="lock-password-input" placeholder="Zadejte heslo..." maxlength="64"
+                            style="width:100%;padding:12px 44px 12px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:white;font-size:15px;outline:none;transition:border-color 0.2s;box-sizing:border-box;letter-spacing:2px;"
+                            onkeydown="if(event.key==='Enter')lockScreen.tryPassword()"
+                            onfocus="this.style.borderColor='rgba(99,102,241,0.7)'"
+                            onblur="this.style.borderColor='rgba(255,255,255,0.15)'">
+                        <button onclick="lockScreen.togglePasswordVisibility()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer;padding:0;">👁</button>
+                    </div>
+                    <div id="lock-error-msg" style="font-size:12px;color:#f87171;margin-top:6px;display:none;text-align:center;">❌ Nesprávné heslo</div>
+                </div>
+                <button id="lock-unlock-btn" onclick="lockScreen.tryPassword()"
+                    style="padding:13px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;font-size:14px;font-weight:800;cursor:pointer;transition:all 0.2s;box-shadow:0 6px 20px rgba(99,102,241,0.35);"
+                    onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">
+                    🔓 Odemknout
+                </button>
+                <div id="lock-attempts" style="text-align:center;font-size:11px;color:rgba(255,255,255,0.3);display:none;"></div>
+            </div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.2);margin-top:4px;">LexisEditor · Bezpečný přístup</div>
+        </div>
+    </div>
+
+    <!-- NASTAVENÍ ZABEZPEČENÍ -->
+    <div id="security-settings-overlay" style="position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(8px);z-index:20000;display:none;align-items:center;justify-content:center;" onclick="if(event.target===this)lockScreen.closeSecuritySettings()">
+        <div style="background:white;border-radius:20px;box-shadow:0 30px 70px rgba(0,0,0,0.3);width:500px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+            <div style="background:linear-gradient(135deg,#0f172a,#1e1b4b);color:white;padding:20px 24px;display:flex;align-items:center;gap:14px;">
+                <span style="font-size:24px;">🔐</span>
+                <div style="flex-grow:1;">
+                    <div style="font-size:16px;font-weight:800;">Zabezpečení aplikace</div>
+                    <div style="font-size:11px;opacity:0.55;margin-top:2px;">Zámek, Touch ID a správa přístupu</div>
+                </div>
+                <button onclick="lockScreen.closeSecuritySettings()" style="background:transparent;border:none;color:rgba(255,255,255,0.6);font-size:20px;cursor:pointer;">&#x2715;</button>
+            </div>
+            <div style="padding:24px;overflow-y:auto;flex-grow:1;display:flex;flex-direction:column;gap:20px;">
+                <!-- Master toggle -->
+                <div style="display:flex;align-items:center;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;">
+                    <div style="flex-grow:1;">
+                        <div style="font-size:14px;font-weight:700;color:#0f172a;">Zámek aplikace</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:2px;">Vyžadovat ověření při spuštění aplikace</div>
+                    </div>
+                    <label class="security-toggle">
+                        <input type="checkbox" id="sec-lock-enabled" onchange="lockScreen.onLockToggle(this.checked)" style="opacity:0;width:0;height:0;">
+                        <span class="security-toggle-slider"></span>
+                    </label>
+                </div>
+                <!-- Settings body -->
+                <div id="sec-settings-body" style="display:none;flex-direction:column;gap:16px;">
+                    <!-- Touch ID row -->
+                    <div id="sec-touchid-row" style="display:none;padding:14px 16px;background:#f0fdf4;border-radius:12px;border:1.5px solid #86efac;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <span style="font-size:24px;">👆</span>
+                            <div style="flex-grow:1;">
+                                <div id="sec-touchid-title" style="font-size:13px;font-weight:700;color:#065f46;">Touch ID</div>
+                                <div id="sec-touchid-status" style="font-size:11px;color:#059669;margin-top:2px;">Detekuji dostupnost...</div>
+                            </div>
+                            <label class="security-toggle">
+                                <input type="checkbox" id="sec-touchid-enabled" onchange="lockScreen.onTouchIdToggle(this.checked)" style="opacity:0;width:0;height:0;">
+                                <span class="security-toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Password section -->
+                    <div style="padding:16px;background:#f8fafc;border-radius:12px;border:1.5px solid #e2e8f0;">
+                        <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:12px;">🔑 Heslo / PIN</div>
+                        <div id="sec-has-password" style="display:none;margin-bottom:10px;padding:8px 12px;background:#eff6ff;border-radius:8px;font-size:12px;color:#2563eb;">✅ Heslo je nastaveno. Pro změnu zadejte nové.</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">NOVÉ HESLO</label>
+                                <input type="password" id="sec-new-password" placeholder="Minimálně 4 znaky..." maxlength="64"
+                                    style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:11px;font-weight:700;color:#64748b;margin-bottom:5px;">POTVRDIT HESLO</label>
+                                <input type="password" id="sec-confirm-password" placeholder="Opakujte heslo..." maxlength="64"
+                                    style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                            </div>
+                            <div id="sec-password-hint" style="font-size:11px;color:#94a3b8;"></div>
+                            <button onclick="lockScreen.savePassword()"
+                                style="padding:9px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">💾 Nastavit heslo</button>
+                        </div>
+                    </div>
+                    <!-- Lock now -->
+                    <button onclick="lockScreen.lockNow()" style="padding:11px;border-radius:10px;background:linear-gradient(135deg,#0f172a,#1e1b4b);color:white;border:none;font-size:13px;font-weight:700;cursor:pointer;">🔒 Zamknout nyní</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        @keyframes orbFloat1 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(40px,30px) scale(1.05);} }
+        @keyframes orbFloat2 { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-30px,-40px) scale(1.08);} }
+        .security-toggle { position:relative;display:inline-block;width:48px;height:26px;cursor:pointer; }
+        .security-toggle input { opacity:0;width:0;height:0; }
+        .security-toggle-slider { position:absolute;inset:0;background:#e2e8f0;border-radius:20px;transition:0.3s; }
+        .security-toggle-slider:before { content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.15); }
+        input:checked + .security-toggle-slider { background:linear-gradient(135deg,#6366f1,#8b5cf6); }
+        input:checked + .security-toggle-slider:before { transform:translateX(22px); }
+        #lock-password-input::placeholder { letter-spacing:0;color:rgba(255,255,255,0.3); }
+        #lock-touchid-btn:hover { background:rgba(99,102,241,0.2)!important; }
+        #lock-touchid-btn.scanning { animation:touchPulse 1s ease-in-out infinite; }
+        @keyframes touchPulse { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,0.4);} 50%{box-shadow:0 0 0 16px rgba(99,102,241,0);} }
+        #lock-touchid-btn.success { background:rgba(16,185,129,0.2)!important;border-color:rgba(16,185,129,0.6)!important; }
+        #lock-touchid-btn.error { background:rgba(239,68,68,0.15)!important;border-color:rgba(239,68,68,0.5)!important;animation:shake 0.4s ease; }
+        @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 60%{transform:translateX(8px);} }
+    </style>
+
+    <script src="js/ui/lexis-lock.js"></script>
+
+</body>
+</html>
+

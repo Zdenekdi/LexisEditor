@@ -79,7 +79,7 @@
             : identity;
 
         return `
-<table style="width:100%; border-collapse:collapse; font-family:'Times New Roman', serif; border-bottom:1px solid #cbd5e1;">
+<table style="width:100%; border-collapse:collapse; font-family:'Times New Roman', serif; border-bottom:1px solid #ddd6cb;">
     <tr>
         <td style="vertical-align:top; padding-bottom:6px;">${leftCell}</td>
         <td style="vertical-align:top; text-align:right; font-size:8.5pt; color:#333; line-height:1.45; padding-bottom:6px;">

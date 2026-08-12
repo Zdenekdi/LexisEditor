@@ -6,12 +6,12 @@ Object.assign(LexisUI.prototype, {
         const container = document.getElementById('contacts-group-filter');
         if (!container) return;
         const groups = await this._getContacts().getGroups();
-        container.innerHTML = groups.map(g => `
+        container.innerHTML = eIco(groups.map(g => `
             <div class="court-type-chip ${this._contactsActiveGroup === g ? 'active' : ''}"
                 onclick="lexisUI._toggleContactGroup('${g}')">
                 ${this._esc(g)}
             </div>
-        `).join('');
+        `).join(''));
     },
 
     _toggleContactGroup(group) {
@@ -204,37 +204,37 @@ Object.assign(LexisUI.prototype, {
         const text = this.core.getText();
         const varMatches = [...new Set([...text.matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1]))];
         const hasVars = varMatches.length > 0;
-        body.innerHTML = `
+        body.innerHTML = eIco(`
             <div class="${hasVars ? 'campaign-info-box' : 'campaign-warn-box'}">
                 ${hasVars
                     ? `✅ <b>Nalezeno ${varMatches.length} proměnných</b> v dokumentu.`
                     : `⚠️ <b>Žádné proměnné nenalezeny.</b> Přidejte <code>{{JménoProměnné}}</code>, nebo kampaň pošle stejný dokument všem.`
                 }
             </div>
-            <p style="font-size:13px;color:#334155;margin-bottom:14px;">
-                Proměnné se zapisují jako <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{NazevPromenné}}</code>.<br>
-                Pro soudy jsou automaticky dostupné: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{NazevSoudu}}</code>, 
-                <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{AdresaSoudu}}</code>, 
-                <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">{{MestoPSC}}</code>.
+            <p style="font-size:13px;color:var(--text-2);margin-bottom:14px;">
+                Proměnné se zapisují jako <code style="background:var(--bg-workspace);padding:2px 6px;border-radius:4px;">{{NazevPromenné}}</code>.<br>
+                Pro soudy jsou automaticky dostupné: <code style="background:var(--bg-workspace);padding:2px 6px;border-radius:4px;">{{NazevSoudu}}</code>, 
+                <code style="background:var(--bg-workspace);padding:2px 6px;border-radius:4px;">{{AdresaSoudu}}</code>, 
+                <code style="background:var(--bg-workspace);padding:2px 6px;border-radius:4px;">{{MestoPSC}}</code>.
             </p>
             <div class="campaign-vars-grid">
                 ${varMatches.map(v => `<div class="campaign-var-chip">{{${this._esc(v)}}}</div>`).join('')}
-                ${varMatches.length === 0 ? '<div style="font-size:12px;color:#94a3b8;">Žádné proměnné.</div>' : ''}
+                ${varMatches.length === 0 ? '<div style="font-size:12px;color:var(--text-faint);">Žádné proměnné.</div>' : ''}
             </div>
-        `;
+        `);
     },
 
     async _renderCampaignStep2(body) {
         const mode = this._campaignRecipientMode;
 
-        body.innerHTML = `
+        body.innerHTML = eIco(`
             <div class="campaign-mode-switcher">
                 <button class="campaign-mode-btn ${mode === 'courts' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('courts')">🏛️ Soudy</button>
                 <button class="campaign-mode-btn ${mode === 'contacts' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('contacts')">👥 Adresář</button>
                 <button class="campaign-mode-btn ${mode === 'csv' ? 'active' : ''}" onclick="lexisUI._setCampaignMode('csv')">📋 CSV / Ručně</button>
             </div>
             <div id="campaign-recipient-body"></div>
-        `;
+        `);
 
         if (mode === 'courts') await this._renderCourtsSelector();
         else if (mode === 'contacts') await this._renderContactsSelector();
@@ -273,7 +273,7 @@ Object.assign(LexisUI.prototype, {
 
         const selCount = this._selectedCourts.size;
 
-        container.innerHTML = `
+        container.innerHTML = eIco(`
             <div class="sp-zn-hint">
                 💡 Vyberte soudy, na které chcete podat. Dokument bude pro každý soud vygenerován zvlášť s vyplněnými proměnnými soudu.
             </div>
@@ -304,7 +304,7 @@ Object.assign(LexisUI.prototype, {
                         </div>
                     `).join('')}
                 `).join('')}
-                ${filtered.length === 0 ? '<div style="padding:24px;text-align:center;color:#94a3b8;">Žádné soudy nenalezeny.</div>' : ''}
+                ${filtered.length === 0 ? '<div style="padding:24px;text-align:center;color:var(--text-faint);">Žádné soudy nenalezeny.</div>' : ''}
             </div>
             <div class="court-selected-tags" id="court-selected-tags">
                 ${[...this._selectedCourts].map(name => `
@@ -314,7 +314,7 @@ Object.assign(LexisUI.prototype, {
                     </div>
                 `).join('')}
             </div>
-        `;
+        `);
     },
 
     _onCourtSearch(val) {
@@ -361,7 +361,7 @@ Object.assign(LexisUI.prototype, {
 
         const selCount = this._selectedContacts.size;
 
-        container.innerHTML = `
+        container.innerHTML = eIco(`
             <div class="sp-zn-hint">
                 💡 Vyberte kontakty z adresáře. Proměnné <code>{{Jmeno}}</code>, <code>{{Adresa}}</code>, <code>{{ISDS}}</code>, <code>{{Email}}</code> budou automaticky doplněny.
             </div>
@@ -369,7 +369,7 @@ Object.assign(LexisUI.prototype, {
                 <div class="court-search-box" style="flex:1;min-width:180px;margin-bottom:0;">
                     <input type="text" class="court-search-input" placeholder="🔍 Hledat..." value="${this._esc(search)}" oninput="lexisUI._onContactsCampaignSearch(this.value)">
                 </div>
-                <select onchange="lexisUI._onContactsCampaignType(this.value)" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;">
+                <select onchange="lexisUI._onContactsCampaignType(this.value)" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);">
                     <option value="">Všechny typy</option>
                     <option value="fyzicka">Fyzické osoby</option>
                     <option value="pravnicka">Právnické osoby</option>
@@ -377,7 +377,7 @@ Object.assign(LexisUI.prototype, {
                     <option value="soud">Soudy</option>
                 </select>
                 ${groups.length > 0 ? `
-                <select onchange="lexisUI._onContactsCampaignGroup(this.value)" style="padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;background:white;">
+                <select onchange="lexisUI._onContactsCampaignGroup(this.value)" style="padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;background:var(--surface);">
                     <option value="">Všechny skupiny</option>
                     ${groups.map(g => `<option value="${this._esc(g)}" ${groupFilter === g ? 'selected' : ''}>${this._esc(g)}</option>`).join('')}
                 </select>` : ''}
@@ -390,17 +390,17 @@ Object.assign(LexisUI.prototype, {
                     ${selCount > 0 ? `<div class="court-count-badge">${selCount} vybráno</div>` : ''}
                 </div>
                 ${filtered.length === 0
-                    ? `<div style="padding:30px;text-align:center;color:#94a3b8;">
-                        📭 Žádné kontakty. <span onclick="lexisUI.openContacts()" style="color:#2563eb;cursor:pointer;font-weight:700;">Přidat kontakty do adresáře →</span>
+                    ? `<div style="padding:30px;text-align:center;color:var(--text-faint);">
+                        📭 Žádné kontakty. <span onclick="lexisUI.openContacts()" style="color:var(--accent-text);cursor:pointer;font-weight:700;">Přidat kontakty do adresáře →</span>
                        </div>`
                     : filtered.map(c => `
                         <div class="court-list-item ${this._selectedContacts.has(c.id) ? 'selected' : ''}" onclick="lexisUI._toggleContact('${c.id}')">
                             <input type="checkbox" ${this._selectedContacts.has(c.id) ? 'checked' : ''} onclick="event.stopPropagation();lexisUI._toggleContact('${c.id}')">
                             <span class="court-list-item-name">
                                 <b>${this._esc(c.jmeno)}</b>
-                                ${c.adresa ? `<span style="font-size:11px;color:#94a3b8;margin-left:8px;">${this._esc(c.adresa)}, ${this._esc(c.mesto || '')}</span>` : ''}
+                                ${c.adresa ? `<span style="font-size:11px;color:var(--text-faint);margin-left:8px;">${this._esc(c.adresa)}, ${this._esc(c.mesto || '')}</span>` : ''}
                             </span>
-                            ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:#cbd5e1;">bez DS</span>'}
+                            ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:var(--border-strong);">bez DS</span>'}
                         </div>
                     `).join('')
                 }
@@ -411,9 +411,9 @@ Object.assign(LexisUI.prototype, {
                     const c = all.find(x => x.id === id);
                     return c ? `<div class="court-selected-tag">${this._esc(c.jmeno)}<span class="court-selected-tag-remove" onclick="lexisUI._toggleContact('${c.id}')">✕</span></div>` : '';
                 }).join('')}
-                ${selCount > 8 ? `<div class="court-selected-tag" style="background:#f1f5f9;color:#64748b;">+${selCount - 8} dalších</div>` : ''}
+                ${selCount > 8 ? `<div class="court-selected-tag" style="background:var(--bg-workspace);color:var(--text-muted);">+${selCount - 8} dalších</div>` : ''}
             </div>` : ''}
-        `;
+        `);
     },
 
     _onContactsCampaignSearch(val) { this._contactsCampaignSearch = val; this._renderContactsSelector(); },
@@ -442,17 +442,17 @@ Object.assign(LexisUI.prototype, {
         const exampleHeaders = varMatches.length > 0 ? varMatches.join(',') : 'Jmeno,Adresa,ISDS';
         const csvVal = this._campaignCsvText || `${exampleHeaders}\nJan Novák,Václavské nám. 1 Praha 1,abc123x\nMarie Svobodová,náměstí Míru 7 Praha 2,xyz987k`;
 
-        container.innerHTML = `
+        container.innerHTML = eIco(`
             <div class="sp-zn-hint">
                 💡 Vložte CSV nebo napište adresáty ručně. První řádek = záhlaví sloupců (odpovídá proměnným v dokumentu).
             </div>
             <div style="display:flex;gap:10px;margin-bottom:10px;">
-                <button onclick="document.getElementById('campaign-csv-input').click()" style="padding:7px 14px;border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:12px;font-weight:700;cursor:pointer;">📂 Načíst soubor (.csv)</button>
-                <span style="font-size:11px;color:#94a3b8;align-self:center;">nebo napiš ručně:</span>
+                <button onclick="document.getElementById('campaign-csv-input').click()" style="padding:7px 14px;border-radius:8px;background:var(--bg-workspace);border:1px solid var(--border);font-size:12px;font-weight:700;cursor:pointer;">📂 Načíst soubor (.csv)</button>
+                <span style="font-size:11px;color:var(--text-faint);align-self:center;">nebo napiš ručně:</span>
             </div>
             <textarea class="campaign-csv-area" id="campaign-csv-ta" oninput="lexisUI._updateCampaignRecordsPreview()">${this._esc(csvVal)}</textarea>
             <div id="campaign-table-preview" style="margin-top:8px;"></div>
-        `;
+        `);
         this._updateCampaignRecordsPreview();
     },
 
@@ -503,28 +503,28 @@ Object.assign(LexisUI.prototype, {
     _renderCampaignStep3(body) {
         const records = this._campaignRecords;
         if (records.length === 0) {
-            body.innerHTML = '<div class="campaign-warn-box">⚠️ Žádní příjemci. Vraťte se zpět.</div>';
+            body.innerHTML = eIco('<div class="campaign-warn-box">⚠️ Žádní příjemci. Vraťte se zpět.</div>');
             return;
         }
         const idx = Math.min(this._campaignPreviewIdx, records.length - 1);
         const docHtml = this.core.getContent();
         const filled = this.exportCampaignRecord(records[idx], docHtml);
         const recipientName = records[idx]._nazev || records[idx][Object.keys(records[idx])[0]] || '';
-        body.innerHTML = `
+        body.innerHTML = eIco(`
             <div class="campaign-preview-nav">
                 <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(-1)">←</button>
                 <div class="campaign-preview-counter">Příjemce ${idx + 1} z ${records.length}: <b>${this._esc(recipientName)}</b></div>
                 <button class="campaign-preview-btn" onclick="lexisUI._campaignPreviewNav(1)">→</button>
             </div>
             <div class="campaign-preview-doc">${filled}</div>
-        `;
+        `);
     },
 
     _renderCampaignStep4(body) {
         const count = this._campaignRecords.length;
         const hasISDS = this._campaignRecords.some(r => r._isds);
-        body.innerHTML = `
-            <p style="font-size:13px;color:#334155;margin-bottom:16px;">Připraveno <b>${count} dokumentů</b> k odeslání:</p>
+        body.innerHTML = eIco(`
+            <p style="font-size:13px;color:var(--text-2);margin-bottom:16px;">Připraveno <b>${count} dokumentů</b> k odeslání:</p>
             <div class="campaign-action-grid">
                 <div class="campaign-action-card ${this._campaignAction === 'download' ? 'selected' : ''}" onclick="lexisUI._setCampaignAction('download')">
                     <div class="campaign-action-icon">📦</div>
@@ -541,9 +541,9 @@ Object.assign(LexisUI.prototype, {
             <div class="campaign-progress-bar" id="campaign-prog-bar" style="display:none;">
                 <div class="campaign-progress-fill" id="campaign-prog-fill" style="width:0%"></div>
             </div>
-            <div id="campaign-run-status" style="font-size:12px;color:#64748b;margin-top:8px;"></div>
+            <div id="campaign-run-status" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
             <div id="campaign-batch-results" style="margin-top:12px;max-height:200px;overflow-y:auto;"></div>
-        `;
+        `);
     },
 
     async campaignNext() {
@@ -584,13 +584,13 @@ Object.assign(LexisUI.prototype, {
         const results = [];
 
         // Table header
-        if (resultsEl) resultsEl.innerHTML = `
+        if (resultsEl) resultsEl.innerHTML = eIco(`
             <table class="campaign-batch-table">
                 <thead><tr>
                     <th>#</th><th>Příjemce</th><th>ISDS</th><th>Stav</th>
                 </tr></thead>
                 <tbody id="campaign-batch-tbody"></tbody>
-            </table>`;
+            </table>`);
 
         for (let i = 0; i < records.length; i++) {
             const record = records[i];
@@ -602,12 +602,12 @@ Object.assign(LexisUI.prototype, {
             if (tbody) {
                 const tr = document.createElement('tr');
                 tr.id = `batch-row-${i}`;
-                tr.innerHTML = `
+                tr.innerHTML = eIco(`
                     <td>${i+1}</td>
                     <td><b>${this._esc(name)}</b></td>
-                    <td>${isds ? `<span class="court-isds-badge">${this._esc(isds)}</span>` : '<span style="color:#cbd5e1;font-size:11px;">—</span>'}</td>
+                    <td>${isds ? `<span class="court-isds-badge">${this._esc(isds)}</span>` : '<span style="color:var(--border-strong);font-size:11px;">—</span>'}</td>
                     <td><span id="batch-status-${i}" class="batch-status-badge batch-status-sending">⏳ Generuji...</span></td>
-                `;
+                `);
                 tbody.appendChild(tr);
                 tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
@@ -623,7 +623,7 @@ Object.assign(LexisUI.prototype, {
                 // mohlo doručit do cizí/neplatné schránky. Reálné (ověřené) hromadné
                 // odeslání dělá modul Datové schránky přes ověřenou frontu (outbox).
                 // Nikdy nehlásíme „odesláno", když jsme nic neodeslali.
-                const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${this._esc(name)}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:#1e293b;}h1,h2,h3{color:#0f172a;}</style></head><body>${filled}</body></html>`;
+                const fullHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8"><title>${this._esc(name)}</title><style>body{font-family:'Segoe UI',sans-serif;max-width:210mm;margin:20mm auto;font-size:12pt;line-height:1.6;color:var(--ink);}h1,h2,h3{color:var(--ink);}</style></head><body>${filled}</body></html>`;
                 const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -660,11 +660,11 @@ Object.assign(LexisUI.prototype, {
         if (statusEl) {
             if (prepared > 0) {
                 // Honest ISDS message: nic se neodeslalo, jen připravily dokumenty.
-                statusEl.innerHTML = `📤 <b>Připraveno ${prepared} dokumentů</b>${err > 0 ? `, ${err} chyb` : ''} (staženy). `
+                statusEl.innerHTML = eIco(`📤 <b>Připraveno ${prepared} dokumentů</b>${err > 0 ? `, ${err} chyb` : ''} (staženy). `
                     + `Datové zprávy se <b>zatím neodeslaly</b> — hromadné odeslání s ověřením příjemce udělej v modulu `
-                    + `<b>Datové schránky → Odeslat</b> (tam se každá schránka ověří proti registru).`;
+                    + `<b>Datové schránky → Odeslat</b> (tam se každá schránka ověří proti registru).`);
             } else {
-                statusEl.innerHTML = `✅ <b>Kampaň dokončena!</b> ${ok} staženo${err > 0 ? `, ${err} chyb` : ''}.`;
+                statusEl.innerHTML = eIco(`✅ <b>Kampaň dokončena!</b> ${ok} staženo${err > 0 ? `, ${err} chyb` : ''}.`);
             }
         }
         if (btnNext) btnNext.disabled = false;

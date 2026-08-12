@@ -228,7 +228,7 @@ const LexisAIProvider = async (prompt, systemPrompt = "Jste špičkový český 
             + `zákonná ustanovení ani judikaturu, aby nevznikaly mylné citace.<br><br>`
             + `Pro skutečnou analýzu spusťte lokální model (<b>Ollama</b> nebo <b>LexisLocal</b>) a ověřte `
             + `poskytovatele v nastavení <i>LexisAI → AI Engine</i>, pak dotaz zopakujte.<br><br>`
-            + `<span style="color:#94a3b8; font-size:12px;">Detail spojení: ${safeDetail}</span>`;
+            + `<span style="color:#a09a92; font-size:12px;">Detail spojení: ${safeDetail}</span>`;
     }
 };
 

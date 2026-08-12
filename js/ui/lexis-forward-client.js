@@ -234,56 +234,56 @@
         // Pak advokát jen potvrdí. Jinak musí klienta vybrat (a příště se zapamatuje).
         const autoReady = !!(suggestedClient && suggestedClient.email);
         const readyBanner = autoReady
-            ? `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:9px 12px;font-size:12px;color:#065f46;margin-bottom:12px;">✓ <b>Návrh je hotový.</b> Klient <b>${esc(suggestedClient.jmeno || '')}</b> (${esc(suggestedClient.email)}) rozpoznán podle historie, e-mail je předvyplněný — jen zkontroluj a odešli.</div>`
+            ? `<div style="background:#eef3ea;border:1px solid #a7f3d0;border-radius:8px;padding:9px 12px;font-size:12px;color:#33562a;margin-bottom:12px;">✓ <b>Návrh je hotový.</b> Klient <b>${esc(suggestedClient.jmeno || '')}</b> (${esc(suggestedClient.email)}) rozpoznán podle historie, e-mail je předvyplněný — jen zkontroluj a odešli.</div>`
             : '';
 
         const overlay = document.createElement('div');
         overlay.id = 'lfw-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.45);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const inp = 'width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;';
-        overlay.innerHTML = `
+        const inp = 'width:100%;box-sizing:border-box;padding:9px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;';
+        overlay.innerHTML = eIco(`
             <div style="background:#fff;border-radius:12px;width:560px;max-width:94vw;max-height:90vh;overflow:auto;padding:18px 20px;font-family:Inter,system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,0.25);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <strong style="font-size:15px;color:#0f172a;">📨 Přeposlat datovou zprávu klientovi</strong>
-                    <button id="lfw-x" style="border:none;background:none;font-size:20px;color:#94a3b8;cursor:pointer;">×</button>
+                    <strong style="font-size:15px;color:#2b2926;">📨 Přeposlat datovou zprávu klientovi</strong>
+                    <button id="lfw-x" style="border:none;background:none;font-size:20px;color:#a09a92;cursor:pointer;">×</button>
                 </div>
                 ${readyBanner}
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:12px;color:#334155;margin-bottom:14px;line-height:1.6;">
+                <div style="background:#faf9f7;border:1px solid #e0dbd3;border-radius:8px;padding:10px 12px;font-size:12px;color:#4a453f;margin-bottom:14px;line-height:1.6;">
                     <div><b>Odesílatel:</b> ${esc(item.sender || item.senderId || '—')}</div>
                     <div><b>Předmět:</b> ${esc(item.annotation || '(bez předmětu)')}</div>
                     ${spzn ? `<div><b>Sp. zn.:</b> ${esc(spzn)}</div>` : ''}
                     ${cj ? `<div><b>Č.j.:</b> ${esc(cj)}</div>` : ''}
                     <div><b>Doručeno:</b> ${esc(item.deliveryTime ? String(item.deliveryTime).replace('T', ' ').slice(0, 16) : '—')}</div>
-                    ${files.length ? `<div><b>Přílohy:</b> ${files.map(f => esc(f.name)).join(', ')}</div>` : '<div style="color:#94a3b8;">Bez stažené přílohy (zpráva zatím není stažená).</div>'}
+                    ${files.length ? `<div><b>Přílohy:</b> ${files.map(f => esc(f.name)).join(', ')}</div>` : '<div style="color:#a09a92;">Bez stažené přílohy (zpráva zatím není stažená).</div>'}
                 </div>
 
-                <label style="font-size:12px;font-weight:700;color:#334155;">Klient (z adresáře)${suggestedId ? ' · <span style="color:#2563eb;">navrženo podle historie</span>' : ''}</label>
+                <label style="font-size:12px;font-weight:700;color:#4a453f;">Klient (z adresáře)${suggestedId ? ' · <span style="color:#9a5b22;">navrženo podle historie</span>' : ''}</label>
                 <select id="lfw-client" style="${inp}margin:4px 0 12px;">
                     <option value="">— vyber klienta —</option>
                     ${options}
                 </select>
 
-                <label style="font-size:12px;font-weight:700;color:#334155;">Předmět e-mailu</label>
+                <label style="font-size:12px;font-weight:700;color:#4a453f;">Předmět e-mailu</label>
                 <input id="lfw-subject" type="text" style="${inp}margin:4px 0 12px;" value="${esc(first.subject)}">
 
-                <label style="font-size:12px;font-weight:700;color:#334155;">Text e-mailu</label>
+                <label style="font-size:12px;font-weight:700;color:#4a453f;">Text e-mailu</label>
                 <textarea id="lfw-body" rows="9" style="${inp}margin:4px 0 6px;resize:vertical;font-family:inherit;">${esc(first.body)}</textarea>
 
-                <label style="font-size:12px;font-weight:700;color:#334155;">Způsob odeslání</label>
-                <div style="margin:4px 0 12px;font-size:12.5px;color:#334155;line-height:1.5;">
-                    <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="radio" name="lfw-method" value="mailto" checked> Otevřít v poště <span style="color:#94a3b8;">(bez přílohy — přiložíš ručně; funguje všude)</span></label>
-                    <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="radio" name="lfw-method" value="native"${hasAttach ? '' : ' disabled'}> Nové okno pošty <b>s přílohou</b> <span style="color:#94a3b8;">(Apple Mail / Outlook)</span></label>
-                    <label style="display:block;cursor:pointer;"><input type="radio" name="lfw-method" value="smtp"${hasAttach ? '' : ' disabled'}> Odeslat přes LexisLocal <b>s přílohou</b> <span style="color:#94a3b8;">(SMTP, odešle server)</span></label>
-                    ${!hasAttach ? '<div style="color:#f59e0b;font-size:11px;margin-top:5px;">Zpráva zatím není stažená — přílohu nelze připojit. Nejdřív ji stáhni v „Přijaté", pak půjde i s přílohou.</div>'
-                        : `<div style="font-size:11px;color:#64748b;margin-top:5px;">📎 ${esc(files.map(f => f.name).join(', '))} <button id="lfw-openfile" style="border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:4px;">Otevřít soubor</button></div>`}
+                <label style="font-size:12px;font-weight:700;color:#4a453f;">Způsob odeslání</label>
+                <div style="margin:4px 0 12px;font-size:12.5px;color:#4a453f;line-height:1.5;">
+                    <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="radio" name="lfw-method" value="mailto" checked> Otevřít v poště <span style="color:#a09a92;">(bez přílohy — přiložíš ručně; funguje všude)</span></label>
+                    <label style="display:block;margin-bottom:4px;cursor:pointer;"><input type="radio" name="lfw-method" value="native"${hasAttach ? '' : ' disabled'}> Nové okno pošty <b>s přílohou</b> <span style="color:#a09a92;">(Apple Mail / Outlook)</span></label>
+                    <label style="display:block;cursor:pointer;"><input type="radio" name="lfw-method" value="smtp"${hasAttach ? '' : ' disabled'}> Odeslat přes LexisLocal <b>s přílohou</b> <span style="color:#a09a92;">(SMTP, odešle server)</span></label>
+                    ${!hasAttach ? '<div style="color:#d9a441;font-size:11px;margin-top:5px;">Zpráva zatím není stažená — přílohu nelze připojit. Nejdřív ji stáhni v „Přijaté", pak půjde i s přílohou.</div>'
+                        : `<div style="font-size:11px;color:#77716a;margin-top:5px;">📎 ${esc(files.map(f => f.name).join(', '))} <button id="lfw-openfile" style="border:1px solid #ddd6cb;background:#fff;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;margin-left:4px;">Otevřít soubor</button></div>`}
                 </div>
-                <div style="font-size:11px;color:#94a3b8;margin-bottom:14px;">Pozn.: e-mail není tak chráněný jako datová schránka — zvaž, co klientovi posíláš.</div>
+                <div style="font-size:11px;color:#a09a92;margin-bottom:14px;">Pozn.: e-mail není tak chráněný jako datová schránka — zvaž, co klientovi posíláš.</div>
 
                 <div style="display:flex;justify-content:flex-end;gap:8px;">
-                    <button id="lfw-cancel" style="padding:9px 14px;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;cursor:pointer;font-size:13px;color:#475569;">Zrušit</button>
-                    <button id="lfw-send" style="padding:9px 16px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">${autoReady ? '✓ Potvrdit a otevřít v poště →' : 'Otevřít v poště →'}</button>
+                    <button id="lfw-cancel" style="padding:9px 14px;border:1px solid #ddd6cb;background:#edeae4;border-radius:8px;cursor:pointer;font-size:13px;color:#5c574f;">Zrušit</button>
+                    <button id="lfw-send" style="padding:9px 16px;border:1px solid #9a5b22;background:#9a5b22;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">${autoReady ? '✓ Potvrdit a otevřít v poště →' : 'Otevřít v poště →'}</button>
                 </div>
-            </div>`;
+            </div>`);
         document.body.appendChild(overlay);
 
         const $ = s => overlay.querySelector(s);
@@ -377,19 +377,19 @@
         const card = overlay.firstElementChild;
         if (!card) { closeModal(); return; }
         const spisTxt = spzn ? `spisu <b>${esc(spzn)}</b>` : 'záznamů (bez sp. zn. — nenaváže se na konkrétní spis)';
-        card.innerHTML = `
+        card.innerHTML = eIco(`
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <strong style="font-size:15px;color:#0f172a;">📨 Otevřeno v poště</strong>
-                <button id="lfw-x2" style="border:none;background:none;font-size:20px;color:#94a3b8;cursor:pointer;">×</button>
+                <strong style="font-size:15px;color:#2b2926;">📨 Otevřeno v poště</strong>
+                <button id="lfw-x2" style="border:none;background:none;font-size:20px;color:#a09a92;cursor:pointer;">×</button>
             </div>
-            <div style="font-size:13px;color:#334155;line-height:1.6;margin-bottom:16px;">
+            <div style="font-size:13px;color:#4a453f;line-height:1.6;margin-bottom:16px;">
                 E-mail pro <b>${esc(payload.recipientEmail)}</b> je připravený v tvém poštovním klientu.<br><br>
                 Až ho tam <b>skutečně odešleš</b>, potvrď to — zapíšu do ${spisTxt} v LexisLocalu, že byl klientovi odeslán.
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px;">
-                <button id="lfw-notyet" style="padding:9px 14px;border:1px solid #cbd5e1;background:#f1f5f9;border-radius:8px;cursor:pointer;font-size:13px;color:#475569;">Ještě neodesláno</button>
-                <button id="lfw-confirm" style="padding:9px 16px;border:1px solid #16a34a;background:#16a34a;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✓ Odesláno — zapiš do spisu</button>
-            </div>`;
+                <button id="lfw-notyet" style="padding:9px 14px;border:1px solid #ddd6cb;background:#edeae4;border-radius:8px;cursor:pointer;font-size:13px;color:#5c574f;">Ještě neodesláno</button>
+                <button id="lfw-confirm" style="padding:9px 16px;border:1px solid #5a8a4a;background:#5a8a4a;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">✓ Odesláno — zapiš do spisu</button>
+            </div>`);
         const q = s => card.querySelector(s);
         q('#lfw-x2').onclick = closeModal;
         q('#lfw-notyet').onclick = closeModal;

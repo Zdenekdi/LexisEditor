@@ -163,3 +163,30 @@ přečtení starého), jak už to umíme u `lexis.key`.
   přijde otázka sdílení/synchronizace (možná server) — velké téma na později, ne teď.
   Pozor, ať se to nesrazí s tím, co je dnes záměrně lokální.
 - **Technické identifikátory zmrazit / migrovat opatrně** (viz kap. 5).
+
+---
+
+## 7. Cenové vrstvy — model HYBRID (rozhodnuto)
+
+Osa „pro koho" (packy core/business/legal) je jedna věc; „co je placené" je druhá.
+Zvolený model je **hybrid** — nízká bariéra na vstupu + vyšší ochota firem platit.
+Mapuje se přímo na existující edice (pole `tier` v `lexis-edition.js`):
+
+| Vrstva | Edice (`tier`) | Packy | Co obsahuje |
+|--------|----------------|-------|-------------|
+| **Zdarma** | `core` (`free`) | core | Plnohodnotný editor: psaní, formátování (vč. Článek/Paragraf/Znak §), šablony, import/export DOCX·PDF, hlavičkový papír/profil, zámek + PII shield, kalendář/.ics, připomínky, LexisLink. |
+| **Lexis Pro** (sólo advokát) | `legal` (`pro`) | core + legal | Datové schránky (odeslat/inbox/outbox/ZFO/odpověď), lhůty § 57, tarify a kalkulačky (poplatek/odměna/úroky), ARES/ISIR, judikatura, Legal Linker, plná moc, Dopis Online, E-podpis + **LexisLocal AI** (agenti, RAG). |
+| **Lexis Firm** (AK s více uživateli) | `full` (`firm`) | core + business + legal | Vše z Pro + Business pack: hromadná gen./kampaně, time tracking a výkazy, sdílené šablony/doložky, týmy/seaty, sdílený adresář + firemní klient-server režim (per-user audit, konflikt přes celou kancelář). |
+
+**Hranice v UI:** placené prvky nesou `data-pack="legal"` (Pro) nebo `data-pack="business"`
+(Firm). Čistě formátovací/znakové vložky (Článek, Paragraf, Znak §) jsou záměrně v Core
+(zdarma) — paid hranice nesahá do běžného psaní. Drafting-aidy (Kontrola struktury, Pojmy,
+Citace) zůstávají placené.
+
+**Co ještě chybí, než z toho budou reálné placené edice** (samostatný krok, vyžaduje
+rozhodnutí o licencování):
+- Entitlement/licence: jak se pozná, kterou vrstvu uživatel zaplatil (dnes je default `full`
+  = vše zapnuté). Volby: offline licenční klíč, nebo lehký ověřovací endpoint.
+- Chování u neplacených funkcí: **skrýt** (dnešní `apply()`), nebo **ukázat s upsell výzvou**
+  („Součást Lexis Pro"). Doporučení: upsell u nejviditelnějších (datovky, lhůty, AI), skrýt zbytek.
+- Build/přepínač výchozí edice per distribuce (dnes lze `?edition=`, `localStorage`, `window.LEXIS_EDITION`).

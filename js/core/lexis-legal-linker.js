@@ -23,7 +23,7 @@
     }
 
     function linkHtml(match, target) {
-        return `<a href="${urlFor(match, target)}" target="_blank" class="legal-link" style="color: #0284c7; text-decoration: underline; font-weight: 500;">${match}</a>`;
+        return `<a href="${urlFor(match, target)}" target="_blank" class="legal-link" style="color: #9a5b22; text-decoration: underline; font-weight: 500;">${match}</a>`;
     }
 
     // Prolinkuje citace v prostém textu (jednoho textového uzlu — bez HTML tagů).

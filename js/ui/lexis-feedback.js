@@ -55,23 +55,23 @@
         ov.style = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
         const card = document.createElement('div');
         card.style = 'background:#fff; border-radius:14px; box-shadow:0 20px 40px -10px rgba(0,0,0,0.35); width:100%; max-width:480px; padding:24px; font-family:Inter,sans-serif;';
-        card.innerHTML = `
+        card.innerHTML = eIco(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <h2 style="margin:0; font-size:17px; color:#0f172a;">🐞 Nahlásit chybu / zpětná vazba</h2>
-                <button id="fb-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:17px; color:#2b2926;">🐞 Nahlásit chybu / zpětná vazba</h2>
+                <button id="fb-close" style="border:none; background:#edeae4; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
-            <p style="margin:0 0 12px; font-size:12px; color:#64748b;">Popište, co se stalo (co jste dělal/a, co jste čekal/a a co se stalo místo toho). Verzi a systém přidáme automaticky.</p>
-            <textarea id="fb-desc" rows="6" placeholder="Popis chyby…" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; resize:vertical;"></textarea>
+            <p style="margin:0 0 12px; font-size:12px; color:#77716a;">Popište, co se stalo (co jste dělal/a, co jste čekal/a a co se stalo místo toho). Verzi a systém přidáme automaticky.</p>
+            <textarea id="fb-desc" rows="6" placeholder="Popis chyby…" style="width:100%; box-sizing:border-box; padding:10px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px; resize:vertical;"></textarea>
             <div id="fb-result" style="font-size:12px; margin:10px 0; min-height:16px;"></div>
             <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button id="fb-copy" style="padding:10px 14px; border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:8px; cursor:pointer; font-size:13px;">Zkopírovat report</button>
-                <button id="fb-send" style="padding:10px 16px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700;">Odeslat e-mailem</button>
-            </div>`;
+                <button id="fb-copy" style="padding:10px 14px; border:1px solid #ddd6cb; background:#fff; color:#4a453f; border-radius:8px; cursor:pointer; font-size:13px;">Zkopírovat report</button>
+                <button id="fb-send" style="padding:10px 16px; border:none; background:#9a5b22; color:#fff; border-radius:8px; cursor:pointer; font-size:13px; font-weight:700;">Odeslat e-mailem</button>
+            </div>`);
         ov.appendChild(card);
         ov.addEventListener('mousedown', e => { if (e.target === ov) ov.remove(); });
         document.body.appendChild(ov);
 
-        const setResult = (html, ok) => { card.querySelector('#fb-result').innerHTML = `<span style="color:${ok ? '#16a34a' : '#dc2626'};">${html}</span>`; };
+        const setResult = (html, ok) => { card.querySelector('#fb-result').innerHTML = eIco(`<span style="color:${ok ? '#5a8a4a' : '#b04331'};">${html}</span>`); };
         card.querySelector('#fb-close').onclick = () => ov.remove();
 
         card.querySelector('#fb-copy').onclick = async () => {

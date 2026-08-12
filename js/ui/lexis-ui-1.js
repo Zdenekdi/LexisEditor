@@ -143,7 +143,7 @@ Object.assign(LexisUI.prototype, {
             window.electronAPI.getTemplates()
                 .then(templates => {
                     const staticCards = Array.from(grid.children).slice(0, 3);
-                    grid.innerHTML = '';
+                    grid.innerHTML = eIco('');
                     staticCards.forEach(c => grid.appendChild(c));
 
                     if (templates) {
@@ -151,11 +151,11 @@ Object.assign(LexisUI.prototype, {
                             const card = document.createElement('div');
                             card.className = 'start-card';
                             card.onclick = () => window.openStartDocument(key);
-                            card.innerHTML = `
+                            card.innerHTML = eIco(`
                                 <div class="card-icon">${tpl.icon || '📝'}</div>
                                 <div class="card-title">${tpl.title}</div>
                                 <div class="card-desc">${tpl.desc || 'Vlastní vzor'}</div>
-                            `;
+                            `);
                             grid.appendChild(card);
                         }
                     }
@@ -229,7 +229,7 @@ Object.assign(LexisUI.prototype, {
                     mammoth.convertToHtml({ arrayBuffer: re.target.result })
                         .then(result => {
                             this.core.setContent(result.value);
-                            this.setDocumentStatus('draft', true);
+                            this.setDocumentStatus(null, true);
                             this.saveActiveDocumentState();
                         })
                         .catch(err => console.error(err));
@@ -238,7 +238,7 @@ Object.assign(LexisUI.prototype, {
             } else {
                 reader.onload = (re) => {
                     this.core.setContent(re.target.result);
-                    this.setDocumentStatus('draft', true);
+                    this.setDocumentStatus(null, true);
                     this.saveActiveDocumentState();
                 };
                 reader.readAsText(file);
@@ -281,22 +281,22 @@ Object.assign(LexisUI.prototype, {
 
             // Build content HTML
             let html = `
-                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; margin-bottom: 25px; font-family: 'Inter', sans-serif;">
-                    <div style="font-size: 14px; font-weight: 700; color: #1e3a8a; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                <div style="background: #faf9f7; border: 1px solid #ddd6cb; border-radius: 8px; padding: 20px; margin-bottom: 25px; font-family: 'Inter', sans-serif;">
+                    <div style="font-size: 14px; font-weight: 700; color: #8a5320; border-bottom: 2px solid #ddd6cb; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
                         📮 DATOVÁ ZPRÁVA (ISDS IMPORT)
                     </div>
                     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                         <tr>
-                            <td style="padding: 6px 0; font-weight: 600; color: #475569; width: 120px;">Odesílatel:</td>
-                            <td style="padding: 6px 0; color: #1e293b;"><b>${res.sender}</b></td>
+                            <td style="padding: 6px 0; font-weight: 600; color: #5c574f; width: 120px;">Odesílatel:</td>
+                            <td style="padding: 6px 0; color: #2b2926;"><b>${res.sender}</b></td>
                         </tr>
                         <tr>
-                            <td style="padding: 6px 0; font-weight: 600; color: #475569;">ID schránky:</td>
-                            <td style="padding: 6px 0; color: #1e293b; font-family: monospace;">${res.senderId}</td>
+                            <td style="padding: 6px 0; font-weight: 600; color: #5c574f;">ID schránky:</td>
+                            <td style="padding: 6px 0; color: #2b2926; font-family: monospace;">${res.senderId}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 6px 0; font-weight: 600; color: #475569;">Předmět:</td>
-                            <td style="padding: 6px 0; color: #1e293b;">${res.subject}</td>
+                            <td style="padding: 6px 0; font-weight: 600; color: #5c574f;">Předmět:</td>
+                            <td style="padding: 6px 0; color: #2b2926;">${res.subject}</td>
                         </tr>
                     </table>
                 </div>
@@ -306,22 +306,22 @@ Object.assign(LexisUI.prototype, {
 
             if (res.attachments && res.attachments.length > 0) {
                 html += `
-                    <div style="margin-top: 30px; border-top: 1px dashed #cbd5e1; padding-top: 20px; font-family: 'Inter', sans-serif;">
-                        <h4 style="font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 10px;">📎 Extrahované přílohy ze zprávy:</h4>
-                        <ul style="padding-left: 20px; font-size: 12px; color: #2563eb;">
+                    <div style="margin-top: 30px; border-top: 1px dashed #ddd6cb; padding-top: 20px; font-family: 'Inter', sans-serif;">
+                        <h4 style="font-size: 13px; font-weight: 700; color: #5c574f; margin-bottom: 10px;">📎 Extrahované přílohy ze zprávy:</h4>
+                        <ul style="padding-left: 20px; font-size: 12px; color: #9a5b22;">
                 `;
                 res.attachments.forEach(att => {
                     html += `<li style="margin-bottom: 5px;"><b>${att.name}</b></li>`;
                 });
                 html += `
                         </ul>
-                        <p style="font-size: 11px; color: #64748b; margin-top: 10px; font-style: italic;">💡 Textový obsah a přílohy PDF byly úspěšně naimportovány do paměti aplikace.</p>
+                        <p style="font-size: 11px; color: #77716a; margin-top: 10px; font-style: italic;">💡 Textový obsah a přílohy PDF byly úspěšně naimportovány do paměti aplikace.</p>
                     </div>
                 `;
             }
 
             this.core.setContent(html);
-            this.setDocumentStatus('draft', true);
+            this.setDocumentStatus(null, true);
             this.saveActiveDocumentState();
 
             this.customAlert("<b>Import úspěšný</b><br><br>Datová zpráva .zfo byla úspěšně načtena a její název byl nastaven jako název dokumentu.");
@@ -419,7 +419,7 @@ Object.assign(LexisUI.prototype, {
             const select = document.getElementById('watermark-select');
             const colorInput = document.getElementById('watermark-color');
             const text = select ? select.value : 'NONE';
-            const color = colorInput ? colorInput.value : '#e2e8f0';
+            const color = colorInput ? colorInput.value : '#e0dbd3';
             
             if (text === 'NONE') {
                 if (wmLayer) wmLayer.remove();
@@ -436,7 +436,7 @@ Object.assign(LexisUI.prototype, {
             // data-atributy umožní exportu (PDF) přečíst a vykreslit vodoznak.
             wmLayer.setAttribute('data-watermark-type', 'text');
             wmLayer.setAttribute('data-watermark-text', text);
-            wmLayer.innerHTML = `<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${window.escapeHTML(text)}</div>`;
+            wmLayer.innerHTML = eIco(`<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${window.escapeHTML(text)}</div>`);
         });
     },
 
@@ -477,8 +477,8 @@ Object.assign(LexisUI.prototype, {
         }
         const headerArea = document.getElementById('header-area');
         const footerArea = document.getElementById('footer-area');
-        if (headerArea) headerArea.innerHTML = window.LexisLetterhead.buildHeaderHtml(p);
-        if (footerArea) footerArea.innerHTML = window.LexisLetterhead.buildFooterHtml(p);
+        if (headerArea) headerArea.innerHTML = eIco(window.LexisLetterhead.buildHeaderHtml(p));
+        if (footerArea) footerArea.innerHTML = eIco(window.LexisLetterhead.buildFooterHtml(p));
         this.saveActiveDocumentState && this.saveActiveDocumentState();
         this.customAlert('✅ Hlavička byla vložena do záhlaví dokumentu.');
     },
@@ -492,14 +492,14 @@ Object.assign(LexisUI.prototype, {
         // profil si uživatel nastaví sám. Značka se bere z edice.
         const brand = (window.Edition && window.Edition.brandName) || 'LexisEditor';
         if (headerArea) {
-            headerArea.innerHTML = useLetterhead
+            headerArea.innerHTML = eIco(useLetterhead
                 ? window.LexisLetterhead.buildHeaderHtml(p)
-                : `<div style="color:#94a3b8;">${brand}</div><div></div>`;
+                : `<div style="color:#a09a92;">${brand}</div><div></div>`);
         }
         if (footerArea) {
-            footerArea.innerHTML = useLetterhead
+            footerArea.innerHTML = eIco(useLetterhead
                 ? window.LexisLetterhead.buildFooterHtml(p)
-                : `<div></div><div style="text-align: right;">Strana 1 z 1</div>`;
+                : `<div></div><div style="text-align: right;">Strana 1 z 1</div>`);
         }
     },
 
@@ -517,7 +517,7 @@ Object.assign(LexisUI.prototype, {
             this.currentDocumentTitle = 'Nepojmenovaný dokument';
             this.updateDocTitleDOM();
             this.core.setContent('<p><br></p>');
-            this.setDocumentStatus('draft', true);
+            this.setDocumentStatus(null, true);
             this.saveActiveDocumentState();
         } else if (type === 'file') {
             this.importDocument();
@@ -527,20 +527,17 @@ Object.assign(LexisUI.prototype, {
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('app-container').style.display = 'flex';
                 
-                let title = "Šablona";
-                if (type === 'zaloba') title = "Žaloba";
-                else if (type === 'smlouva') title = "Smlouva";
-                else if (type === 'odvolani') title = "Odvolání";
-                else if (type === 'posudek') title = "Právní posudek";
-                
-                this.currentDocumentTitle = title;
-                this.updateDocTitleDOM();
-                
                 if (window.electronAPI && window.electronAPI.getTemplateContent) {
-                    const content = await window.electronAPI.getTemplateContent(type);
-                    this.core.setContent(content);
+                    const tpl = await window.electronAPI.getTemplateContent(type);
+                    const content = (tpl && typeof tpl === 'object') ? (tpl.content || '') : (tpl || '');
+                    this.currentDocumentTitle = (tpl && tpl.title) ? tpl.title : "Šablona";
+                    this.updateDocTitleDOM();
+                    if (content) this.core.setContent(content);
+                } else {
+                    this.currentDocumentTitle = "Šablona";
+                    this.updateDocTitleDOM();
                 }
-                this.setDocumentStatus('draft', true);
+                this.setDocumentStatus(null, true);
                 this.saveActiveDocumentState();
             });
         }
@@ -603,37 +600,37 @@ Object.assign(LexisUI.prototype, {
         modal.style = "background:#fff;padding:30px;border-radius:16px;width:450px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);font-family:'Outfit',sans-serif;";
         
         const statsHtml = foundCount > 0 ? 
-            `<div style="background:#f1f5f9; padding:15px; border-radius:8px; margin-bottom:20px;">
+            `<div style="background:#edeae4; padding:15px; border-radius:8px; margin-bottom:20px;">
                 <div style="font-weight:700; color:var(--word-blue); font-size:12px; margin-bottom:8px; text-transform:uppercase;">Nalezeno vzorcem:</div>
-                <div style="font-size:13px; color:#475569;">${results.join(", ")}</div>
+                <div style="font-size:13px; color:#5c574f;">${results.join(", ")}</div>
             </div>` : 
-            `<div style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; border:1px dashed #e2e8f0; border-radius:8px; margin-bottom:20px;">
+            `<div style="text-align:center; padding:20px; color:#a09a92; font-size:13px; border:1px dashed #e0dbd3; border-radius:8px; margin-bottom:20px;">
                 Vzorce nenašly žádná data. Doporučujeme AI skenování pro detekci jmen.
             </div>`;
 
-        modal.innerHTML = `
+        modal.innerHTML = eIco(`
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
                 <div style="font-size:32px;">🛡️</div>
                 <div>
                     <div style="font-weight:800; font-size:18px; color:var(--word-blue);">Právní Anonymizátor</div>
-                    <div style="font-size:12px; color:#64748b;">Zabezpečení dokumentu před sdílením</div>
+                    <div style="font-size:12px; color:#77716a;">Zabezpečení dokumentu před sdílením</div>
                 </div>
             </div>
             ${statsHtml}
             <div id="ai-anon-status" style="display:none; margin-bottom:20px; padding:15px; background:rgba(124,58,237,0.1); border-radius:8px; border:1px solid rgba(124,58,237,0.2);">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div class="spinner-small"></div>
-                    <div style="font-size:13px; color:#7c3aed; font-weight:600;">AI analyzuje jména a firmy...</div>
+                    <div style="font-size:13px; color:var(--accent); font-weight:600;">AI analyzuje jména a firmy...</div>
                 </div>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
                 <button id="anon-standard" style="padding:12px; background:var(--word-blue); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">Standardní (Regex)</button>
-                <button id="anon-ai" style="padding:12px; background:linear-gradient(135deg, #7c3aed, #4f46e5); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">AI Skenování Jmen</button>
+                <button id="anon-ai" style="padding:12px; background:linear-gradient(135deg, var(--accent), var(--accent)); color:white; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">AI Skenování Jmen</button>
             </div>
             <div style="display:flex; justify-content:center;">
-                <button id="anon-cancel" style="color:#64748b; background:none; border:none; cursor:pointer; font-size:13px; font-weight:500;">Zavřít bez změn</button>
+                <button id="anon-cancel" style="color:#77716a; background:none; border:none; cursor:pointer; font-size:13px; font-weight:500;">Zavřít bez změn</button>
             </div>
-        `;
+        `);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 

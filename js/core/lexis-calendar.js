@@ -343,7 +343,7 @@ function calendarTargets(event) {
     };
 }
 
-module.exports = {
+const __lexisCalendarExports = {
     escapeIcsText,
     toDateStamp,
     toIsoDate,
@@ -365,6 +365,13 @@ module.exports = {
     calendarTargets
 };
 
+// Pozn.: v prohlížeči (Electron renderer) `module` neexistuje — proto guard,
+// jinak nezajištěný `module.exports` vyhodí ReferenceError a přeruší skript
+// (kvůli čemuž se dřív window.LexisCalendar vůbec nenastavil).
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = __lexisCalendarExports;
+}
+
 if (typeof window !== 'undefined') {
-    window.LexisCalendar = module.exports;
+    window.LexisCalendar = __lexisCalendarExports;
 }

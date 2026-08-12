@@ -5,6 +5,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportDocx: (htmlContent, headerHtml, footerHtml) => ipcRenderer.invoke('export-docx', htmlContent, headerHtml, footerHtml),
     searchAres: (ico) => ipcRenderer.invoke('search-ares', ico),
     getTemplates: () => ipcRenderer.invoke('get-templates'),
+    getTemplateContent: (type) => ipcRenderer.invoke('get-template-content', type),
+    // Licencování (entitlement) — neaktivní, dokud LICENSING_ENABLED=false v main.js.
+    getLicenseStatus: () => ipcRenderer.invoke('get-license-status'),
+    licenseEdition: (() => { try { return ipcRenderer.sendSync('get-license-edition-sync') || ''; } catch (e) { return ''; } })(),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
     resetTemplates: () => ipcRenderer.invoke('reset-templates'),
     getAppVersion: () => ipcRenderer.invoke('get-version'),

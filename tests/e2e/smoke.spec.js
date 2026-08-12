@@ -1,78 +1,56 @@
-const { _electron: electron } = require('playwright');
+// tests/e2e/smoke.spec.js
+// Smoke test: renderer se v prohlížeči (file://) nastartuje bez chyb.
+// electronAPI je nahrazeno stubem, protože mimo Electron neexistuje.
+// Spuštění:  npm run test:e2e   (nebo:  npx playwright test tests/e2e/smoke.spec.js)
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-test.describe('LexisEditor Smoke Tests', () => {
-  let electronApp;
-  let window;
+// Stub electronAPI: každá metoda vrací Promise; on*-listenery vrací unsubscribe.
+function installElectronStub() {
+  const def = (name) => {
+    if (/^on[A-Z]/.test(name)) return () => () => {};
+    const map = {
+      getAppVersion: '0.0.0-test',
+      lockGetConfig: { enabled: false, touchIdEnabled: false, hasPassword: false, method: 'password' },
+      lockTouchIdAvailable: { available: false, biometricName: 'Touch ID' },
+      getTemplates: [], getTemplateContent: '',
+      getAIConfig: { provider: 'lexislocal', models: [] },
+      getIsdsConfig: {}, licenseEdition: 'Free', lexisLocalToken: null,
+    };
+    return () => Promise.resolve(name in map ? map[name] : {});
+  };
+  window.electronAPI = new Proxy({}, { get: (_t, prop) => (typeof prop === 'string' ? def(prop) : undefined) });
+}
 
-  test.beforeAll(async () => {
-    // Spustit aplikaci
-    electronApp = await electron.launch({
-      args: [path.join(__dirname, '../../main.js')],
-    });
-    window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
-  });
+test('renderer nastartuje bez JS chyb a s klíčovými globály', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(e.message));
 
-  test.afterAll(async () => {
-    if (electronApp) {
-      await electronApp.close();
-    }
-  });
+  await page.addInitScript(installElectronStub);
+  await page.goto('file://' + path.resolve(__dirname, '..', '..', 'index.html'), { waitUntil: 'load' });
+  await page.waitForTimeout(1500);
 
-  test('should launch the application and load the main window', async () => {
-    // Zkontrolovat, že se aplikace načetla
-    expect(window).toBeTruthy();
+  const checks = await page.evaluate(() => ({
+    lexisUI: typeof window.lexisUI,
+    eIco: typeof window.eIco,
+    LexisIcons: typeof window.LexisIcons,
+    LexisCalendar: typeof window.LexisCalendar,
+    ribbonTabs: document.querySelectorAll('.ribbon-tabs .tab').length,
+    iconsRendered: document.querySelectorAll('.icon-sq svg').length,
+    statusBar: !!document.querySelector('.status-bar'),
+    iconSelectBuilt: !!document.querySelector('.icon-select-btn'),
+  }));
 
-    // Zkontrolovat titulek okna
-    const title = await window.title();
-    expect(title).toBe('LexisEditor');
-  });
+  // Žádná neodchycená chyba v rendereru (regrese by ji shodila).
+  expect(pageErrors, 'neočekávané page errors: ' + pageErrors.join(' | ')).toEqual([]);
 
-  test('should display key UI components', async () => {
-    // Ověřit, že kritické části UI existují
-    const appContainer = await window.locator('#app-container');
-    await expect(appContainer).toBeAttached();
-
-    const startScreen = await window.locator('#start-screen');
-    await expect(startScreen).toBeAttached();
-
-    const sidebar = await window.locator('#sidebar');
-    await expect(sidebar).toBeAttached();
-  });
-
-  test('should display legal tab calculators', async () => {
-    const tabLegal = await window.locator('#tab-legal');
-    await expect(tabLegal).toBeAttached();
-    
-    const feeBtn = await window.locator('text=Poplatek');
-    await expect(feeBtn).toBeAttached();
-
-    const tariffBtn = await window.locator('text=Odměna');
-    await expect(tariffBtn).toBeAttached();
-  });
-
-  test('should display lexisai tab buttons', async () => {
-    const tabLexisAi = await window.locator('#tab-lexisai');
-    await expect(tabLexisAi).toBeAttached();
-    
-    const aiBridgeBtn = await window.locator('text=AI Bridge');
-    await expect(aiBridgeBtn).toBeAttached();
-
-    const rewriteBtn = await window.locator('text=Přepsat');
-    await expect(rewriteBtn).toBeAttached();
-
-    const risksBtn = await window.locator('text=Hledat rizika');
-    await expect(risksBtn).toBeAttached();
-
-    const translateBtn = await window.locator('text=Přeložit');
-    await expect(translateBtn).toBeAttached();
-
-    const generateBtn = await window.locator('text=Nová doložka');
-    await expect(generateBtn).toBeAttached();
-
-    const autocompleteBtn = await window.locator('text=Dopsat AI');
-    await expect(autocompleteBtn).toBeAttached();
-  });
+  // Jádro UI se postavilo.
+  expect(checks.lexisUI).toBe('object');
+  expect(checks.eIco).toBe('function');
+  expect(checks.LexisIcons).toBe('object');
+  expect(checks.LexisCalendar).toBe('object'); // regreseguard: dřív padalo na `module is not defined`
+  expect(checks.statusBar).toBe(true);
+  expect(checks.iconSelectBuilt).toBe(true);
+  expect(checks.ribbonTabs).toBeGreaterThanOrEqual(6);
+  expect(checks.iconsRendered).toBeGreaterThan(50);
 });

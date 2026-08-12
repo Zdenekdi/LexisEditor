@@ -51,10 +51,10 @@
         if (!matches.length) {
             const needle = panel.querySelector('#lfr-find').value;
             el.textContent = needle ? 'Nenalezeno' : '';
-            el.style.color = needle ? '#dc2626' : '#94a3b8';
+            el.style.color = needle ? '#b04331' : '#a09a92';
         } else {
             el.textContent = `${current + 1} / ${matches.length}`;
-            el.style.color = '#475569';
+            el.style.color = '#5c574f';
         }
     }
 
@@ -126,7 +126,7 @@
         computeMatches(rep && needle ? rep : ''); // po nahrazení už hledaný řetězec typicky není
         current = -1;
         const el = panel.querySelector('#lfr-count');
-        if (el) { el.textContent = `Nahrazeno: ${n}×`; el.style.color = '#16a34a'; }
+        if (el) { el.textContent = `Nahrazeno: ${n}×`; el.style.color = '#5a8a4a'; }
     }
 
     function build() {
@@ -134,21 +134,24 @@
         panel.id = 'lfr-panel';
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-label', 'Najít a nahradit');
+        // Barvy z tématu (CSS proměnné) → panel se sám přizpůsobí světlému
+        // i tmavému režimu editoru (body.dark-mode). Panel visí na <body>,
+        // takže var() dědí správnou variantu.
         panel.style.cssText = [
             'position:fixed', 'top:74px', 'right:24px', 'z-index:100000',
-            'background:#ffffff', 'border:1px solid #e2e8f0', 'border-radius:10px',
-            'box-shadow:0 12px 30px rgba(15,23,42,0.18)', 'padding:10px',
+            'background:var(--surface,#ffffff)', 'border:1px solid var(--border,#e0dbd3)', 'border-radius:10px',
+            'box-shadow:0 12px 30px rgba(0,0,0,0.28)', 'padding:10px',
             'font-family:Inter,system-ui,sans-serif', 'width:320px'
         ].join(';');
 
-        const inputStyle = 'flex:1;padding:7px 9px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;outline:none;box-sizing:border-box;';
-        const btn = 'border:1px solid #cbd5e1;background:#fff;border-radius:7px;cursor:pointer;font-size:13px;padding:6px 9px;line-height:1;color:#334155;';
-        const btnPrimary = 'border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:7px;cursor:pointer;font-size:12.5px;padding:7px 10px;font-weight:600;';
+        const inputStyle = 'flex:1;padding:7px 9px;border:1px solid var(--border-strong,#ddd6cb);border-radius:7px;font-size:13px;outline:none;box-sizing:border-box;background:var(--surface,#fff);color:var(--ink,#2b2926);';
+        const btn = 'border:1px solid var(--border-strong,#ddd6cb);background:var(--surface,#fff);border-radius:7px;cursor:pointer;font-size:13px;padding:6px 9px;line-height:1;color:var(--ink,#4a453f);';
+        const btnPrimary = 'border:1px solid var(--accent,#9a5b22);background:var(--accent,#9a5b22);color:#fff;border-radius:7px;cursor:pointer;font-size:12.5px;padding:7px 10px;font-weight:600;';
 
-        panel.innerHTML = `
+        panel.innerHTML = eIco(`
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                <strong style="font-size:12.5px;color:#0f172a;">Najít a nahradit</strong>
-                <button id="lfr-close" title="Zavřít (Esc)" style="${btn}border:none;font-size:16px;color:#94a3b8;padding:2px 6px;">×</button>
+                <strong style="font-size:12.5px;color:var(--ink,#2b2926);">Najít a nahradit</strong>
+                <button id="lfr-close" title="Zavřít (Esc)" style="${btn}border:none;font-size:16px;color:var(--text-faint,#a09a92);padding:2px 6px;">×</button>
             </div>
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
                 <input id="lfr-find" type="text" placeholder="Hledat…" style="${inputStyle}" autocomplete="off">
@@ -158,14 +161,14 @@
                 <input id="lfr-replace" type="text" placeholder="Nahradit za…" style="${inputStyle}" autocomplete="off">
             </div>
             <div style="display:flex;align-items:center;gap:6px;">
-                <span id="lfr-count" style="font-size:12px;color:#94a3b8;min-width:64px;"></span>
+                <span id="lfr-count" style="font-size:12px;color:var(--text-faint,#a09a92);min-width:64px;"></span>
                 <button id="lfr-prev" title="Předchozí (Shift+Enter)" style="${btn}">↑</button>
                 <button id="lfr-next" title="Další (Enter)" style="${btn}">↓</button>
                 <span style="flex:1;"></span>
                 <button id="lfr-one" title="Nahradit tento výskyt" style="${btn}">Nahradit</button>
                 <button id="lfr-all" title="Nahradit všechny výskyty" style="${btnPrimary}">Vše</button>
             </div>
-        `;
+        `);
         document.body.appendChild(panel);
 
         const $ = sel => panel.querySelector(sel);
@@ -176,8 +179,9 @@
         $('#lfr-all').onclick = replaceAll;
         $('#lfr-case').onclick = () => {
             caseSensitive = !caseSensitive;
-            $('#lfr-case').style.background = caseSensitive ? '#dbeafe' : '#fff';
-            $('#lfr-case').style.borderColor = caseSensitive ? '#2563eb' : '#cbd5e1';
+            $('#lfr-case').style.background = caseSensitive ? 'var(--accent-tint-bg,#efe3cf)' : 'var(--surface,#fff)';
+            $('#lfr-case').style.borderColor = caseSensitive ? 'var(--accent,#9a5b22)' : 'var(--border-strong,#ddd6cb)';
+            $('#lfr-case').style.color = caseSensitive ? 'var(--accent-text,#8a5320)' : 'var(--ink,#4a453f)';
             runSearch();
         };
 

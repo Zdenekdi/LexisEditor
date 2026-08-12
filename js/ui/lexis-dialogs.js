@@ -14,12 +14,12 @@ class LexisDialogs {
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
         const modal = document.createElement('div');
         modal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
-        modal.innerHTML = `
-            <div style="margin:0 0 20px 0;font-size:14px;color:#1e293b;line-height:1.5;white-space:pre-wrap;">${text}</div>
+        modal.innerHTML = eIco(`
+            <div style="margin:0 0 20px 0;font-size:14px;color:#2b2926;line-height:1.5;white-space:pre-wrap;">${window.LexisIcons ? window.LexisIcons.emojiToIcon(text) : text}</div>
             <div style="display:flex;justify-content:flex-end;">
-                <button id="ca-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Rozumím</button>
+                <button id="ca-ok" style="padding:8px 16px;background:#9a5b22;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Rozumím</button>
             </div>
-        `;
+        `);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         const okBtn = document.getElementById('ca-ok');
@@ -34,13 +34,13 @@ class LexisDialogs {
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
         const modal = document.createElement('div');
         modal.style = "background:#fff;padding:24px;border-radius:12px;width:360px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
-        modal.innerHTML = `
-            <div style="margin:0 0 20px 0;font-size:14px;color:#1e293b;line-height:1.5;white-space:pre-wrap;">${text}</div>
+        modal.innerHTML = eIco(`
+            <div style="margin:0 0 20px 0;font-size:14px;color:#2b2926;line-height:1.5;white-space:pre-wrap;">${window.LexisIcons ? window.LexisIcons.emojiToIcon(text) : text}</div>
             <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button id="cc-cancel" style="padding:8px 16px;background:#f1f5f9;color:#475569;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${cancelLabel}</button>
-                <button id="cc-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${okLabel}</button>
+                <button id="cc-cancel" style="padding:8px 16px;background:#edeae4;color:#5c574f;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${cancelLabel}</button>
+                <button id="cc-ok" style="padding:8px 16px;background:#9a5b22;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">${okLabel}</button>
             </div>
-        `;
+        `);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         
@@ -60,14 +60,14 @@ class LexisDialogs {
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);";
         const modal = document.createElement('div');
         modal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
-        modal.innerHTML = `
-            <h3 style="margin:0 0 12px 0;font-size:14px;color:#1e293b;font-weight:600;">${title}</h3>
-            <input type="text" id="cp-input" value="${defaultValue}" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:20px;box-sizing:border-box;font-size:13px;outline:none;">
+        modal.innerHTML = eIco(`
+            <h3 style="margin:0 0 12px 0;font-size:14px;color:#2b2926;font-weight:600;">${window.LexisIcons ? window.LexisIcons.emojiToIcon(title) : title}</h3>
+            <input type="text" id="cp-input" value="${defaultValue}" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:6px;margin-bottom:20px;box-sizing:border-box;font-size:13px;outline:none;">
             <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button id="cp-cancel" style="padding:8px 16px;background:#f1f5f9;color:#475569;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
-                <button id="cp-ok" style="padding:8px 16px;background:#2563eb;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Potvrdit</button>
+                <button id="cp-cancel" style="padding:8px 16px;background:#edeae4;color:#5c574f;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
+                <button id="cp-ok" style="padding:8px 16px;background:#9a5b22;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Potvrdit</button>
             </div>
-        `;
+        `);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
         
@@ -112,64 +112,64 @@ class LexisDialogs {
             const modal = document.createElement('div');
             modal.style = "background:#fff;padding:24px;border-radius:12px;width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif;box-sizing:border-box;";
             
-            modal.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid #e2e8f0;padding-bottom:10px;">
-                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">⚖️ Advokátní tarif (§ 7)</h3>
-                    <button id="tc-close" style="background:none;border:none;font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;outline:none;">&times;</button>
+            modal.innerHTML = eIco(`
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-bottom:1px solid #e0dbd3;padding-bottom:10px;">
+                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#2b2926;display:flex;align-items:center;gap:8px;">⚖️ Advokátní tarif (§ 7)</h3>
+                    <button id="tc-close" style="background:none;border:none;font-size:24px;color:#a09a92;cursor:pointer;line-height:1;outline:none;">&times;</button>
                 </div>
                 
                 <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px;">
                     <div style="display:flex;flex-direction:column;gap:6px;">
-                        <label style="font-size:12px;font-weight:600;color:#475569;">Tarifní hodnota (hodnota věci v Kč)</label>
-                        <input type="text" id="tc-value" placeholder="např. 150 000" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;">
+                        <label style="font-size:12px;font-weight:600;color:#5c574f;">Tarifní hodnota (hodnota věci v Kč)</label>
+                        <input type="text" id="tc-value" placeholder="např. 150 000" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;">
                     </div>
                     
                     <div style="display:flex;flex-direction:column;gap:6px;">
-                        <label style="font-size:12px;font-weight:600;color:#475569;">Počet úkonů právní služby</label>
-                        <input type="number" id="tc-acts" value="1" min="1" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;">
+                        <label style="font-size:12px;font-weight:600;color:#5c574f;">Počet úkonů právní služby</label>
+                        <input type="number" id="tc-acts" value="1" min="1" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:6px;font-size:13px;outline:none;box-sizing:border-box;">
                     </div>
                     
                     <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#334155;cursor:pointer;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4a453f;cursor:pointer;">
                             <input type="checkbox" id="tc-flatrate" checked style="width:16px;height:16px;cursor:pointer;">
                             Připočíst režijní paušál (300 Kč za úkon)
                         </label>
                         
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#334155;cursor:pointer;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#4a453f;cursor:pointer;">
                             <input type="checkbox" id="tc-vat" style="width:16px;height:16px;cursor:pointer;">
                             Plátce DPH (připočíst 21 %)
                         </label>
                     </div>
                 </div>
                 
-                <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:20px;font-family:'Inter',sans-serif;">
-                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;">
+                <div style="background:#faf9f7;padding:16px;border-radius:8px;border:1px solid #e0dbd3;margin-bottom:20px;font-family:'Inter',sans-serif;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#5c574f;margin-bottom:6px;">
                         <span>Sazba za 1 úkon:</span>
-                        <span id="tc-out-single" style="font-weight:600;color:#0f172a;">0 Kč</span>
+                        <span id="tc-out-single" style="font-weight:600;color:#2b2926;">0 Kč</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:#5c574f;margin-bottom:6px;">
                         <span>Odměna celkem:</span>
-                        <span id="tc-out-base" style="font-weight:600;color:#0f172a;">0 Kč</span>
+                        <span id="tc-out-base" style="font-weight:600;color:#2b2926;">0 Kč</span>
                     </div>
-                    <div id="tc-out-flatrate-row" style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;">
+                    <div id="tc-out-flatrate-row" style="display:flex;justify-content:space-between;font-size:13px;color:#5c574f;margin-bottom:6px;">
                         <span>Režijní paušál celkem:</span>
-                        <span id="tc-out-flatrate" style="font-weight:600;color:#0f172a;">0 Kč</span>
+                        <span id="tc-out-flatrate" style="font-weight:600;color:#2b2926;">0 Kč</span>
                     </div>
-                    <div id="tc-out-vat-row" style="display:flex;justify-content:space-between;font-size:13px;color:#475569;margin-bottom:6px;display:none;">
+                    <div id="tc-out-vat-row" style="display:flex;justify-content:space-between;font-size:13px;color:#5c574f;margin-bottom:6px;display:none;">
                         <span>DPH (21 %):</span>
-                        <span id="tc-out-vat" style="font-weight:600;color:#0f172a;">0 Kč</span>
+                        <span id="tc-out-vat" style="font-weight:600;color:#2b2926;">0 Kč</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#0f172a;margin-top:10px;border-top:1px dashed #cbd5e1;padding-top:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#2b2926;margin-top:10px;border-top:1px dashed #ddd6cb;padding-top:10px;">
                         <span>CELKEM:</span>
-                        <span id="tc-out-total" style="color:#2563eb;">0 Kč</span>
+                        <span id="tc-out-total" style="color:#9a5b22;">0 Kč</span>
                     </div>
                 </div>
                 
                 <div style="display:flex;justify-content:flex-end;gap:10px;">
-                    <button id="tc-cancel" style="padding:10px 16px;background:#f1f5f9;color:#475569;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;">Zavřít</button>
-                    <button id="tc-insert" style="padding:10px 16px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;display:flex;align-items:center;gap:6px;">✍️ Vložit výpočet</button>
+                    <button id="tc-cancel" style="padding:10px 16px;background:#edeae4;color:#5c574f;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;">Zavřít</button>
+                    <button id="tc-insert" style="padding:10px 16px;background:#9a5b22;color:#fff;font-weight:600;border:none;border-radius:6px;cursor:pointer;font-size:13px;outline:none;display:flex;align-items:center;gap:6px;">✍️ Vložit výpočet</button>
                 </div>
-            `;
+            `);
             
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
@@ -309,17 +309,17 @@ class LexisDialogs {
         
         const output = document.getElementById('ai-output');
         if (output) {
-            output.innerHTML = `
+            output.innerHTML = eIco(`
                 <div style="display:flex; flex-direction:column; gap:10px; font-family:'Inter',sans-serif;">
-                    <div style="font-weight:600; font-size:13px; color:#1e293b; margin-bottom:5px;">Nová Plná moc</div>
-                    <input id="pa-name" placeholder="Jméno zmocnitele (např. Jan Novák)" class="combo-box" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; outline:none; box-sizing:border-box;">
-                    <select id="pa-type" class="combo-box" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; outline:none; box-sizing:border-box; background:white;">
+                    <div style="font-weight:600; font-size:13px; color:#2b2926; margin-bottom:5px;">Nová Plná moc</div>
+                    <input id="pa-name" placeholder="Jméno zmocnitele (např. Jan Novák)" class="combo-box" style="width:100%; padding:10px; border:1px solid #ddd6cb; border-radius:6px; outline:none; box-sizing:border-box;">
+                    <select id="pa-type" class="combo-box" style="width:100%; padding:10px; border:1px solid #ddd6cb; border-radius:6px; outline:none; box-sizing:border-box; background:white;">
                         <option value="obecná">Obecná plná moc</option>
                         <option value="procesní">Procesní plná moc</option>
                     </select>
                     <button id="btn-generate-pa" style="padding:10px; background:var(--word-blue); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:700; transition:all 0.2s;">Vygenerovat plnou moc</button>
                 </div>
-            `;
+            `);
             
             document.getElementById('btn-generate-pa').onclick = () => this.generatePA();
         }

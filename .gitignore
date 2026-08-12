@@ -19,3 +19,8 @@ temp_script.js
 # Historie editoru a lokální data
 lexis_history.json
 lexis_settings.json
+
+# Licencovani — NIKDY necommitovat privatni klic ani vydane licence
+.license-keys/
+**/license_private.pem
+lexis_license.json

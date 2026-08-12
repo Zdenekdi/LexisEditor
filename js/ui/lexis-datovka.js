@@ -73,8 +73,8 @@
         const overlay = document.createElement('div');
         overlay.style = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:99999; display:flex; align-items:center; justify-content:center; padding:20px;';
         const card = document.createElement('div');
-        card.style = `background:#fff; border-radius:14px; box-shadow:0 20px 40px -10px rgba(0,0,0,0.35); width:100%; max-width:${maxWidth || 560}px; max-height:88vh; overflow:auto; padding:22px;`;
-        card.innerHTML = innerHtml;
+        card.style = `background:var(--surface); border-radius:14px; box-shadow:0 20px 40px -10px rgba(0,0,0,0.35); width:100%; max-width:${maxWidth || 560}px; max-height:88vh; overflow:auto; padding:22px;`;
+        card.innerHTML = eIco(innerHtml);
         overlay.appendChild(card);
         overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeOverlay(overlay); });
         document.body.appendChild(overlay);
@@ -87,11 +87,11 @@
         if (courts.length === 0) { toast('Registr soudů není načten.'); return; }
         const { overlay, card } = makeOverlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <h2 style="margin:0; font-size:16px; color:#0f172a;">⚖️ Vybrat soud</h2>
-                <button id="cp-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:16px; color:var(--ink);">⚖️ Vybrat soud</h2>
+                <button id="cp-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
-            <input id="cp-search" placeholder="Hledat soud…" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:10px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
-            <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Po výběru se ověří <b>reálná</b> schránka soudu přes ISDS (FindDataBox).</div>
+            <input id="cp-search" placeholder="Hledat soud…" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:10px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
+            <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">Po výběru se ověří <b>reálná</b> schránka soudu přes ISDS (FindDataBox).</div>
             <div id="cp-list" style="max-height:52vh; overflow:auto;"></div>`, 520);
         const listEl = card.querySelector('#cp-list');
         const searchEl = card.querySelector('#cp-search');
@@ -99,11 +99,11 @@
         function renderCourts(filter) {
             const f = norm(filter);
             const matched = courts.filter(c => !f || norm(c.nazev).includes(f) || norm(c.zkratka).includes(f) || norm(c.mesto).includes(f)).slice(0, 200);
-            listEl.innerHTML = matched.length ? matched.map((c, i) => `
-                <div class="cp-item" data-i="${courts.indexOf(c)}" style="padding:8px 6px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:12px;">
-                    <div style="font-weight:700; color:#0f172a;">${esc(c.nazev)}</div>
-                    <div style="color:#64748b;">${esc(c.mesto || '')}${c.zkratka ? ' · ' + esc(c.zkratka) : ''}</div>
-                </div>`).join('') : '<div style="font-size:12px; color:#94a3b8; padding:12px; text-align:center;">Nic nenalezeno.</div>';
+            listEl.innerHTML = eIco(matched.length ? matched.map((c, i) => `
+                <div class="cp-item" data-i="${courts.indexOf(c)}" style="padding:8px 6px; border-bottom:1px solid #edeae4; cursor:pointer; font-size:12px;">
+                    <div style="font-weight:700; color:var(--ink);">${esc(c.nazev)}</div>
+                    <div style="color:var(--text-muted);">${esc(c.mesto || '')}${c.zkratka ? ' · ' + esc(c.zkratka) : ''}</div>
+                </div>`).join('') : '<div style="font-size:12px; color:var(--text-faint); padding:12px; text-align:center;">Nic nenalezeno.</div>');
             listEl.querySelectorAll('.cp-item').forEach(el => el.onclick = () => {
                 const court = courts[parseInt(el.getAttribute('data-i'), 10)];
                 closeOverlay(overlay);
@@ -127,30 +127,30 @@
         const doc = currentDoc();
         const html = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h2 style="margin:0; font-size:17px; color:#0f172a;">📨 Odeslat datovou schránkou</h2>
-                <button id="dtv-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:17px; color:var(--ink);">📨 Odeslat datovou schránkou</h2>
+                <button id="dtv-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
-            <label style="font-size:12px; font-weight:700; color:#334155;">Předmět</label>
-            <input id="dtv-subject" value="${esc(doc.title)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 14px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-2);">Předmět</label>
+            <input id="dtv-subject" value="${esc(doc.title)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 14px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
 
             <div id="dtv-suggest" style="margin-bottom:10px;"></div>
 
-            <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">Přidat příjemce</div>
+            <div style="font-size:12px; font-weight:700; color:var(--text-2); margin-bottom:6px;">Přidat příjemce</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
-                <button class="dtv-add" data-mode="ic" style="flex:1; min-width:110px; padding:8px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px;">🔎 Dle IČO</button>
-                <button class="dtv-add" data-mode="id" style="flex:1; min-width:110px; padding:8px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px;">⌨️ Ruční ID</button>
-                <button class="dtv-add" data-mode="contacts" style="flex:1; min-width:110px; padding:8px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px;">📇 Adresář</button>
-                <button class="dtv-add" data-mode="court" style="flex:1; min-width:110px; padding:8px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px;">⚖️ Soud</button>
+                <button class="dtv-add" data-mode="ic" style="flex:1; min-width:110px; padding:8px; border:1px solid #ddd6cb; background:var(--surface-2); border-radius:8px; cursor:pointer; font-size:12px;">🔎 Dle IČO</button>
+                <button class="dtv-add" data-mode="id" style="flex:1; min-width:110px; padding:8px; border:1px solid #ddd6cb; background:var(--surface-2); border-radius:8px; cursor:pointer; font-size:12px;">⌨️ Ruční ID</button>
+                <button class="dtv-add" data-mode="contacts" style="flex:1; min-width:110px; padding:8px; border:1px solid #ddd6cb; background:var(--surface-2); border-radius:8px; cursor:pointer; font-size:12px;">📇 Adresář</button>
+                <button class="dtv-add" data-mode="court" style="flex:1; min-width:110px; padding:8px; border:1px solid #ddd6cb; background:var(--surface-2); border-radius:8px; cursor:pointer; font-size:12px;">⚖️ Soud</button>
             </div>
-            <div id="dtv-status" style="font-size:11px; color:#64748b; min-height:16px; margin-bottom:6px;"></div>
-            <div id="dtv-recipients" style="border:1px solid #e2e8f0; border-radius:8px; min-height:60px; padding:8px; margin-bottom:14px;"></div>
+            <div id="dtv-status" style="font-size:11px; color:var(--text-muted); min-height:16px; margin-bottom:6px;"></div>
+            <div id="dtv-recipients" style="border:1px solid #e0dbd3; border-radius:8px; min-height:60px; padding:8px; margin-bottom:14px;"></div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                <div style="font-size:11px; color:#64748b;">Přílohou bude aktuální dokument jako PDF.</div>
+                <div style="font-size:11px; color:var(--text-muted);">Přílohou bude aktuální dokument jako PDF.</div>
                 <div style="display:flex; gap:8px;">
-                    <button id="dtv-inbox" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">📥 Přijaté</button>
-                    <button id="dtv-outbox" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">📤 Odeslané</button>
-                    <button id="dtv-send" style="padding:9px 16px; border:none; background:#16a34a; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Odeslat všem</button>
+                    <button id="dtv-inbox" style="padding:9px 14px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:12px;">📥 Přijaté</button>
+                    <button id="dtv-outbox" style="padding:9px 14px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:12px;">📤 Odeslané</button>
+                    <button id="dtv-send" style="padding:9px 16px; border:none; background:#5a8a4a; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Odeslat všem</button>
                 </div>
             </div>`;
         const { overlay, card } = makeOverlay(html, 600);
@@ -160,18 +160,18 @@
         function setStatus(msg) { statusEl.textContent = msg || ''; }
         function renderList() {
             if (recipients.length === 0) {
-                listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:14px;">Zatím žádní příjemci</div>';
+                listEl.innerHTML = eIco('<div style="font-size:12px; color:var(--text-faint); text-align:center; padding:14px;">Zatím žádní příjemci</div>');
                 return;
             }
-            listEl.innerHTML = recipients.map((r, i) => `
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 4px; border-bottom:1px solid #f1f5f9;">
+            listEl.innerHTML = eIco(recipients.map((r, i) => `
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 4px; border-bottom:1px solid #edeae4;">
                     <div style="font-size:12px;">
-                        <span style="font-weight:700; color:#0f172a;">${esc(r.name)}</span>
-                        <span style="color:#64748b;"> · ${esc(r.dbID)}</span>
-                        ${r.deliverable ? '<span style="color:#16a34a;"> · doručitelná</span>' : '<span style="color:#dc2626;"> · nedoručitelná</span>'}
+                        <span style="font-weight:700; color:var(--ink);">${esc(r.name)}</span>
+                        <span style="color:var(--text-muted);"> · ${esc(r.dbID)}</span>
+                        ${r.deliverable ? '<span style="color:var(--green);"> · doručitelná</span>' : '<span style="color:#b04331;"> · nedoručitelná</span>'}
                     </div>
-                    <button class="dtv-rm" data-i="${i}" style="border:none; background:none; color:#dc2626; cursor:pointer; font-size:14px;">✕</button>
-                </div>`).join('');
+                    <button class="dtv-rm" data-i="${i}" style="border:none; background:none; color:#b04331; cursor:pointer; font-size:14px;">✕</button>
+                </div>`).join(''));
             listEl.querySelectorAll('.dtv-rm').forEach(btn => btn.onclick = () => {
                 recipients.splice(parseInt(btn.getAttribute('data-i'), 10), 1);
                 renderList();
@@ -192,11 +192,11 @@
                     if (reg && reg.nazev) officialName = reg.nazev;
                 }
             } catch (e) {}
-            suggestEl.innerHTML = `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:8px 10px;">
-                    <div style="font-size:12px; color:#1e3a8a;">📍 V dokumentu: <b>${esc(officialName)}</b></div>
-                    <button id="dtv-suggest-add" style="border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; padding:6px 12px; flex-shrink:0;">Přidat soud</button>
-                </div>`;
+            suggestEl.innerHTML = eIco(`
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--accent-tint-bg); border:1px solid #efe3cf; border-radius:8px; padding:8px 10px;">
+                    <div style="font-size:12px; color:var(--accent-text);">📍 V dokumentu: <b>${esc(officialName)}</b></div>
+                    <button id="dtv-suggest-add" style="border:none; background:#9a5b22; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; padding:6px 12px; flex-shrink:0;">Přidat soud</button>
+                </div>`);
             suggestEl.querySelector('#dtv-suggest-add').onclick = async () => {
                 setStatus(`Ověřuji schránku: ${officialName}…`);
                 await findAndAdd({ firmName: officialName, dbType: 'OVM' }, officialName);
@@ -287,11 +287,11 @@
     // ---------------- Outbox panel ----------------
 
     const STATUS_STYLE = {
-        pending: ['#f59e0b', 'čeká'],
-        sending: ['#3b82f6', 'odesílá se'],
-        sent: ['#0ea5e9', 'odesláno'],
-        delivered: ['#16a34a', 'doručeno'],
-        failed: ['#dc2626', 'chyba'],
+        pending: ['#d9a441', 'čeká'],
+        sending: ['#9a5b22', 'odesílá se'],
+        sent: ['#c39a5a', 'odesláno'],
+        delivered: ['#5a8a4a', 'doručeno'],
+        failed: ['#b04331', 'chyba'],
         review: ['#a855f7', 'ověřit ručně']
     };
 
@@ -299,37 +299,37 @@
         if (!api() || !api().isdsOutboxList) { toast('Outbox je dostupný jen v desktopové aplikaci.'); return; }
         const { overlay, card } = makeOverlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h2 style="margin:0; font-size:17px; color:#0f172a;">📤 Odeslané datové zprávy</h2>
+                <h2 style="margin:0; font-size:17px; color:var(--ink);">📤 Odeslané datové zprávy</h2>
                 <div style="display:flex; gap:8px;">
-                    <button id="ob-refresh" style="padding:7px 12px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">🔄 Aktualizovat stav</button>
-                    <button id="ob-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                    <button id="ob-refresh" style="padding:7px 12px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:12px;">🔄 Aktualizovat stav</button>
+                    <button id="ob-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
                 </div>
             </div>
             <div id="ob-list">Načítám…</div>`, 680);
         const listEl = card.querySelector('#ob-list');
 
         function badge(status) {
-            const s = STATUS_STYLE[status] || ['#64748b', status];
+            const s = STATUS_STYLE[status] || ['#77716a', status];
             return `<span style="background:${s[0]}22; color:${s[0]}; font-size:10px; font-weight:800; padding:2px 8px; border-radius:20px;">${s[1].toUpperCase()}</span>`;
         }
         function render(items) {
             if (!items || items.length === 0) {
-                listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:20px;">Zatím nic odesláno.</div>';
+                listEl.innerHTML = eIco('<div style="font-size:12px; color:var(--text-faint); text-align:center; padding:20px;">Zatím nic odesláno.</div>');
                 return;
             }
             items.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-            listEl.innerHTML = items.map(it => `
-                <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 6px; border-bottom:1px solid #f1f5f9;">
+            listEl.innerHTML = eIco(items.map(it => `
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 6px; border-bottom:1px solid #edeae4;">
                     <div style="font-size:12px; min-width:0;">
-                        <div style="font-weight:700; color:#0f172a;">${esc(it.recipient && it.recipient.name)} <span style="color:#94a3b8; font-weight:400;">· ${esc(it.recipient && it.recipient.dbID)}</span></div>
-                        <div style="color:#64748b;">${esc(it.subject || '')}${it.dmID ? ' · dmID ' + esc(it.dmID) : ''}${it.statusLabel ? ' · ' + esc(it.statusLabel) : ''}${it.lastError ? ' · <span style="color:#dc2626;">' + esc(it.lastError) + '</span>' : ''}</div>
+                        <div style="font-weight:700; color:var(--ink);">${esc(it.recipient && it.recipient.name)} <span style="color:var(--text-faint); font-weight:400;">· ${esc(it.recipient && it.recipient.dbID)}</span></div>
+                        <div style="color:var(--text-muted);">${esc(it.subject || '')}${it.dmID ? ' · dmID ' + esc(it.dmID) : ''}${it.statusLabel ? ' · ' + esc(it.statusLabel) : ''}${it.lastError ? ' · <span style="color:#b04331;">' + esc(it.lastError) + '</span>' : ''}</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                         ${badge(it.status)}
-                        ${it.dmID ? `<button class="ob-receipt" data-id="${esc(it.dmID)}" title="Uložit podepsanou doručenku (právní doklad)" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">📄 Doručenka</button>` : ''}
-                        ${(it.status === 'failed' || it.status === 'review') ? `<button class="ob-retry" data-id="${esc(it.id)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">Opakovat</button>` : ''}
+                        ${it.dmID ? `<button class="ob-receipt" data-id="${esc(it.dmID)}" title="Uložit podepsanou doručenku (právní doklad)" style="border:1px solid #ddd6cb; background:var(--surface); border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">📄 Doručenka</button>` : ''}
+                        ${(it.status === 'failed' || it.status === 'review') ? `<button class="ob-retry" data-id="${esc(it.id)}" style="border:1px solid #ddd6cb; background:var(--surface); border-radius:6px; cursor:pointer; font-size:11px; padding:3px 8px;">Opakovat</button>` : ''}
                     </div>
-                </div>`).join('');
+                </div>`).join(''));
             listEl.querySelectorAll('.ob-retry').forEach(btn => btn.onclick = async () => {
                 await api().isdsOutboxRetry(btn.getAttribute('data-id'));
                 setTimeout(load, 400);
@@ -337,11 +337,11 @@
         }
         async function load() {
             try { const res = await api().isdsOutboxList(); render(res && res.items); }
-            catch (e) { listEl.innerHTML = '<div style="color:#dc2626; font-size:12px;">Chyba: ' + esc(e.message) + '</div>'; }
+            catch (e) { listEl.innerHTML = eIco('<div style="color:#b04331; font-size:12px;">Chyba: ' + esc(e.message) + '</div>'); }
         }
         card.querySelector('#ob-close').onclick = () => { closeOverlay(overlay); if (window._obUnsub) window._obUnsub(); };
         card.querySelector('#ob-refresh').onclick = async () => {
-            listEl.innerHTML = 'Aktualizuji stavy doručení…';
+            listEl.innerHTML = eIco('Aktualizuji stavy doručení…');
             try { const res = await api().isdsOutboxRefreshStatus(); render(res && res.items); }
             catch (e) { load(); }
         };
@@ -358,20 +358,20 @@
         if (!api() || !api().isdsInboxList) { toast('Přijaté zprávy jsou dostupné jen v desktopové aplikaci.'); return; }
         const { overlay, card } = makeOverlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h2 style="margin:0; font-size:17px; color:#0f172a;">📥 Přijaté datové zprávy</h2>
-                <button id="ib-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:17px; color:var(--ink);">📥 Přijaté datové zprávy</h2>
+                <button id="ib-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
-                <label style="font-size:12px; color:#334155; display:flex; align-items:center; gap:6px;">
+                <label style="font-size:12px; color:var(--text-2); display:flex; align-items:center; gap:6px;">
                     Režim:
-                    <select id="ib-mode" style="padding:6px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px;">
+                    <select id="ib-mode" style="padding:6px; border:1px solid #ddd6cb; border-radius:8px; font-size:12px;">
                         <option value="envelope">Jen upozornění (nespustí doručení)</option>
                         <option value="download">Automaticky stáhnout (spustí doručení)</option>
                     </select>
                 </label>
-                <button id="ib-refresh" style="padding:8px 14px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">🔄 Načíst přijaté</button>
+                <button id="ib-refresh" style="padding:8px 14px; border:none; background:#9a5b22; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">🔄 Načíst přijaté</button>
             </div>
-            <div id="ib-warn" style="font-size:11px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px; margin-bottom:10px;">
+            <div id="ib-warn" style="font-size:11px; color:var(--accent-text); background:var(--accent-tint-bg); border:1px solid #ecd9a8; border-radius:8px; padding:8px; margin-bottom:10px;">
                 ⚠️ „Stáhnout" u zprávy stáhne její obsah, což se považuje za <b>doručení přihlášením</b> a spustí běh lhůty. „Jen upozornění" doručení nespouští.
             </div>
             <div id="ib-list">Klikni na „Načíst přijaté".</div>`, 720);
@@ -383,31 +383,31 @@
         function fmtTime(t) { return t ? String(t).replace('T', ' ').slice(0, 16) : ''; }
 
         function render(items) {
-            if (!items || items.length === 0) { listEl.innerHTML = '<div style="font-size:12px; color:#94a3b8; text-align:center; padding:18px;">Zatím žádné přijaté zprávy. Klikni na „Načíst přijaté".</div>'; return; }
+            if (!items || items.length === 0) { listEl.innerHTML = eIco('<div style="font-size:12px; color:var(--text-faint); text-align:center; padding:18px;">Zatím žádné přijaté zprávy. Klikni na „Načíst přijaté".</div>'); return; }
             items.sort((a, b) => (b.deliveryTime || '').localeCompare(a.deliveryTime || ''));
-            listEl.innerHTML = items.map(it => {
+            listEl.innerHTML = eIco(items.map(it => {
                 const downloaded = it.localStatus === 'downloaded';
                 const filesHtml = downloaded && it.files && it.files.length
-                    ? '<div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;">' + it.files.map((f, fi) => `<button class="ib-file" data-id="${esc(it.dmID)}" data-fi="${fi}" style="border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">📎 ${esc(f.name)}</button>`).join('') + '</div>'
+                    ? '<div style="margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;">' + it.files.map((f, fi) => `<button class="ib-file" data-id="${esc(it.dmID)}" data-fi="${fi}" style="border:1px solid #ddd6cb; background:var(--surface-2); border-radius:6px; font-size:11px; padding:2px 8px; cursor:pointer;">📎 ${esc(f.name)}</button>`).join('') + '</div>'
                     : '';
                 return `
-                <div style="padding:9px 6px; border-bottom:1px solid #f1f5f9;">
+                <div style="padding:9px 6px; border-bottom:1px solid #edeae4;">
                     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
                         <div style="font-size:12px; min-width:0;">
-                            <div style="font-weight:700; color:#0f172a;">${esc(it.sender || it.senderId || 'Neznámý odesílatel')}</div>
-                            <div style="color:#334155;">${esc(it.annotation || '(bez předmětu)')}</div>
-                            <div style="color:#64748b; font-size:11px;">Doručeno: ${esc(fmtTime(it.deliveryTime)) || '—'} · ${esc(it.statusLabel || '')}${downloaded ? ' · staženo' : ''}</div>
+                            <div style="font-weight:700; color:var(--ink);">${esc(it.sender || it.senderId || 'Neznámý odesílatel')}</div>
+                            <div style="color:var(--text-2);">${esc(it.annotation || '(bez předmětu)')}</div>
+                            <div style="color:var(--text-muted); font-size:11px;">Doručeno: ${esc(fmtTime(it.deliveryTime)) || '—'} · ${esc(it.statusLabel || '')}${downloaded ? ' · staženo' : ''}</div>
                             ${filesHtml}
                         </div>
                         <div style="display:flex; flex-direction:column; gap:5px; flex-shrink:0; align-items:flex-end;">
-                            ${!downloaded ? `<button class="ib-dl" data-id="${esc(it.dmID)}" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⬇️ Stáhnout</button>` : ''}
-                            <button class="ib-deadline" data-id="${esc(it.dmID)}" style="border:none; background:${it.deadlineCreated ? '#e2e8f0' : '#16a34a'}; color:${it.deadlineCreated ? '#475569' : '#fff'}; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⏳ ${it.deadlineCreated ? 'Lhůta ✓' : 'Vytvořit lhůtu'}</button>
-                            <button class="ib-forward" data-id="${esc(it.dmID)}" title="Přiřadit klientovi a přeposlat e-mailem" style="border:1px solid #2563eb; background:#eff6ff; color:#2563eb; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">📨 Klientovi</button>
-                            <button class="ib-reply" data-id="${esc(it.dmID)}" data-pack="legal" title="Vytvořit koncept odpovědi s hlavičkou (č.j./sp. zn.)" style="border:1px solid #2563eb; background:#eff6ff; color:#2563eb; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">↩️ Odpovědět</button>
+                            ${!downloaded ? `<button class="ib-dl" data-id="${esc(it.dmID)}" style="border:1px solid #ddd6cb; background:var(--surface); border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⬇️ Stáhnout</button>` : ''}
+                            <button class="ib-deadline" data-id="${esc(it.dmID)}" style="border:none; background:${it.deadlineCreated ? '#e0dbd3' : '#5a8a4a'}; color:${it.deadlineCreated ? '#5c574f' : '#fff'}; border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">⏳ ${it.deadlineCreated ? 'Lhůta ✓' : 'Vytvořit lhůtu'}</button>
+                            <button class="ib-forward" data-id="${esc(it.dmID)}" title="Přiřadit klientovi a přeposlat e-mailem" style="border:1px solid #9a5b22; background:var(--accent-tint-bg); color:var(--accent-text); border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">📨 Klientovi</button>
+                            <button class="ib-reply" data-id="${esc(it.dmID)}" data-pack="legal" title="Vytvořit koncept odpovědi s hlavičkou (č.j./sp. zn.)" style="border:1px solid #9a5b22; background:var(--accent-tint-bg); color:var(--accent-text); border-radius:6px; cursor:pointer; font-size:11px; padding:4px 8px;">↩️ Odpovědět</button>
                         </div>
                     </div>
                 </div>`;
-            }).join('');
+            }).join(''));
 
             listEl.querySelectorAll('.ib-dl').forEach(btn => btn.onclick = async () => {
                 if (!window.confirm('Stažením se zpráva považuje za DORUČENOU a spustí se běh lhůty. Pokračovat?')) return;
@@ -451,13 +451,13 @@
         }
         async function load() {
             try { const res = await api().isdsInboxList(); window._ibItems = (res && res.items) || []; render(window._ibItems); }
-            catch (e) { listEl.innerHTML = '<div style="color:#dc2626;">Chyba: ' + esc(e.message) + '</div>'; }
+            catch (e) { listEl.innerHTML = eIco('<div style="color:#b04331;">Chyba: ' + esc(e.message) + '</div>'); }
         }
         card.querySelector('#ib-close').onclick = () => closeOverlay(overlay);
         card.querySelector('#ib-refresh').onclick = async () => {
-            listEl.innerHTML = 'Načítám přijaté zprávy…';
+            listEl.innerHTML = eIco('Načítám přijaté zprávy…');
             const res = await api().isdsInboxRefresh(modeSel.value);
-            if (!res || !res.success) { listEl.innerHTML = '<div style="color:#dc2626;">Chyba: ' + esc((res && res.error) || '') + '</div>'; return; }
+            if (!res || !res.success) { listEl.innerHTML = eIco('<div style="color:#b04331;">Chyba: ' + esc((res && res.error) || '') + '</div>'); return; }
             window._ibItems = res.items || [];
             render(window._ibItems);
         };
@@ -474,17 +474,17 @@
         const name = (event.title || 'lhuta').replace(/[^\w\-. ]+/g, '_');
         const { overlay, card } = makeOverlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h2 style="margin:0; font-size:16px; color:#0f172a;">📅 Přidat lhůtu do kalendáře</h2>
-                <button id="cal-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:16px; color:var(--ink);">📅 Přidat lhůtu do kalendáře</h2>
+                <button id="cal-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
-            <div style="font-size:12px; color:#334155; margin-bottom:14px;"><b>${esc(event.title || 'Lhůta')}</b><br>${esc(cal.toIsoDate(event.date))}</div>
+            <div style="font-size:12px; color:var(--text-2); margin-bottom:14px;"><b>${esc(event.title || 'Lhůta')}</b><br>${esc(cal.toIsoDate(event.date))}</div>
             <div style="display:flex; flex-direction:column; gap:8px;">
-                <button class="cal-btn" data-a="apple" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">  Apple / systémový kalendář (otevřít .ics)</button>
-                <button class="cal-btn" data-a="google" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📆 Přidat do Google kalendáře</button>
-                <button class="cal-btn" data-a="outlook" style="padding:10px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📧 Přidat do Outlook kalendáře</button>
-                <button class="cal-btn" data-a="save" style="padding:10px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer; font-size:12px; text-align:left; color:#475569;">💾 Uložit soubor .ics (pro libovolný kalendář)</button>
+                <button class="cal-btn" data-a="apple" style="padding:10px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">  Apple / systémový kalendář (otevřít .ics)</button>
+                <button class="cal-btn" data-a="google" style="padding:10px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📆 Přidat do Google kalendáře</button>
+                <button class="cal-btn" data-a="outlook" style="padding:10px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:13px; text-align:left;">📧 Přidat do Outlook kalendáře</button>
+                <button class="cal-btn" data-a="save" style="padding:10px; border:1px solid #ddd6cb; background:var(--surface-2); border-radius:8px; cursor:pointer; font-size:12px; text-align:left; color:var(--text-2);">💾 Uložit soubor .ics (pro libovolný kalendář)</button>
             </div>
-            <div style="font-size:11px; color:#94a3b8; margin-top:12px;">Data zůstávají u vás — odkaz jen předvyplní událost ve vašem kalendáři.</div>`, 460);
+            <div style="font-size:11px; color:var(--text-faint); margin-top:12px;">Data zůstávají u vás — odkaz jen předvyplní událost ve vašem kalendáři.</div>`, 460);
         card.querySelector('#cal-close').onclick = () => closeOverlay(overlay);
         card.querySelectorAll('.cal-btn').forEach(btn => btn.onclick = async () => {
             const a = btn.getAttribute('data-a');
@@ -505,29 +505,29 @@
         const today = (cal ? cal.toIsoDate(new Date()) : '');
         const { overlay, card } = makeOverlay(`
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h2 style="margin:0; font-size:16px; color:#0f172a;">⏳ Nová lhůta</h2>
-                <button id="dl-close" style="border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
+                <h2 style="margin:0; font-size:16px; color:var(--ink);">⏳ Nová lhůta</h2>
+                <button id="dl-close" style="border:none; background:var(--bg-workspace); border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px;">✕</button>
             </div>
-            <label style="font-size:12px; font-weight:700; color:#334155;">Název lhůty</label>
-            <input id="dl-title" value="${esc(p.title || '')}" placeholder="např. Odvolání – spis 12 C 34/2026" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-2);">Název lhůty</label>
+            <input id="dl-title" value="${esc(p.title || '')}" placeholder="např. Odvolání – spis 12 C 34/2026" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
             <div style="display:flex; gap:10px;">
                 <div style="flex:1;">
-                    <label style="font-size:12px; font-weight:700; color:#334155;">Datum doručení</label>
-                    <input id="dl-date" type="date" value="${esc(p.deliveredAt || today)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--text-2);">Datum doručení</label>
+                    <input id="dl-date" type="date" value="${esc(p.deliveredAt || today)}" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
                 </div>
                 <div style="width:110px;">
-                    <label style="font-size:12px; font-weight:700; color:#334155;">Dní</label>
-                    <input id="dl-days" type="number" value="${esc(p.days != null ? p.days : 15)}" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--text-2);">Dní</label>
+                    <input id="dl-days" type="number" value="${esc(p.days != null ? p.days : 15)}" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
                 </div>
                 <div style="width:110px;">
-                    <label style="font-size:12px; font-weight:700; color:#334155;">Připomenout (dní)</label>
-                    <input id="dl-remind" type="number" value="3" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
+                    <label style="font-size:12px; font-weight:700; color:var(--text-2);">Připomenout (dní)</label>
+                    <input id="dl-remind" type="number" value="3" min="0" style="width:100%; box-sizing:border-box; padding:9px; margin:4px 0 12px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
                 </div>
             </div>
-            <div id="dl-preview" style="font-size:12px; color:#16a34a; min-height:16px; margin-bottom:12px;"></div>
+            <div id="dl-preview" style="font-size:12px; color:var(--green); min-height:16px; margin-bottom:12px;"></div>
             <div style="display:flex; justify-content:flex-end; gap:8px;">
-                <button id="dl-cancel" style="padding:9px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer; font-size:12px;">Zrušit</button>
-                <button id="dl-next" style="padding:9px 16px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Přidat do kalendáře →</button>
+                <button id="dl-cancel" style="padding:9px 14px; border:1px solid #ddd6cb; background:var(--surface); border-radius:8px; cursor:pointer; font-size:12px;">Zrušit</button>
+                <button id="dl-next" style="padding:9px 16px; border:none; background:#9a5b22; color:#fff; border-radius:8px; cursor:pointer; font-size:12px; font-weight:700;">Přidat do kalendáře →</button>
             </div>`, 520);
         function computeAndShow() {
             if (!cal) return null;

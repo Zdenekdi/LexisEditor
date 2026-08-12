@@ -76,7 +76,7 @@ Object.assign(LexisUI.prototype, {
                     // Create beautiful reply template in editor
                     const dateStr = new Date().toLocaleDateString('cs-CZ');
                     const replyHtml = `
-                        <h1 class="ql-align-center" style="font-size: 16pt; color: #1e3a8a;">VYJÁDŘENÍ ÚČASTNÍKA</h1>
+                        <h1 class="ql-align-center" style="font-size: 16pt; color: #8a5320;">VYJÁDŘENÍ ÚČASTNÍKA</h1>
                         <p><br></p>
                         <p><b>Adresát:</b></p>
                         <p><b>${updatedRecipient}</b></p>
@@ -94,7 +94,7 @@ Object.assign(LexisUI.prototype, {
                                 </tr>
                             </tbody>
                         </table>
-                        <hr style="border: none; border-top: 1px solid #cbd5e1; margin-bottom: 20px;">
+                        <hr style="border: none; border-top: 1px solid #ddd6cb; margin-bottom: 20px;">
                         <p>K výzvě soudu ze dne [doplňte datum výzvy] k č. j. <b>${updatedCj}</b> podává účastník prostřednictvím svého právního zástupce následující vyjádření:</p>
                         <p><br></p>
                         <p><b>I.</b></p>
@@ -116,7 +116,7 @@ Object.assign(LexisUI.prototype, {
                     // 5. Update editor text and set state
                     this.core.setContent(replyHtml);
                     this.resetHeaderFooterDOM();
-                    this.setDocumentStatus('draft', true);
+                    this.setDocumentStatus(null, true);
                     
                     // 6. Automatically register in Deadline Guard & active document memory!
                     const id = 'dl_' + Date.now();
@@ -204,19 +204,19 @@ Object.assign(LexisUI.prototype, {
         if (!output) return;
         
         if (subTab === 'chat') {
-            output.innerHTML = "Dobrý den, jsem váš právní agent. Zadejte libovolný dotaz nebo si nechte zkontrolovat smlouvu.";
+            output.innerHTML = eIco("Dobrý den, jsem váš právní agent. Zadejte libovolný dotaz nebo si nechte zkontrolovat smlouvu.");
             if (actions) actions.style.display = 'none';
         } else if (subTab === 'research') {
-            output.innerHTML = "🔍 <b>Právní rešerše</b><br><br>Zadejte téma nebo ustanovení zákona, které si přejete vyhledat či analyzovat (např. <i>výpověď z nájmu</i>).";
+            output.innerHTML = eIco("🔍 <b>Právní rešerše</b><br><br>Zadejte téma nebo ustanovení zákona, které si přejete vyhledat či analyzovat (např. <i>výpověď z nájmu</i>).");
             if (actions) {
                 actions.style.display = 'flex';
-                actions.innerHTML = `
-                    <button onclick="document.getElementById('ai-prompt').value='Analyzuj judikaturu k § 2285 OZ'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-right:5px; margin-bottom:5px;">§ 2285 Judikatura</button>
-                    <button onclick="document.getElementById('ai-prompt').value='Vyhledej judikáty ohledně smluvní pokuty'; window.sendAIQuery()" style="padding:6px 12px; background:#e2e8f0; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-bottom:5px;">Smluvní pokuta</button>
-                `;
+                actions.innerHTML = eIco(`
+                    <button onclick="document.getElementById('ai-prompt').value='Analyzuj judikaturu k § 2285 OZ'; window.sendAIQuery()" style="padding:6px 12px; background:#e0dbd3; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-right:5px; margin-bottom:5px;">§ 2285 Judikatura</button>
+                    <button onclick="document.getElementById('ai-prompt').value='Vyhledej judikáty ohledně smluvní pokuty'; window.sendAIQuery()" style="padding:6px 12px; background:#e0dbd3; border:none; border-radius:4px; font-size:10px; font-weight:700; cursor:pointer; margin-bottom:5px;">Smluvní pokuta</button>
+                `);
             }
         } else if (subTab === 'sovereignty') {
-            output.innerHTML = `
+            output.innerHTML = eIco(`
                 <style>
                     .sov-card {
                         background: rgba(255, 255, 255, 0.7);
@@ -249,27 +249,27 @@ Object.assign(LexisUI.prototype, {
                         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
                     }
                     .sov-btn-blue {
-                        background: linear-gradient(135deg, #003399, #1e40af);
+                        background: linear-gradient(135deg, #8a5320, #8a5320);
                         color: white;
                     }
                     .sov-btn-blue:hover {
-                        background: linear-gradient(135deg, #1e40af, #1d4ed8);
+                        background: linear-gradient(135deg, #8a5320, #8a5320);
                         transform: translateY(-1px);
                         box-shadow: 0 4px 6px rgba(30, 64, 175, 0.2);
                     }
                     .sov-btn-green {
-                        background: linear-gradient(135deg, #16a34a, #15803d);
+                        background: linear-gradient(135deg, #5a8a4a, #4f7a41);
                         color: white;
                     }
                     .sov-btn-green:hover {
-                        background: linear-gradient(135deg, #15803d, #166534);
+                        background: linear-gradient(135deg, #4f7a41, #3f6b34);
                         transform: translateY(-1px);
                         box-shadow: 0 4px 6px rgba(22, 163, 74, 0.2);
                     }
                     .ledger-dot {
                         width: 6px;
                         height: 6px;
-                        background: #6366f1;
+                        background: var(--accent);
                         border-radius: 50%;
                         display: inline-block;
                         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
@@ -282,19 +282,19 @@ Object.assign(LexisUI.prototype, {
                         text-transform: uppercase;
                     }
                 </style>
-                <div style="font-family: 'Inter', system-ui, sans-serif; color: #1e293b; line-height: 1.5; padding: 5px;">
+                <div style="font-family: 'Inter', system-ui, sans-serif; color: #2b2926; line-height: 1.5; padding: 5px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                        <h3 style="margin:0; color:#003399; display:flex; align-items:center; gap:8px; font-size: 14px; font-weight: 800;">
+                        <h3 style="margin:0; color:#8a5320; display:flex; align-items:center; gap:8px; font-size: 14px; font-weight: 800;">
                             <span>🇪🇺</span> Technologická suverenita
                         </h3>
-                        <span style="font-size: 9px; font-weight: bold; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px;">Lokální AI</span>
+                        <span style="font-size: 9px; font-weight: bold; background: #f2ece0; color: #0369a1; padding: 2px 6px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.5px;">Lokální AI</span>
                     </div>
-                    <p style="font-size:11px; color:#64748b; line-height:1.4; margin: 0 0 15px 0;">
+                    <p style="font-size:11px; color:#77716a; line-height:1.4; margin: 0 0 15px 0;">
                         Systém běží lokálně na vašem HW a plně odpovídá evropským nařízením o ochraně osobních údajů (GDPR) a AI Act.
                     </p>
                     
                     <div class="sov-card">
-                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#5c574f; display:flex; align-items:center; gap:6px;">
                             <span>🔋</span> Ekologická Telemetrie & HW
                         </h4>
                         <div id="sovereign-telemetry-status" style="font-size:11px; display:flex; flex-direction:column; gap:6px;">
@@ -303,21 +303,21 @@ Object.assign(LexisUI.prototype, {
                     </div>
 
                     <div class="sov-card">
-                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; justify-content:space-between; align-items:center;">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#5c574f; display:flex; justify-content:space-between; align-items:center;">
                             <span style="display:flex; align-items:center; gap:6px;"><span>📜</span> AI Act Ledger (Audit)</span>
-                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:rgba(0,51,153,0.1); color:#003399; border:1px solid rgba(0,51,153,0.2); border-radius:4px; font-size:9px; font-weight:800; cursor:pointer; transition: all 0.2s;">Ověřit integritu</button>
+                            <button onclick="window.verifyLedgerIntegrity()" style="padding:2px 8px; background:rgba(0,51,153,0.1); color:#8a5320; border:1px solid rgba(0,51,153,0.2); border-radius:4px; font-size:9px; font-weight:800; cursor:pointer; transition: all 0.2s;">Ověřit integritu</button>
                         </h4>
                         <div id="ledger-verification-status" style="font-size:10px; margin-bottom:8px; font-weight:bold;"></div>
-                        <div id="ledger-recent-transactions" style="font-size:10px; color:#64748b; display:flex; flex-direction:column; gap:4px;">
+                        <div id="ledger-recent-transactions" style="font-size:10px; color:#77716a; display:flex; flex-direction:column; gap:4px;">
                             Načítám poslední transakce...
                         </div>
                     </div>
 
                     <div class="sov-card">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#5c574f; display:flex; align-items:center; gap:6px;">
                             <span>🔑</span> Rotace šifrovacích klíčů
                         </h4>
-                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#77716a; line-height:1.3;">
                             Vektorové databáze (RAG) jsou kryptograficky odděleny pro každý spis. Můžete rotovat šifrovací klíče.
                         </p>
                         <button onclick="window.rotateLocalKeys()" class="sov-btn sov-btn-blue">
@@ -327,10 +327,10 @@ Object.assign(LexisUI.prototype, {
                     </div>
 
                     <div class="sov-card">
-                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#475569; display:flex; align-items:center; gap:6px;">
+                        <h4 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#5c574f; display:flex; align-items:center; gap:6px;">
                             <span>📦</span> Dublin Core PDF/A Archivace
                         </h4>
-                        <p style="margin:0 0 12px 0; font-size:10px; color:#64748b; line-height:1.3;">
+                        <p style="margin:0 0 12px 0; font-size:10px; color:#77716a; line-height:1.3;">
                             Stáhněte si standardizovaná metadata v Dublin Core XML formátu k aktuálnímu dokumentu.
                         </p>
                         <button onclick="window.downloadArchivalMetadata()" class="sov-btn sov-btn-green">
@@ -338,7 +338,7 @@ Object.assign(LexisUI.prototype, {
                         </button>
                     </div>
                 </div>
-            `;
+            `);
 
             window.loadSovereignTelemetry = async () => {
                 const statusEl = document.getElementById('sovereign-telemetry-status');
@@ -358,8 +358,8 @@ Object.assign(LexisUI.prototype, {
                     const vramUsedGb = vramTotal - vramFree;
                     const vramPct = Math.round((vramUsedGb / vramTotal) * 100);
 
-                    statusEl.innerHTML = `
-                        <div style="font-size: 10px; color: #64748b; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                    statusEl.innerHTML = eIco(`
+                        <div style="font-size: 10px; color: #77716a; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-bottom: 1px solid #edeae4; padding-bottom: 8px;">
                             <div><strong>OS:</strong> ${stats.platform} (${stats.arch})</div>
                             <div style="text-align: right;"><strong>CPU:</strong> ${stats.cpuCores} jader</div>
                             <div><strong>Uptime:</strong> ${Math.round(stats.uptimeSeconds / 3600)} hod</div>
@@ -367,35 +367,35 @@ Object.assign(LexisUI.prototype, {
                         </div>
                         
                         <div style="margin-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #5c574f; margin-bottom: 4px;">
                                 <span>🧠 Operační paměť (RAM)</span>
                                 <span>${ramUsedGb.toFixed(1)} / ${stats.memoryTotalGb} GB (${ramPct}%)</span>
                             </div>
-                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
-                                <div style="width: ${ramPct}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #6366f1); border-radius: 3px;"></div>
+                            <div style="width: 100%; height: 6px; background: #e0dbd3; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${ramPct}%; height: 100%; background: linear-gradient(90deg, #9a5b22, var(--accent)); border-radius: 3px;"></div>
                             </div>
                         </div>
 
                         <div>
-                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #475569; margin-bottom: 4px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: #5c574f; margin-bottom: 4px;">
                                 <span>🔋 Grafická paměť (VRAM)</span>
                                 <span>${vramUsedGb.toFixed(1)} / ${vramTotal} GB (${vramPct}%)</span>
                             </div>
-                            <div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
-                                <div style="width: ${vramPct}%; height: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); border-radius: 3px;"></div>
+                            <div style="width: 100%; height: 6px; background: #e0dbd3; border-radius: 3px; overflow: hidden;">
+                                <div style="width: ${vramPct}%; height: 100%; background: linear-gradient(90deg, #5a8a4a, #9a5b22); border-radius: 3px;"></div>
                             </div>
                         </div>
-                    `;
+                    `);
                 } catch (e) {
-                    statusEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`;
+                    statusEl.innerHTML = eIco(`<span style="color:#c0553f; font-weight:700;">Chyba: Lokální server neodpovídá.</span>`);
                 }
             };
 
             window.verifyLedgerIntegrity = async () => {
                 const statusEl = document.getElementById('ledger-verification-status');
                 if (!statusEl) return;
-                statusEl.innerHTML = "Ověřuji hashovací blockchain řetězec...";
-                statusEl.style.color = "#64748b";
+                statusEl.innerHTML = eIco("Ověřuji hashovací blockchain řetězec...");
+                statusEl.style.color = "#77716a";
                 
                 try {
                     const conn = this.getLexisLocalConnection();
@@ -404,15 +404,15 @@ Object.assign(LexisUI.prototype, {
                     
                     const data = await response.json();
                     if (data.valid) {
-                        statusEl.innerHTML = "✅ Integrita ledgeru je 100% v pořádku!";
-                        statusEl.style.color = "#16a34a";
+                        statusEl.innerHTML = eIco("✅ Integrita ledgeru je 100% v pořádku!");
+                        statusEl.style.color = "#5a8a4a";
                     } else {
-                        statusEl.innerHTML = `❌ Narušena integrita: ${data.reason}`;
-                        statusEl.style.color = "#ef4444";
+                        statusEl.innerHTML = eIco(`❌ Narušena integrita: ${data.reason}`);
+                        statusEl.style.color = "#c0553f";
                     }
                 } catch (e) {
-                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
-                    statusEl.style.color = "#ef4444";
+                    statusEl.innerHTML = eIco(`❌ Selhalo: ${e.message}`);
+                    statusEl.style.color = "#c0553f";
                 }
             };
 
@@ -427,31 +427,31 @@ Object.assign(LexisUI.prototype, {
                     
                     const logs = await response.json();
                     if (logs.length === 0) {
-                        listEl.innerHTML = "<div style='text-align:center; padding:10px; color:#94a3b8; font-size:10px;'>Žádné záznamy v ledgeru.</div>";
+                        listEl.innerHTML = eIco("<div style='text-align:center; padding:10px; color:#a09a92; font-size:10px;'>Žádné záznamy v ledgeru.</div>");
                         return;
                     }
                     
                     const recent = logs.slice(-4).reverse();
-                    listEl.innerHTML = `
+                    listEl.innerHTML = eIco(`
                         <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px; position: relative;">
                             ${recent.map((log, idx) => {
                                 const isKeyRotation = log.action && log.action.includes('rotate');
-                                const badgeColor = isKeyRotation ? 'background:#fee2e2; color:#ef4444;' : 'background:#e0f2fe; color:#0369a1;';
+                                const badgeColor = isKeyRotation ? 'background:#f0dcd6; color:#c0553f;' : 'background:#f2ece0; color:#0369a1;';
                                 return `
                                     <div style="display: flex; gap: 10px; align-items: flex-start; position: relative;">
                                         <div style="display: flex; flex-direction: column; align-items: center;">
                                             <span class="ledger-dot"></span>
-                                            ${idx < recent.length - 1 ? '<div style="width: 1px; height: 35px; background: #e2e8f0; margin-top: 4px;"></div>' : ''}
+                                            ${idx < recent.length - 1 ? '<div style="width: 1px; height: 35px; background: #e0dbd3; margin-top: 4px;"></div>' : ''}
                                         </div>
                                         <div style="flex: 1; font-size: 10px;">
                                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                                <span style="font-weight: bold; color: #1e293b;">${log.action}</span>
+                                                <span style="font-weight: bold; color: #2b2926;">${log.action}</span>
                                                 <span class="ledger-badge" style="${badgeColor}">${log.humanApproved ? 'ověřeno' : 'systém'}</span>
                                             </div>
-                                            <div style="color: #64748b; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
+                                            <div style="color: #77716a; font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">
                                                 ${log.prompt || 'Bez dodatečných parametrů'}
                                             </div>
-                                            <div style="color: #94a3b8; font-size: 8px; font-family: monospace; margin-top: 1px;">
+                                            <div style="color: #a09a92; font-size: 8px; font-family: monospace; margin-top: 1px;">
                                                 Hash: ${log.hash ? log.hash.substring(0, 16) : 'N/A'}
                                             </div>
                                         </div>
@@ -459,17 +459,17 @@ Object.assign(LexisUI.prototype, {
                                 `;
                             }).join('')}
                         </div>
-                    `;
+                    `);
                 } catch (e) {
-                    listEl.innerHTML = "<div style='color:#ef4444; font-size:10px;'>Chyba při načítání auditních logů.</div>";
+                    listEl.innerHTML = eIco("<div style='color:#c0553f; font-size:10px;'>Chyba při načítání auditních logů.</div>");
                 }
             };
 
             window.rotateLocalKeys = async () => {
                 const statusEl = document.getElementById('key-rotation-status');
                 if (!statusEl) return;
-                statusEl.innerHTML = "Rotuji klíče a přešifrovávám databázi...";
-                statusEl.style.color = "#64748b";
+                statusEl.innerHTML = eIco("Rotuji klíče a přešifrovávám databázi...");
+                statusEl.style.color = "#77716a";
                 
                 try {
                     const conn = this.getLexisLocalConnection();
@@ -478,14 +478,14 @@ Object.assign(LexisUI.prototype, {
                     
                     const data = await response.json();
                     if (data.success) {
-                        statusEl.innerHTML = "✅ Klíč úspěšně rotován a RAG indexy přešifrovány!";
-                        statusEl.style.color = "#16a34a";
+                        statusEl.innerHTML = eIco("✅ Klíč úspěšně rotován a RAG indexy přešifrovány!");
+                        statusEl.style.color = "#5a8a4a";
                     } else {
                         throw new Error(data.error || "Neznámá chyba.");
                     }
                 } catch (e) {
-                    statusEl.innerHTML = `❌ Selhalo: ${e.message}`;
-                    statusEl.style.color = "#ef4444";
+                    statusEl.innerHTML = eIco(`❌ Selhalo: ${e.message}`);
+                    statusEl.style.color = "#c0553f";
                 }
             };
 
@@ -533,15 +533,15 @@ Object.assign(LexisUI.prototype, {
             window.loadSovereignTelemetry();
             window.loadRecentLedgerTransactions();
         } else if (subTab === 'summary') {
-            output.innerHTML = "📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.";
+            output.innerHTML = eIco("📝 <b>Automatické shrnutí dokumentu</b><br><br>Klikněte na tlačítko níže pro vygenerování stručného shrnutí celého aktuálního dokumentu.");
             if (actions) {
                 actions.style.display = 'flex';
-                actions.innerHTML = `
+                actions.innerHTML = eIco(`
                     <button onclick="document.getElementById('ai-prompt').value='Vytvoř stručné a strukturované shrnutí tohoto textu.'; window.sendAIQuery()" style="padding:8px 16px; background:var(--word-blue); color:white; border:none; border-radius:4px; font-size:11px; font-weight:700; cursor:pointer;">⚡ Spustit shrnutí</button>
-                `;
+                `);
             }
         } else if (subTab === 'kb') {
-            output.innerHTML = "🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.";
+            output.innerHTML = eIco("🧠 <b>Znalostní báze (Knowledge Base)</b><br><br>AI využívá lokálně nahrané soubory z vaší kanceláře. Zadejte dotaz mířící do vašich interních předpisů a doložek.");
             if (actions) actions.style.display = 'none';
         }
     },
@@ -600,12 +600,12 @@ Object.assign(LexisUI.prototype, {
         dialog.style.transform = 'scale(0.95)';
         dialog.style.transition = 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
-        dialog.innerHTML = `
+        dialog.innerHTML = eIco(`
             <div style="display: flex; align-items: center; gap: 10px;">
-                <div style="width: 36px; height: 36px; background: rgba(22, 163, 74, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #16a34a;">🛡️</div>
+                <div style="width: 36px; height: 36px; background: rgba(22, 163, 74, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #5a8a4a;">🛡️</div>
                 <div>
-                    <h3 style="margin: 0; color: #1e293b; font-size: 15px; font-weight: 800;">GDPR Data Shield Anonymizace</h3>
-                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
+                    <h3 style="margin: 0; color: #2b2926; font-size: 15px; font-weight: 800;">GDPR Data Shield Anonymizace</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 11px; color: #77716a;">
                         Detekovali a odstranili jsme citlivé údaje. Zkontrolujte výsledek a uložte změny.
                     </p>
                 </div>
@@ -613,20 +613,20 @@ Object.assign(LexisUI.prototype, {
             
             <div style="display: flex; gap: 20px; height: 320px;">
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
-                    <span style="font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase;">PŮVODNÍ TEXT</span>
-                    <textarea readonly style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; resize: none; background: #f8fafc; color: #94a3b8; line-height: 1.5; font-family: inherit;">${originalText}</textarea>
+                    <span style="font-size: 10px; font-weight: 800; color: #a09a92; letter-spacing: 0.5px; text-transform: uppercase;">PŮVODNÍ TEXT</span>
+                    <textarea readonly style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #e0dbd3; border-radius: 8px; resize: none; background: #faf9f7; color: #a09a92; line-height: 1.5; font-family: inherit;">${originalText}</textarea>
                 </div>
                 <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
-                    <span style="font-size: 10px; font-weight: 800; color: #16a34a; letter-spacing: 0.5px; text-transform: uppercase;">ANONYMIZOVANÝ TEXT</span>
-                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #bbf7d0; border-radius: 8px; resize: none; background: #f0fdf4; color: #166534; line-height: 1.5; font-family: inherit; outline: none; transition: border-color 0.2s;">${anonymizedText}</textarea>
+                    <span style="font-size: 10px; font-weight: 800; color: #5a8a4a; letter-spacing: 0.5px; text-transform: uppercase;">ANONYMIZOVANÝ TEXT</span>
+                    <textarea id="anonymized-preview-text" style="flex: 1; font-size: 11px; padding: 12px; border: 1px solid #d9e6d0; border-radius: 8px; resize: none; background: #eef3ea; color: #3f6b34; line-height: 1.5; font-family: inherit; outline: none; transition: border-color 0.2s;">${anonymizedText}</textarea>
                 </div>
             </div>
             
             <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 5px;">
-                <button id="btn-anon-cancel" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; color: #475569; transition: background 0.2s;">Zrušit</button>
-                <button id="btn-anon-confirm" style="padding: 10px 20px; background: linear-gradient(135deg, #16a34a, #15803d); color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);">Nahradit text v dokumentu</button>
+                <button id="btn-anon-cancel" style="padding: 10px 20px; background: #edeae4; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; color: #5c574f; transition: background 0.2s;">Zrušit</button>
+                <button id="btn-anon-confirm" style="padding: 10px 20px; background: linear-gradient(135deg, #5a8a4a, #4f7a41); color: white; border: none; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);">Nahradit text v dokumentu</button>
             </div>
-        `;
+        `);
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
@@ -663,7 +663,7 @@ Object.assign(LexisUI.prototype, {
         const form = document.getElementById('variables-form');
         if (!form) return;
         
-        form.innerHTML = '';
+        form.innerHTML = eIco('');
         const text = this.core.getText();
         
         const regex = /\[([A-ZÁ-Ž0-9_]{3,30})\]|\{\{([a-zA-Z0-9_á-žÁ-Ž]{2,30})\}\}/g;
@@ -676,7 +676,7 @@ Object.assign(LexisUI.prototype, {
         }
         
         if (variables.size === 0) {
-            form.innerHTML = '<div style="font-size:11px; color:#64748b; text-align:center; padding:10px;">Nebyly nalezeny žádné proměnné typu [JMÉNO] nebo {{jmeno}}.</div>';
+            form.innerHTML = eIco('<div style="font-size:11px; color:#77716a; text-align:center; padding:10px;">Nebyly nalezeny žádné proměnné typu [JMÉNO] nebo {{jmeno}}.</div>');
             return;
         }
         
@@ -685,13 +685,13 @@ Object.assign(LexisUI.prototype, {
             container.style = "display:flex; flex-direction:column; gap:4px; margin-bottom:10px;";
             
             const label = document.createElement('label');
-            label.style = "font-size:10px; font-weight:700; color:#475569; text-transform:uppercase;";
+            label.style = "font-size:10px; font-weight:700; color:#5c574f; text-transform:uppercase;";
             label.innerText = varName;
             
             const input = document.createElement('input');
             input.type = 'text';
             input.placeholder = `Vyplňte ${varName}...`;
-            input.style = "padding:6px; border:1px solid #cbd5e1; border-radius:4px; font-size:12px;";
+            input.style = "padding:6px; border:1px solid #ddd6cb; border-radius:4px; font-size:12px;";
             
             input.addEventListener('input', () => {
                 const val = input.value;
@@ -702,7 +702,7 @@ Object.assign(LexisUI.prototype, {
                     .split(`[${varName}]`).join(val)
                     .split(`{{${varName}}}`).join(val);
                 
-                this.core.quill.root.innerHTML = updatedHtml;
+                this.core.quill.root.innerHTML = eIco(updatedHtml);
             });
             
             container.appendChild(label);
@@ -875,17 +875,17 @@ Object.assign(LexisUI.prototype, {
                         const result = await window.electronAPI.searchAres(cleanIco);
                         if (result && result.success) {
                             const d = result.data;
-                            const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                            const baseStyle = "border: 1px solid #e0dbd3; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #faf9f7;";
                             const html = `
                                 <div style="${baseStyle}">
-                                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
-                                    <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES: Právnická/Fyzická osoba</p>
-                                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
-                                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #9a5b22, #8a5320);"></div>
+                                    <p style="margin-bottom: 8px; color: #9a5b22; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES: Právnická/Fyzická osoba</p>
+                                    <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>${d.obchodniJmeno}</strong></p>
+                                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
                                         <div><strong>IČO:</strong> ${d.ico}</div>
                                         <div><strong>DIČ:</strong> ${d.dic || 'Neuvedeno'}</div>
                                         <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
-                                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Staženo z Rejstříku MFČR (${d.pravniForma})</div>
+                                        <div style="grid-column: span 2; font-size: 11px; color: #a09a92; font-style: italic;">Staženo z Rejstříku MFČR (${d.pravniForma})</div>
                                     </div>
                                 </div>
                                 <p><br></p>
@@ -909,17 +909,17 @@ Object.assign(LexisUI.prototype, {
                     };
                     const d = results[cleanIco];
                     if (d) {
-                        const baseStyle = "border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #f8fafc;";
+                        const baseStyle = "border: 1px solid #e0dbd3; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #faf9f7;";
                         const html = `
                             <div style="${baseStyle}">
-                                <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #2563eb, #1d4ed8);"></div>
-                                <p style="margin-bottom: 8px; color: #2563eb; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES (Simulace): Právnická osoba</p>
-                                <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>${d.obchodniJmeno}</strong></p>
-                                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                                <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #9a5b22, #8a5320);"></div>
+                                <p style="margin-bottom: 8px; color: #9a5b22; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES (Simulace): Právnická osoba</p>
+                                <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>${d.obchodniJmeno}</strong></p>
+                                <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
                                     <div><strong>IČO:</strong> ${d.ico}</div>
                                     <div><strong>DIČ:</strong> ${d.dic}</div>
                                     <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
-                                    <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Simulovaná data pro prohlížeč (${d.pravniForma})</div>
+                                    <div style="grid-column: span 2; font-size: 11px; color: #a09a92; font-style: italic;">Simulovaná data pro prohlížeč (${d.pravniForma})</div>
                                 </div>
                             </div>
                             <p><br></p>
@@ -984,7 +984,7 @@ Object.assign(LexisUI.prototype, {
             this.isDictating = false;
             if (btn) {
                 btn.style.background = '';
-                btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+                btn.innerHTML = eIco('<div class="icon-sq">🎙️</div>Diktovat');
             }
             this.customAlert("🎙️ <b>Diktování zastaveno.</b>");
         } else {
@@ -1003,7 +1003,7 @@ Object.assign(LexisUI.prototype, {
                 this.isDictating = true;
                 if (btn) {
                     btn.style.background = 'rgba(239, 68, 68, 0.2)';
-                    btn.innerHTML = '<div class="icon-sq">🔴</div>Nahrávám...';
+                    btn.innerHTML = eIco('<div class="icon-sq">🔴</div>Nahrávám...');
                 }
             };
             
@@ -1022,7 +1022,7 @@ Object.assign(LexisUI.prototype, {
                 this.isDictating = false;
                 if (btn) {
                     btn.style.background = '';
-                    btn.innerHTML = '<div class="icon-sq">🎙️</div>Diktovat';
+                    btn.innerHTML = eIco('<div class="icon-sq">🎙️</div>Diktovat');
                 }
             };
             
@@ -1035,7 +1035,7 @@ Object.assign(LexisUI.prototype, {
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);";
         
         const modal = document.createElement('div');
-        modal.style = "background:#fff;padding:28px;border-radius:16px;width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif;border:1px solid #e2e8f0;position:relative;animation: modalFadeIn 0.3s ease;";
+        modal.style = "background:#fff;padding:28px;border-radius:16px;width:400px;box-shadow:0 20px 40px rgba(0,0,0,0.2);font-family:'Inter',sans-serif;border:1px solid #e0dbd3;position:relative;animation: modalFadeIn 0.3s ease;";
         
         const styleSheet = document.createElement("style");
         styleSheet.innerText = `
@@ -1046,35 +1046,35 @@ Object.assign(LexisUI.prototype, {
         `;
         document.head.appendChild(styleSheet);
         
-        modal.innerHTML = `
-            <div style="font-weight:700;font-size:18px;margin-bottom:8px;color:#1e293b;display:flex;align-items:center;gap:10px;">
+        modal.innerHTML = eIco(`
+            <div style="font-weight:700;font-size:18px;margin-bottom:8px;color:#2b2926;display:flex;align-items:center;gap:10px;">
                 <span>✉️</span> Dopis Online (Česká pošta)
             </div>
-            <div style="font-size:13px;color:#64748b;margin-bottom:20px;">Odešlete aktuální dokument jako fyzický dopis.</div>
+            <div style="font-size:13px;color:#77716a;margin-bottom:20px;">Odešlete aktuální dokument jako fyzický dopis.</div>
             
             <div style="margin-bottom:15px;">
-                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Adresát (Příjemce):</label>
-                <input id="post-recipient" type="text" value="Jan Novák, Jankovcova 1522, 170 00 Praha" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;box-sizing:border-box;">
+                <label style="display:block;font-size:11px;font-weight:700;color:#5c574f;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Adresát (Příjemce):</label>
+                <input id="post-recipient" type="text" value="Jan Novák, Jankovcova 1522, 170 00 Praha" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;box-sizing:border-box;">
             </div>
             
             <div style="margin-bottom:20px;">
-                <label style="display:block;font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Typ zásilky:</label>
-                <select id="post-type" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;" onchange="document.getElementById('post-price').innerText = this.value === 'registered' ? '54 Kč' : '26 Kč'">
+                <label style="display:block;font-size:11px;font-weight:700;color:#5c574f;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Typ zásilky:</label>
+                <select id="post-type" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;" onchange="document.getElementById('post-price').innerText = this.value === 'registered' ? '54 Kč' : '26 Kč'">
                     <option value="standard">Obyčejné psaní (A5/A4) — 26 Kč</option>
                     <option value="registered">Doporučené psaní — 54 Kč</option>
                 </select>
             </div>
             
-            <div style="background:#f8fafc;padding:12px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#334155;">
+            <div style="background:#faf9f7;padding:12px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#4a453f;">
                 <span>Předpokládaná cena:</span>
-                <strong id="post-price" style="color:#2563eb;font-size:15px;margin-left:auto;">26 Kč</strong>
+                <strong id="post-price" style="color:#9a5b22;font-size:15px;margin-left:auto;">26 Kč</strong>
             </div>
             
             <div style="display:flex;justify-content:flex-end;gap:10px;">
-                <button id="post-cancel" style="padding:10px 18px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px;">Zrušit</button>
-                <button id="post-send" style="padding:10px 18px;background:#2563eb;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(37,99,235,0.2);">Odeslat dopis</button>
+                <button id="post-cancel" style="padding:10px 18px;background:#edeae4;color:#5c574f;border:none;border-radius:8px;cursor:pointer;font-weight:500;font-size:13px;">Zrušit</button>
+                <button id="post-send" style="padding:10px 18px;background:#9a5b22;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;font-size:13px;box-shadow:0 4px 10px rgba(37,99,235,0.2);">Odeslat dopis</button>
             </div>
-        `;
+        `);
         
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
@@ -1160,30 +1160,64 @@ Tímto způsobem funguje bezproblémové propojení s vaším stávajícím clou
             text = `<div style="max-height: 400px; overflow-y: auto; text-align: left; padding: 10px; font-family: inherit; line-height: 1.6; font-size: 13px;">
                 <p>Vítejte u kompletního průvodce pro nastavení <b>100% offline umělé inteligence</b> v LexisEditoru. Všechna data jsou zpracovávána výhradně na vašem lokálním počítači.</p>
                 
-                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:16px;">🍏 Metoda A: Apple Intelligence (přes "apfel")</h3>
+                <h3 style="color:#9a5b22; border-bottom:1px solid #e4e0d8; padding-bottom:4px; margin-top:16px;">🍏 Metoda A: Apple Intelligence (přes "apfel")</h3>
                 <p>Umožňuje přímý přístup k integrovanému 3B AI modelu ve vašem Macu s procesorem Apple Silicon (M1/M2/M3/M4) s macOS 15.0+ (Sequoia).</p>
                 <ol style="padding-left: 20px;">
                     <li>Otevřete aplikaci <b>Terminál</b>.</li>
-                    <li>Nainstalujte Homebrew (pokud jej nemáte):<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></li>
-                    <li>Nainstalujte nástroj apfel:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">brew install Arthur-Ficial/tap/apfel</code></li>
-                    <li>Spusťte lokální AI server:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px; font-weight:bold;">apfel --serve</code></li>
+                    <li>Nainstalujte Homebrew (pokud jej nemáte):<br><code style="background:#f4f1ec; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code></li>
+                    <li>Nainstalujte nástroj apfel:<br><code style="background:#f4f1ec; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">brew install Arthur-Ficial/tap/apfel</code></li>
+                    <li>Spusťte lokální AI server:<br><code style="background:#f4f1ec; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px; font-weight:bold;">apfel --serve</code></li>
                     <li>Na kartě <b>LexisAI</b> zvolte jako poskytovatele <b>Apple Intelligence (apfel)</b>. Endpoint a model se nastaví automaticky.</li>
                 </ol>
-                <div style="background:rgba(37,99,235,0.08); border-left:4px solid #2563eb; padding:8px 12px; margin:12px 0; border-radius:0 4px 4px 0; font-size:12px;">
+                <div style="background:rgba(37,99,235,0.08); border-left:4px solid #9a5b22; padding:8px 12px; margin:12px 0; border-radius:0 4px 4px 0; font-size:12px;">
                     💡 <b>Tip:</b> Okno s běžícím příkazem <code>apfel --serve</code> ponechte otevřené na pozadí.
                 </div>
 
-                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🦙 Metoda B: Ollama (Univerzální lokální AI)</h3>
+                <h3 style="color:#9a5b22; border-bottom:1px solid #e4e0d8; padding-bottom:4px; margin-top:20px;">🦙 Metoda B: Ollama (Univerzální lokální AI)</h3>
                 <p>Vhodné pro Windows, Linux i starší Intel Macy. Umožňuje spouštět libovolné open-source modely (např. Llama 3).</p>
                 <ol style="padding-left: 20px;">
-                    <li>Stáhněte a nainstalujte aplikaci ze stránky <a href="https://ollama.com" target="_blank" style="color:#2563eb; text-decoration:underline;">ollama.com</a>.</li>
-                    <li>Otevřete Terminál / Příkazový řádek a stáhněte model Llama 3:<br><code style="background:#f3f4f6; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">ollama run llama3</code></li>
+                    <li>Stáhněte a nainstalujte aplikaci ze stránky <a href="https://ollama.com" target="_blank" style="color:#9a5b22; text-decoration:underline;">ollama.com</a>.</li>
+                    <li>Otevřete Terminál / Příkazový řádek a stáhněte model Llama 3:<br><code style="background:#f4f1ec; padding:2px 6px; border-radius:4px; display:block; margin:4px 0; font-family:monospace; font-size:11px;">ollama run llama3</code></li>
                     <li>V Ribbonu na kartě <b>LexisAI</b> zvolte poskytovatele <b>Ollama (Local)</b>.</li>
                 </ol>
 
-                <h3 style="color:#2563eb; border-bottom:1px solid #e5e7eb; padding-bottom:4px; margin-top:20px;">🔒 Absolutní Datová Suverenita</h3>
+                <h3 style="color:#9a5b22; border-bottom:1px solid #e4e0d8; padding-bottom:4px; margin-top:20px;">🔒 Absolutní Datová Suverenita</h3>
                 <p>Veškeré rešerše, audity smluv i hlasové diktování probíhají offline v paměti vašeho počítače. Žádná data neopouštějí váš stroj.</p>
             </div>`;
+        } else if (topic === 'isds') {
+            title = "📨 Datová schránka (ISDS)";
+            text = `1. <b>Nastavení DS</b> (karta <i>Právní nástroje</i> → <b>Nastavení DS</b>): zadejte přihlašovací údaje, případně certifikát.<br>
+2. <b>Odeslání:</b> tlačítkem <b>Dopis Online</b> nebo <b>Odpovědět</b> připravíte podání; systém jej zařadí k odeslání (sledujte ve složce <i>Odeslané</i>).<br>
+3. <b>Import ZFO:</b> přijatou zprávu ve formátu <code>.zfo</code> načtete tlačítkem <b>Import ZFO</b>.<br>
+4. <b>Doručenka:</b> stav doručení uvidíte u odeslané zprávy.<br>
+5. Před odesláním můžete dokument opatřit <b>E-podpisem</b>.<br><br>
+<i>Vyžaduje platné přihlášení k ISDS v Nastavení DS.</i>`;
+        } else if (topic === 'anonymize') {
+            title = "🛡️ Anonymizace (GDPR) a čištění metadat";
+            text = `1. <b>GDPR Shield / Anonymizovat:</b> označte text (nebo použijte na celý dokument) a funkce nahradí jména, rodná čísla a adresy zástupnými znaky.<br>
+2. <b>Vždy zkontrolujte výsledek</b> před odesláním — v exportu je anonymizace nevratná.<br>
+3. <b>Vyčistit metadata:</b> před odesláním DOCX/PDF odstraní skryté údaje (autor, historie úprav, komentáře).<br><br>
+<i>Tip: pro čistý úřední výstup vypněte také režim sledování změn.</i>`;
+        } else if (topic === 'security') {
+            title = "🔒 Zabezpečení, zámek a záloha klíče";
+            text = `1. <b>Zabezpečení</b> (karta <i>Právní nástroje</i>): zapněte <b>zámek aplikace</b>, volitelně <b>Touch ID</b>.<br>
+2. Nastavte <b>Heslo / PIN</b> v okně Zabezpečení.<br>
+3. <b>Záloha klíče — KRITICKÉ:</b> data jsou šifrovaná lokálně. Bez zálohy klíče je při ztrátě počítače nebo reinstalaci <b>nelze obnovit</b>. Uložte zálohu klíče na bezpečné místo (tlačítko <b>Záloha klíče</b>).<br>
+4. <b>Zamknout nyní</b> uzamkne aplikaci kdykoli ručně.`;
+        } else if (topic === 'citations') {
+            title = "⚖️ Citace: Legal Linker, judikatura, rejstřík";
+            text = `1. <b>Legal Linker / Odkazovat zákony:</b> automaticky převede zmínky paragrafů a zákonů na ověřené hypertextové odkazy.<br>
+2. <b>Judikatura:</b> vyhledá rozhodnutí podle spisové značky nebo tématu.<br>
+3. <b>Citace:</b> vloží citaci na pozici kurzoru.<br>
+4. <b>Rejstřík citací</b> (Table of Authorities): vygeneruje přehled všech citovaných zdrojů v dokumentu.<br><br>
+<i>Tip: před finalizací spusťte <b>Prověřit text</b> (audit) pro kontrolu odkazů a hierarchie.</i>`;
+        } else if (topic === 'ai-usage') {
+            title = "✨ Práce s LexisAI (panel)";
+            text = `Otevřete AI panel (<b>AI Bridge</b> / ikona jiskry).<br><br>
+<b>Nad výběrem textu:</b> Analyzovat, Přepsat, Vysvětlit, Přeložit.<br>
+<b>Nad celým dokumentem:</b> Hledat rizika, Shrnutí, Dopsat AI, Nová doložka.<br>
+<b>Persona (swarm) a model:</b> zvolte styl agenta (Rešeršník / Spisovatel / Stylista / Kontrolor / Sekretářka) a jazykový model.<br><br>
+<i>Vše běží přes zvoleného poskytovatele — u lokálního (Ollama / Apple Intelligence) zcela offline. Zprovoznění lokální AI viz „Návod: Lokální AI".</i>`;
         } else if (topic === 'updates') {
             title = "🔄 Kontrola aktualizací";
             text = `<b>Aktuální verze:</b> v${this.appVersion || '—'}<br><br>
@@ -1192,7 +1226,7 @@ Provádím kontrolu lokálního úložiště a serverů...<br>
         } else if (topic === 'about') {
             title = "ℹ️ O aplikaci LexisEditor";
             text = `<b>LexisEditor Professional Legal Workspace</b><br>
-Verze: <b>3.5.0</b><br><br>
+Verze: <b>${this.appVersion || '—'}</b><br><br>
 Lokální právní textový procesor s integrovaným AI asistentem, napojením na státní registry (ARES) a šifrovaným úložištěm.<br><br>
 <i>Vyvinuto s důrazem na absolutní datovou suverenitu advokátní praxe. All rights reserved.</i>`;
         }
@@ -1401,7 +1435,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
             if (response.ok) {
                 const data = await response.json();
                 if (data && data.models && data.models.length > 0) {
-                    modelSelect.innerHTML = '';
+                    modelSelect.innerHTML = eIco('');
                     data.models.forEach(m => {
                         const opt = document.createElement('option');
                         opt.value = m.name;
@@ -1425,31 +1459,46 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
     },
 
     setDocumentStatus(status, suppressNotification = false) {
-        this.documentStatus = status;
+        // Status je NEPOVINNÝ — prázdný / „none" = bez stavu (odznak se skryje).
+        if (status === 'none' || status === '') status = null;
+        this.documentStatus = status || null;
         const badge = document.getElementById('doc-status-badge');
         if (!badge) return;
-        
+
         // Remove all previous status classes
         badge.className = 'status-pill';
-        
-        let label = '';
+
+        let label = '', iconId = '';
         if (status === 'draft') {
             badge.classList.add('status-draft');
-            label = '✍️ Rozpracované';
+            label = 'Rozpracované'; iconId = 'psat';
         } else if (status === 'ai') {
             badge.classList.add('status-ai');
-            label = '✨ Generované AI';
+            label = 'Generované AI'; iconId = 'ai-jiskra';
         } else if (status === 'review') {
             badge.classList.add('status-review');
-            label = '🔍 Ke kontrole';
+            label = 'Ke kontrole'; iconId = 'najit';
         } else if (status === 'final') {
             badge.classList.add('status-final');
-            label = '✅ Hotové';
+            label = 'Hotové'; iconId = 'prijmout';
         }
-        
-        badge.innerText = label;
-        
-        if (!suppressNotification) {
+
+        // Stav je NEPOVINNÝ. Se stavem → barevný odznak s ikonou; bez stavu → tichá
+        // volitelná značka „+ Stav" (uživatel ji může ignorovat, nic není vynuceno).
+        if (label) {
+            var ic = (window.LexisIcons && iconId)
+                ? window.LexisIcons.sizeSvg(window.LexisIcons.get(iconId), 12).replace('display:block', 'display:inline-block;vertical-align:-2px;margin-right:4px')
+                : '';
+            badge.innerHTML = eIco(ic + label);
+            badge.title = 'Změnit stav dokumentu';
+        } else {
+            badge.classList.add('status-empty');
+            badge.innerHTML = eIco('<span class="status-add-plus">+</span>Stav');
+            badge.title = 'Přidat stav dokumentu (volitelné)';
+        }
+        badge.style.display = '';
+
+        if (!suppressNotification && label) {
             if (status === 'final') {
                 this.customConfirm(
                     `💼 <b>Stav dokumentu změněn na: ✅ Hotové</b><br><br>` +
@@ -1496,7 +1545,7 @@ Lokální právní textový procesor s integrovaným AI asistentem, napojením n
                 html: html,
                 text: text,
                 title: title,
-                status: this.documentStatus || 'draft',
+                status: this.documentStatus || null,
                 deadline: this.currentDocumentDeadline || null,
                 cj: this.currentDocumentCj || '',
                 headerHtml: headerHtml,

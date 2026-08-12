@@ -146,7 +146,7 @@
             #editor-wrapper.show-ruler::before {
                 content: ""; position: absolute; top: -18px; left: 0; right: 0; height: 18px;
                 background-image: repeating-linear-gradient(to right,
-                    #94a3b8 0, #94a3b8 1px, transparent 1px, transparent 20px);
+                    #a09a92 0, #a09a92 1px, transparent 1px, transparent 20px);
             }
         `;
         document.head.appendChild(style);
@@ -202,7 +202,7 @@
             // data-atributy umožní budoucí export vodoznaku do PDF/DOCX.
             wmLayer.setAttribute('data-watermark-type', 'image');
             wmLayer.setAttribute('data-watermark-src', e.target.result);
-            wmLayer.innerHTML = `<img src="${e.target.result}" alt="vodoznak" style="max-width:60%; max-height:60%; opacity:0.15; transform: rotate(-30deg); user-select:none;">`;
+            wmLayer.innerHTML = eIco(`<img src="${e.target.result}" alt="vodoznak" style="max-width:60%; max-height:60%; opacity:0.15; transform: rotate(-30deg); user-select:none;">`);
             toast('🖼️ Obrázkový vodoznak byl nastaven.');
         };
         reader.readAsDataURL(file);

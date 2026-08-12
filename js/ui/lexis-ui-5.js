@@ -44,7 +44,7 @@ Object.assign(LexisUI.prototype, {
         overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);font-family:'Inter',sans-serif;";
         
         const modal = document.createElement('div');
-        modal.style = "background:#ffffff;border-radius:16px;width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);border:1px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;animation: modalFadeIn 0.25s ease-out;";
+        modal.style = "background:#ffffff;border-radius:16px;width:480px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);border:1px solid #e0dbd3;display:flex;flex-direction:column;overflow:hidden;animation: modalFadeIn 0.25s ease-out;";
 
         // Ensure keyframes animation is present
         if (!document.getElementById('modal-fade-in-style')) {
@@ -59,35 +59,35 @@ Object.assign(LexisUI.prototype, {
             document.head.appendChild(styleSheet);
         }
 
-        modal.innerHTML = `
-            <div style="padding:20px 24px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+        modal.innerHTML = eIco(`
+            <div style="padding:20px 24px;background:#faf9f7;border-bottom:1px solid #e0dbd3;display:flex;justify-content:space-between;align-items:center;">
                 <div>
-                    <h2 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">⏱️ Vykázat činnost</h2>
-                    <p style="margin:2px 0 0 0;font-size:11px;color:#64748b;">Zapsat odpracovaný čas do výkazů v LexisLocal</p>
+                    <h2 style="margin:0;font-size:16px;font-weight:700;color:#2b2926;display:flex;align-items:center;gap:8px;">⏱️ Vykázat činnost</h2>
+                    <p style="margin:2px 0 0 0;font-size:11px;color:#77716a;">Zapsat odpracovaný čas do výkazů v LexisLocal</p>
                 </div>
-                <button id="tt-close" style="background:none;border:none;font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;outline:none;padding:0;">&times;</button>
+                <button id="tt-close" style="background:none;border:none;font-size:24px;color:#a09a92;cursor:pointer;line-height:1;outline:none;padding:0;">&times;</button>
             </div>
             
             <div style="padding:24px;display:flex;flex-direction:column;gap:16px;box-sizing:border-box;">
                 <div style="display:flex;flex-direction:column;gap:6px;">
-                    <label style="font-size:12px;font-weight:600;color:#475569;">Spis / Věc / Dokument</label>
-                    <input type="text" id="tt-doc-name" placeholder="např. sp. zn. 77 EX 123/2026" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;transition:border-color 0.2s;" value="${defaultDocName}">
+                    <label style="font-size:12px;font-weight:600;color:#5c574f;">Spis / Věc / Dokument</label>
+                    <input type="text" id="tt-doc-name" placeholder="např. sp. zn. 77 EX 123/2026" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;transition:border-color 0.2s;" value="${defaultDocName}">
                 </div>
                 
                 <div style="display:flex;gap:16px;">
                     <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-                        <label style="font-size:12px;font-weight:600;color:#475569;">Datum</label>
-                        <input type="date" id="tt-date" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;" value="${todayStr}">
+                        <label style="font-size:12px;font-weight:600;color:#5c574f;">Datum</label>
+                        <input type="date" id="tt-date" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;" value="${todayStr}">
                     </div>
                     <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
-                        <label style="font-size:12px;font-weight:600;color:#475569;">Čas (hodiny)</label>
-                        <input type="number" id="tt-hours" step="0.05" min="0.05" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;" value="${defaultHours}">
+                        <label style="font-size:12px;font-weight:600;color:#5c574f;">Čas (hodiny)</label>
+                        <input type="number" id="tt-hours" step="0.05" min="0.05" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;" value="${defaultHours}">
                     </div>
                 </div>
                 
                 <div style="display:flex;flex-direction:column;gap:6px;">
-                    <label style="font-size:12px;font-weight:600;color:#475569;">Typ úkonu</label>
-                    <select id="tt-action-type" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;appearance:none;-webkit-appearance:none;">
+                    <label style="font-size:12px;font-weight:600;color:#5c574f;">Typ úkonu</label>
+                    <select id="tt-action-type" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;background:#fff;appearance:none;-webkit-appearance:none;">
                         <option value="psaní" selected>Sepisování a úpravy dokumentu</option>
                         <option value="revize">Revize a kontrola</option>
                         <option value="studium">Studium spisu</option>
@@ -97,16 +97,16 @@ Object.assign(LexisUI.prototype, {
                 </div>
                 
                 <div style="display:flex;flex-direction:column;gap:6px;">
-                    <label style="font-size:12px;font-weight:600;color:#475569;">Popis (nepovinné)</label>
-                    <input type="text" id="tt-desc" placeholder="např. Příprava žaloby na zaplacení" style="width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;">
+                    <label style="font-size:12px;font-weight:600;color:#5c574f;">Popis (nepovinné)</label>
+                    <input type="text" id="tt-desc" placeholder="např. Příprava žaloby na zaplacení" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;">
                 </div>
             </div>
             
-            <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:12px;">
-                <button id="tt-cancel" style="padding:10px 18px;background:#f1f5f9;color:#475569;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:background 0.2s;">Zrušit</button>
-                <button id="tt-submit" style="padding:10px 20px;background:#2563eb;color:#ffffff;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 6px -1px rgba(37,99,235,0.2);transition:background 0.2s;">Vykázat</button>
+            <div style="padding:16px 24px;background:#faf9f7;border-top:1px solid #e0dbd3;display:flex;justify-content:flex-end;gap:12px;">
+                <button id="tt-cancel" style="padding:10px 18px;background:#edeae4;color:#5c574f;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:background 0.2s;">Zrušit</button>
+                <button id="tt-submit" style="padding:10px 20px;background:#9a5b22;color:#ffffff;font-weight:600;font-size:13px;border:none;border-radius:8px;cursor:pointer;box-shadow:0 4px 6px -1px rgba(37,99,235,0.2);transition:background 0.2s;">Vykázat</button>
             </div>
-        `;
+        `);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
@@ -115,11 +115,11 @@ Object.assign(LexisUI.prototype, {
         document.getElementById('tt-cancel').onclick = () => overlay.remove();
         
         const submitBtn = document.getElementById('tt-submit');
-        submitBtn.onmouseover = () => submitBtn.style.background = "#1d4ed8";
-        submitBtn.onmouseout = () => submitBtn.style.background = "#2563eb";
+        submitBtn.onmouseover = () => submitBtn.style.background = "#8a5320";
+        submitBtn.onmouseout = () => submitBtn.style.background = "#9a5b22";
         const cancelBtn = document.getElementById('tt-cancel');
-        cancelBtn.onmouseover = () => cancelBtn.style.background = "#e2e8f0";
-        cancelBtn.onmouseout = () => cancelBtn.style.background = "#f1f5f9";
+        cancelBtn.onmouseover = () => cancelBtn.style.background = "#e0dbd3";
+        cancelBtn.onmouseout = () => cancelBtn.style.background = "#edeae4";
 
         submitBtn.onclick = async () => {
             const documentName = document.getElementById('tt-doc-name').value.trim();
@@ -263,15 +263,15 @@ Object.assign(LexisUI.prototype, {
 
     insertSubjectHeader(type) {
         let html = "";
-        const baseStyle = "padding: 20px 25px; margin: 30px 0; background: #ffffff; border-radius: 12px; font-family: 'Inter', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; position: relative; overflow: hidden;";
+        const baseStyle = "padding: 20px 25px; margin: 30px 0; background: #ffffff; border-radius: 12px; font-family: 'Inter', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e0dbd3; position: relative; overflow: hidden;";
         
         if (type === 'person') {
             html = `
                 <div style="${baseStyle}">
-                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #3b82f6, #2563eb);"></div>
-                    <p style="margin-bottom: 8px; color: #3b82f6; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Fyzická osoba</p>
-                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
-                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #9a5b22, #9a5b22);"></div>
+                    <p style="margin-bottom: 8px; color: #9a5b22; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Fyzická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
                         <div><strong>Narozen(a):</strong> [DATUM]</div>
                         <div><strong>ID DS:</strong> [ID DATOVÉ SCHRÁNKY]</div>
                         <div style="grid-column: span 2;"><strong>Bytem:</strong> [ADRESA TRVALÉHO POBYTU]</div>
@@ -282,14 +282,14 @@ Object.assign(LexisUI.prototype, {
         } else if (type === 'entrepreneur') {
             html = `
                 <div style="${baseStyle}">
-                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #f59e0b, #d97706);"></div>
-                    <p style="margin-bottom: 8px; color: #d97706; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Podnikající fyzická osoba</p>
-                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
-                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #d9a441, #b06a2a);"></div>
+                    <p style="margin-bottom: 8px; color: #b06a2a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Podnikající fyzická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>[JMÉNO A PŘÍJMENÍ]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
                         <div><strong>IČO:</strong> [IČO]</div>
                         <div><strong>DIČ:</strong> [DIČ]</div>
                         <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA MÍSTA PODNIKÁNÍ]</div>
-                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8;">Zapsán v živnostenském rejstříku vedeném [ÚŘAD]</div>
+                        <div style="grid-column: span 2; font-size: 11px; color: #a09a92;">Zapsán v živnostenském rejstříku vedeném [ÚŘAD]</div>
                     </div>
                 </div>
                 <p><br></p>
@@ -297,15 +297,15 @@ Object.assign(LexisUI.prototype, {
         } else if (type === 'company') {
             html = `
                 <div style="${baseStyle}">
-                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #10b981, #059669);"></div>
-                    <p style="margin-bottom: 8px; color: #10b981; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Právnická osoba</p>
-                    <p style="font-size: 18px; margin: 0; color: #1e293b;"><strong>[OBCHODNÍ FIRMA / NÁZEV]</strong></p>
-                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #475569;">
+                    <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #5a8a4a, #4f7a41);"></div>
+                    <p style="margin-bottom: 8px; color: #5a8a4a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Identifikace: Právnická osoba</p>
+                    <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>[OBCHODNÍ FIRMA / NÁZEV]</strong></p>
+                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
                         <div><strong>IČO:</strong> [IČO]</div>
                         <div><strong>DIČ:</strong> [DIČ]</div>
                         <div style="grid-column: span 2;"><strong>Sídlo:</strong> [ADRESA SÍDLA]</div>
                         <div style="grid-column: span 2;"><strong>Zastoupená:</strong> [JMÉNO], [FUNKCE]</div>
-                        <div style="grid-column: span 2; font-size: 11px; color: #94a3b8; font-style: italic;">Zapsaná v obchodním rejstříku vedeném [SOUD] v [MĚSTO], oddíl [ODDÍL], vložka [VLOŽKA]</div>
+                        <div style="grid-column: span 2; font-size: 11px; color: #a09a92; font-style: italic;">Zapsaná v obchodním rejstříku vedeném [SOUD] v [MĚSTO], oddíl [ODDÍL], vložka [VLOŽKA]</div>
                     </div>
                 </div>
                 <p><br></p>
@@ -345,11 +345,11 @@ Object.assign(LexisUI.prototype, {
         
         if (detectedCourt && detectedSpzn) {
             hearingsSection.style.display = 'block';
-            hearingsList.innerHTML = `
-                <div style="font-size: 11px; color: #64748b; text-align: center; padding: 10px; font-style: italic;">
+            hearingsList.innerHTML = eIco(`
+                <div style="font-size: 11px; color: #77716a; text-align: center; padding: 10px; font-style: italic;">
                     🔍 Vyhledávám nařízená jednání u ${detectedCourt.nazev}...
                 </div>
-            `;
+            `);
             
             const queryParams = {
                 druhOrganizace: null,
@@ -373,7 +373,7 @@ Object.assign(LexisUI.prototype, {
                     const data = res.data;
                     const udalosti = data.udalosti || [];
                     if (udalosti.length > 0) {
-                        hearingsList.innerHTML = udalosti.map((u, idx) => {
+                        hearingsList.innerHTML = eIco(udalosti.map((u, idx) => {
                             const dateStr = u.datum || '';
                             const timeStr = u.cas || '';
                             const room = u.jednaciSin || 'Neznámá síň';
@@ -382,8 +382,8 @@ Object.assign(LexisUI.prototype, {
                             const isCancelled = u.jednaciZruseno === 'Ano' || u.jednaciZruseno === true;
                             
                             const statusPill = isCancelled 
-                                ? `<span style="background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">❌ ZRUŠENO</span>`
-                                : `<span style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">📅 NAŘÍZENO</span>`;
+                                ? `<span style="background: #f0dcd6; color: #8a3626; border: 1px solid #e0a99d; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">❌ ZRUŠENO</span>`
+                                : `<span style="background: #d9e6d0; color: #4f7a41; border: 1px solid #d9e6d0; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-block;">📅 NAŘÍZENO</span>`;
 
                             const hearingData = {
                                 id: 'hearing_' + Date.now() + '_' + idx,
@@ -403,7 +403,7 @@ Object.assign(LexisUI.prototype, {
                             };
 
                             return `
-                                <div style="background: white; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #14532d;">
+                                <div style="background: white; border: 1px solid #d9e6d0; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #33562a;">
                                     <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                                         <span>⚖️ ${type}</span>
                                         ${statusPill}
@@ -413,32 +413,32 @@ Object.assign(LexisUI.prototype, {
                                     <div style="margin-bottom: 3px;"><b>Místo:</b> ${data.organizace || detectedCourt.nazev}, síň ${room}</div>
                                     <div style="margin-bottom: 5px;"><b>Soudce:</b> ${judge}</div>
                                     ${!isCancelled ? `
-                                        <button onclick="window.saveHearingToCalendar('${encodeURIComponent(JSON.stringify(hearingData))}')" style="background: #16a34a; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center;">📅 Zapsat do kalendáře</button>
+                                        <button onclick="window.saveHearingToCalendar('${encodeURIComponent(JSON.stringify(hearingData))}')" style="background: #5a8a4a; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center;">📅 Zapsat do kalendáře</button>
                                     ` : ''}
                                 </div>
                             `;
-                        }).join('');
+                        }).join(''));
                     } else {
-                        hearingsList.innerHTML = `
-                            <div style="font-size: 11px; color: #64748b; text-align: center; padding: 10px; font-style: italic;">
+                        hearingsList.innerHTML = eIco(`
+                            <div style="font-size: 11px; color: #77716a; text-align: center; padding: 10px; font-style: italic;">
                                 Pro sp. zn. <b>${detectedSpzn.fullText}</b> není u ${detectedCourt.nazev} v následujících 30 dnech nařízeno žádné jednání.
                             </div>
-                        `;
+                        `);
                     }
                 } else {
-                    hearingsList.innerHTML = `
-                        <div style="font-size: 11px; color: #ef4444; text-align: center; padding: 10px; font-style: italic;">
+                    hearingsList.innerHTML = eIco(`
+                        <div style="font-size: 11px; color: #c0553f; text-align: center; padding: 10px; font-style: italic;">
                             ⚠️ Nepodařilo se načíst jednání z InfoJednání.
                         </div>
-                    `;
+                    `);
                 }
             }).catch((err) => {
                 console.error("Chyba InfoJednání API:", err);
-                hearingsList.innerHTML = `
-                    <div style="font-size: 11px; color: #ef4444; text-align: center; padding: 10px; font-style: italic;">
+                hearingsList.innerHTML = eIco(`
+                    <div style="font-size: 11px; color: #c0553f; text-align: center; padding: 10px; font-style: italic;">
                         ⚠️ Chyba spojení s portálem InfoJednání.
                     </div>
-                `;
+                `);
             });
         } else {
             hearingsSection.style.display = 'none';
@@ -483,7 +483,7 @@ Object.assign(LexisUI.prototype, {
                     throw new Error(`HTTP ${res.status}`);
                 }
                 const resData = await res.json();
-                this.customAlert(`📅 <b>Jednání zapsáno do kalendáře!</b><br><br>Událost byla úspěšně uložena a byl vygenerován kalendářový soubor:<br><span style="font-size: 11px; color:#16a34a; font-family:monospace; word-break: break-all;">${resData.filePath}</span>`);
+                this.customAlert(`📅 <b>Jednání zapsáno do kalendáře!</b><br><br>Událost byla úspěšně uložena a byl vygenerován kalendářový soubor:<br><span style="font-size: 11px; color:#5a8a4a; font-family:monospace; word-break: break-all;">${resData.filePath}</span>`);
             } catch (e) {
                 console.error(e);
                 this.customAlert("❌ <b>Chyba zapsání do kalendáře</b><br><br>LexisLocal backend je offline, nebo se nepodařilo uložit událost.");
@@ -584,15 +584,15 @@ Object.assign(LexisUI.prototype, {
         const imgCenter = this._hfImages['center'];
         const imgRight = this._hfImages['right'];
 
-        if (pl) pl.innerHTML = imgLeft
+        if (pl) pl.innerHTML = eIco(imgLeft
             ? `<img src="${imgLeft}" style="max-height:36px; object-fit:contain;"><br>${resolve(left)}`
-            : resolve(left) || '<span style="color:#cbd5e1">—</span>';
-        if (pc) pc.innerHTML = imgCenter
+            : resolve(left) || '<span style="color:#ddd6cb">—</span>');
+        if (pc) pc.innerHTML = eIco(imgCenter
             ? `<img src="${imgCenter}" style="max-height:36px; object-fit:contain;"><br>${resolve(center)}`
-            : resolve(center) || '<span style="color:#cbd5e1">—</span>';
-        if (pr) pr.innerHTML = imgRight
+            : resolve(center) || '<span style="color:#ddd6cb">—</span>');
+        if (pr) pr.innerHTML = eIco(imgRight
             ? `<img src="${imgRight}" style="max-height:36px; object-fit:contain;"><br>${resolve(right)}`
-            : resolve(right) || '<span style="color:#cbd5e1">—</span>';
+            : resolve(right) || '<span style="color:#ddd6cb">—</span>');
 
         if (previewEl) previewEl.style.fontSize = fontSize;
     },
@@ -625,8 +625,8 @@ Object.assign(LexisUI.prototype, {
         const height = document.getElementById('hf-height')?.value || 'normal';
         const fontSize = document.getElementById('hf-fontsize')?.value || '11px';
         const bgColor = document.getElementById('hf-bg-color')?.value || '#ffffff';
-        const textColor = document.getElementById('hf-text-color')?.value || '#334155';
-        const lineColor = document.getElementById('hf-line-color')?.value || '#cbd5e1';
+        const textColor = document.getElementById('hf-text-color')?.value || '#4a453f';
+        const lineColor = document.getElementById('hf-line-color')?.value || '#ddd6cb';
         const fontFamily = document.getElementById('hf-font-family')?.value || "'Segoe UI', sans-serif";
 
         const today = new Date().toLocaleDateString('cs-CZ');
@@ -658,7 +658,7 @@ Object.assign(LexisUI.prototype, {
         const areaId = this._currentHFTarget === 'header' ? 'header-area' : 'footer-area';
         const area = document.getElementById(areaId);
         if (area) {
-            area.innerHTML = areaHtml;
+            area.innerHTML = eIco(areaHtml);
             area.contentEditable = 'false'; // Lock from direct editing now
         }
 
@@ -799,16 +799,16 @@ Object.assign(LexisUI.prototype, {
         this._campaignRecords = records;
 
         if (records.length === 0) {
-            preview.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:8px;">Žádné záznamy.</div>';
+            preview.innerHTML = eIco('<div style="font-size:12px;color:#a09a92;padding:8px;">Žádné záznamy.</div>');
             return;
         }
         const headers = Object.keys(records[0]);
-        preview.innerHTML = `
+        preview.innerHTML = eIco(`
             <table class="campaign-recipients-table">
                 <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}<th>Adresát č.</th></tr></thead>
                 <tbody>${records.map((r, i) => `<tr><td>${headers.map(h => r[h]).join('</td><td>')}</td><td>#${i+1}</td></tr>`).join('')}</tbody>
             </table>
-        `;
+        `);
     },
 
     exportCampaignRecord(record, templateHtml) {
@@ -865,7 +865,7 @@ Object.assign(LexisUI.prototype, {
         const typeFilter = document.getElementById('contacts-type-filter')?.value || '';
         const activeGroup = this._contactsActiveGroup || '';
 
-        tbody.innerHTML = `<tr><td colspan="6" style="padding:30px;text-align:center;color:#94a3b8;">⏳ Načítám...</td></tr>`;
+        tbody.innerHTML = eIco(`<tr><td colspan="6" style="padding:30px;text-align:center;color:#a09a92;">⏳ Načítám...</td></tr>`);
 
         const all = await this._getContacts().getAll();
         let filtered = all.filter(c => {
@@ -881,47 +881,47 @@ Object.assign(LexisUI.prototype, {
         });
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:#94a3b8;font-size:13px;">
+            tbody.innerHTML = eIco(`<tr><td colspan="6" style="padding:40px;text-align:center;color:#a09a92;font-size:13px;">
                 📭 Žádné kontakty. Přidejte první kontakt tlačítkem "+ Nový kontakt" nebo importujte CSV.
-            </td></tr>`;
+            </td></tr>`);
             if (countEl) countEl.textContent = `Celkem: 0 kontaktů`;
             return;
         }
 
         const typLabels = { fyzicka: '👤 FO', pravnicka: '🏢 PO', organ: '🏛️ Úřad', soud: '⚖️ Soud' };
 
-        tbody.innerHTML = filtered.map(c => `
+        tbody.innerHTML = eIco(filtered.map(c => `
             <tr>
                 <td style="padding:10px 16px;">
-                    <div style="font-weight:700;color:#0f172a;font-size:13px;">${this._esc(c.jmeno || '')}</div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${typLabels[c.typ] || ''}${c.ic ? ` · IČO: ${c.ic}` : ''}</div>
+                    <div style="font-weight:700;color:#2b2926;font-size:13px;">${this._esc(c.jmeno || '')}</div>
+                    <div style="font-size:11px;color:#a09a92;margin-top:2px;">${typLabels[c.typ] || ''}${c.ic ? ` · IČO: ${c.ic}` : ''}</div>
                 </td>
-                <td style="padding:10px 16px;font-size:12px;color:#475569;">
+                <td style="padding:10px 16px;font-size:12px;color:#5c574f;">
                     ${c.adresa ? `${this._esc(c.adresa)}<br>` : ''}
-                    ${c.psc || c.mesto ? `${c.psc || ''} ${c.mesto || ''}`.trim() : '<span style="color:#cbd5e1">—</span>'}
+                    ${c.psc || c.mesto ? `${c.psc || ''} ${c.mesto || ''}`.trim() : '<span style="color:#ddd6cb">—</span>'}
                 </td>
                 <td style="padding:10px 16px;">
-                    ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:#cbd5e1">—</span>'}
+                    ${c.isds ? `<span class="court-isds-badge">${this._esc(c.isds)}</span>` : '<span style="font-size:11px;color:#ddd6cb">—</span>'}
                 </td>
-                <td style="padding:10px 16px;font-size:12px;color:#475569;">
+                <td style="padding:10px 16px;font-size:12px;color:#5c574f;">
                     ${c.email ? `📧 ${this._esc(c.email)}<br>` : ''}
                     ${c.tel ? `📞 ${this._esc(c.tel)}` : ''}
-                    ${!c.email && !c.tel ? '<span style="color:#cbd5e1">—</span>' : ''}
+                    ${!c.email && !c.tel ? '<span style="color:#ddd6cb">—</span>' : ''}
                 </td>
                 <td style="padding:10px 16px;">
                     <div style="display:flex;flex-wrap:wrap;gap:4px;">
-                        ${(c.skupiny || []).map(g => `<span style="background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;">${this._esc(g)}</span>`).join('')}
+                        ${(c.skupiny || []).map(g => `<span style="background:#f6efe4;color:#9a5b22;border:1px solid #efe3cf;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;">${this._esc(g)}</span>`).join('')}
                     </div>
                 </td>
                 <td style="padding:10px 16px;text-align:center;">
                     <div style="display:flex;gap:6px;justify-content:center;">
-                        <button onclick="lexisUI.insertContactToDoc('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#10b981;color:white;border:none;font-size:11px;font-weight:700;cursor:pointer;">✅ Vložit</button>
-                        <button onclick="lexisUI.openContactForm('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:11px;font-weight:700;cursor:pointer;color:#334155;">✏️ Upravit</button>
-                        <button onclick="lexisUI.deleteContact('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;font-size:11px;font-weight:700;cursor:pointer;color:#991b1b;">🗑️</button>
+                        <button onclick="lexisUI.insertContactToDoc('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#5a8a4a;color:white;border:none;font-size:11px;font-weight:700;cursor:pointer;">✅ Vložit</button>
+                        <button onclick="lexisUI.openContactForm('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#edeae4;border:1px solid #e0dbd3;font-size:11px;font-weight:700;cursor:pointer;color:#4a453f;">✏️ Upravit</button>
+                        <button onclick="lexisUI.deleteContact('${c.id}')" style="padding:5px 10px;border-radius:6px;background:#f6ebe7;border:1px solid #e6c3ba;font-size:11px;font-weight:700;cursor:pointer;color:#8a3626;">🗑️</button>
                     </div>
                 </td>
             </tr>
-        `).join('');
+        `).join(''));
 
         if (countEl) countEl.textContent = `Zobrazeno: ${filtered.length} / ${all.length} kontaktů`;
     }
