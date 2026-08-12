@@ -19,7 +19,7 @@
 //   Městský soud v Brně           7y7abii  (nově doplněn)
 // -----------------------------------------------------------------------------
 
-const { COURT_PATTERNS } = require('../../js/core/court-data.js');
+const { COURT_PATTERNS, detectCourt } = require('../../js/core/court-data.js');
 const registry = require('../../js/core/court-registry.js');
 const { COURT_REGISTRY, findCourtInRegistry, getCourtIsds, isValidIsdsFormat } = registry;
 
@@ -81,5 +81,25 @@ describe('Soudy — unikátní ISDS (riziko doručení špatnému soudu)', () =>
       .filter(([, v]) => v.length > 1)
       .map(([isds, v]) => `${isds}: ${v.join(' + ')}`);
     expect(dups).toEqual([]);
+  });
+});
+
+describe('Soudy — detekce nejvyšších soudů z textu', () => {
+  const cases = [
+    ['Podávám dovolání k Nejvyššímu soudu v Brně.', 'Nejvyšší soud', 'kccaa9t'],
+    ['Kasační stížnost k Nejvyššímu správnímu soudu.', 'Nejvyšší správní soud', 'wwjaa4f'],
+    ['Ústavní stížnost podaná Ústavnímu soudu.', 'Ústavní soud', 'z2tadw5']
+  ];
+  test.each(cases)('detekuje %j → správný soud i ISDS', (text, expectName, expectIsds) => {
+    const d = detectCourt(text);
+    expect(d).toBeTruthy();
+    expect(d.nazev).toBe(expectName);
+    const { isds } = getCourtIsds(d.nazev);
+    expect(isds).toBe(expectIsds);
+  });
+
+  test('„Nejvyšší správní soud" se NEzamění za „Nejvyšší soud" (riziko špatné datovky)', () => {
+    const d = detectCourt('Nejvyšší správní soud');
+    expect(d && d.nazev).toBe('Nejvyšší správní soud');
   });
 });

@@ -1,5 +1,20 @@
 const COURT_PATTERNS = [
   {
+    "nazev": "Nejvyšší správní soud",
+    "kod": "NSSCRBR",
+    "pattern": "nejvyss[a-z]*\\s+spravn[a-z]*\\s+soud[a-z]*"
+  },
+  {
+    "nazev": "Nejvyšší soud",
+    "kod": "NSCRBRN",
+    "pattern": "nejvyss[a-z]*\\s+soud[a-z]*"
+  },
+  {
+    "nazev": "Ústavní soud",
+    "kod": "USCRBRN",
+    "pattern": "ustavn[a-z]*\\s+soud[a-z]*"
+  },
+  {
     "nazev": "Krajský soud Brno",
     "kod": "KSJIMBM",
     "pattern": "krajsk[e|y|eho|emu|ym|ych]*\\s+soud[u|em|y|ech]*\\s+(?:v\\s+|ve\\s+)?brno[a-za-ž]*"
