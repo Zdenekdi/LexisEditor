@@ -7,24 +7,21 @@
 // špatné/duplicitní ISDS), hrozí odeslání podání do datové schránky ŠPATNÉHO
 // soudu. Tento test to hlídá a známé nedodělky v datech při každém běhu vypíše.
 //
-// KNOWN_* = známé chyby v datech, které vyžadují ověření reálného ISDS
-// (mojedatovaschranka.cz / justice.cz). Test je kvůli nim ZELENÝ, aby chytal
-// NOVÉ regrese; po opravě dat prostě odeber položku z allow-listu a test
-// začne vynucovat 100% konzistenci.
+// Historicky (do 2026-08) zde byly allow-listy KNOWN_UNRESOLVED a
+// KNOWN_DUPLICATE_ISDS pro dočasně tolerované chyby v datech. Po ověření
+// reálných ISDS proti oficiálnímu registru (mojedatovaschranka.cz) byly
+// všechny opraveny — test nyní vynucuje 100% konzistenci bez výjimek:
+//   Krajský soud v Praze          hvbabbq  (dříve chybně snkabbm)
+//   Krajský soud v Brně           5wwaa9j  (dříve chybně 5nkzumb)
+//   Okresní soud Brno-venkov      w7wabin  (dříve chybně 5nkzumb)
+//   Krajský soud v Hradci Králové ep7abae  (dříve chybně ep6abbm)
+//   Okresní soud Hradec Králové   8paabmt  (dříve chybně ep6abbm)
+//   Městský soud v Brně           7y7abii  (nově doplněn)
 // -----------------------------------------------------------------------------
 
 const { COURT_PATTERNS } = require('../../js/core/court-data.js');
 const registry = require('../../js/core/court-registry.js');
 const { COURT_REGISTRY, findCourtInRegistry, getCourtIsds, isValidIsdsFormat } = registry;
-
-// TODO(data): doplnit do COURT_REGISTRY s ověřeným ISDS.
-const KNOWN_UNRESOLVED = ['Městský soud Brno'];
-
-// TODO(data): OVĚŘIT a opravit — každý soud má vlastní datovku, tyto se sdílí:
-//   snkabbm → Krajský soud v Praze + Městský soud v Praze
-//   5nkzumb → Krajský soud v Brně + Okresní soud Brno-venkov
-//   ep6abbm → Krajský soud v Hradci Králové + Okresní soud Hradec Králové
-const KNOWN_DUPLICATE_ISDS = ['snkabbm', '5nkzumb', 'ep6abbm'];
 
 describe('Soudy — integrita dat', () => {
   test('každý pattern má název, kód a platný regex', () => {
@@ -55,18 +52,11 @@ describe('Soudy — integrita dat', () => {
 });
 
 describe('Soudy — detekce ↔ registr', () => {
-  test('každý detekovatelný soud jde dohledat v registru (mimo známé mezery)', () => {
+  test('každý detekovatelný soud jde dohledat v registru', () => {
     const unresolved = COURT_PATTERNS
       .filter(c => !findCourtInRegistry(c.nazev))
       .map(c => c.nazev);
-
-    const stillKnown = unresolved.filter(n => KNOWN_UNRESOLVED.includes(n));
-    if (stillKnown.length) {
-      // eslint-disable-next-line no-console
-      console.warn('[soudy] ZNÁMÉ nedohledatelné soudy (doplnit do registru):', stillKnown);
-    }
-    const unexpected = unresolved.filter(n => !KNOWN_UNRESOLVED.includes(n));
-    expect(unexpected).toEqual([]);
+    expect(unresolved).toEqual([]);
   });
 
   test('dohledané soudy mají platný ISDS', () => {
@@ -81,23 +71,15 @@ describe('Soudy — detekce ↔ registr', () => {
 });
 
 describe('Soudy — unikátní ISDS (riziko doručení špatnému soudu)', () => {
-  test('žádné NOVÉ duplicitní ISDS (mimo známé k opravě)', () => {
+  test('žádné duplicitní ISDS — každý soud má vlastní datovku', () => {
     const byIsds = {};
     for (const c of COURT_REGISTRY) {
       if (!c.isds) continue;
       (byIsds[c.isds] = byIsds[c.isds] || []).push(c.nazev);
     }
-    const dups = Object.entries(byIsds).filter(([, v]) => v.length > 1);
-
-    const known = dups.filter(([isds]) => KNOWN_DUPLICATE_ISDS.includes(isds));
-    if (known.length) {
-      // eslint-disable-next-line no-console
-      console.warn('[soudy] ZNÁMÉ duplicitní ISDS — OVĚŘIT a opravit:',
-        known.map(([isds, v]) => `${isds} → ${v.join(', ')}`).join(' | '));
-    }
-    const unexpected = dups
-      .filter(([isds]) => !KNOWN_DUPLICATE_ISDS.includes(isds))
+    const dups = Object.entries(byIsds)
+      .filter(([, v]) => v.length > 1)
       .map(([isds, v]) => `${isds}: ${v.join(' + ')}`);
-    expect(unexpected).toEqual([]);
+    expect(dups).toEqual([]);
   });
 });

@@ -67,7 +67,7 @@ const COURT_REGISTRY = [
         adresa: "Náměstí Kinských 5",
         mesto: "Praha 5",
         psc: "150 75",
-        isds: "snkabbm",
+        isds: "hvbabbq",
         lat: 50.0784, lon: 14.4066
     },
     {
@@ -77,7 +77,7 @@ const COURT_REGISTRY = [
         adresa: "Rooseveltova 16",
         mesto: "Brno",
         psc: "601 95",
-        isds: "5nkzumb",
+        isds: "5wwaa9j",
         lat: 49.1994, lon: 16.6136
     },
     {
@@ -97,7 +97,7 @@ const COURT_REGISTRY = [
         adresa: "Československé armády 218",
         mesto: "Hradec Králové",
         psc: "502 13",
-        isds: "ep6abbm",
+        isds: "ep7abae",
         lat: 50.2096, lon: 15.8337
     },
     {
@@ -141,6 +141,16 @@ const COURT_REGISTRY = [
         psc: "120 00",
         isds: "snkabbm",
         lat: 50.0796, lon: 14.4193
+    },
+    {
+        nazev: "Městský soud v Brně",
+        zkratka: "MSBM",
+        typ: "mestsky",
+        adresa: "Polní 994/39",
+        mesto: "Brno",
+        psc: "608 01",
+        isds: "7y7abii",
+        lat: 49.1760, lon: 16.6030
     },
 
     // ── OBVODNÍ SOUDY PRAHA ───────────────────────────────────────
@@ -283,7 +293,7 @@ const COURT_REGISTRY = [
         adresa: "Příkop 16",
         mesto: "Brno",
         psc: "604 23",
-        isds: "5nkzumb",
+        isds: "w7wabin",
         lat: 49.2002, lon: 16.6193
     },
     {
@@ -423,7 +433,7 @@ const COURT_REGISTRY = [
         adresa: "Čs. armády 218",
         mesto: "Hradec Králové",
         psc: "502 13",
-        isds: "ep6abbm",
+        isds: "8paabmt",
         lat: 50.2096, lon: 15.8337
     },
     {
@@ -1012,13 +1022,14 @@ const COURT_TYPES = {
 // ─────────────────────────────────────────────────────────────
 //  ISDS — validace formátu, join klíč a bezpečnostní pojistka
 //
-//  ⚠️ DŮLEŽITÉ: Vestavěné ISDS identifikátory NEJSOU ověřené proti
-//  oficiálnímu registru (mojedatovaschranka.cz / justice.cz); některé
-//  jsou zjevně placeholder (sekvenční nebo duplicitní — např. KS Praha
-//  a MS Praha sdílí "snkabbm"). NESMÍ se použít pro reálné doručení bez
-//  ověření — hrozí odeslání do cizí/neplatné datové schránky. Proto je
-//  ISDS_DATA_VERIFIED = false a odesílací tok musí volat getCourtIsds()
-//  a při verified=false vyžádat ruční potvrzení / vyhledání ISDS.
+//  ⚠️ DŮLEŽITÉ: Většina vestavěných ISDS identifikátorů NENÍ systematicky
+//  ověřena proti oficiálnímu registru (mojedatovaschranka.cz / justice.cz).
+//  Dříve zde byly 3 duplicitní datovky (Praha/Brno/Hradec Králové) — ty byly
+//  ověřeny a opraveny proti oficiálnímu registru (2026-08), ale zbytek sady
+//  ověřen není. NESMÍ se použít pro reálné doručení bez ověření — hrozí
+//  odeslání do cizí/neplatné datové schránky. Proto je ISDS_DATA_VERIFIED
+//  = false a odesílací tok musí volat getCourtIsds() a při verified=false
+//  vyžádat ruční potvrzení / vyhledání ISDS.
 // ─────────────────────────────────────────────────────────────
 const ISDS_DATA_VERIFIED = false;
 
