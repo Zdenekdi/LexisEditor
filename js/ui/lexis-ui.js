@@ -1418,15 +1418,14 @@ class LexisUI {
         if (!text) return;
         
         let detectedCourt = null;
-        const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-        
-        if (window.COURT_PATTERNS) {
+        // Jednotn\u00e1 robustn\u00ed detekce (sklo\u0148ov\u00e1n\u00ed + rozli\u0161en\u00ed dvojic). Fallback na
+        // starou smy\u010dku jen kdyby LexisCourt nebyl na\u010dten.
+        if (window.LexisCourt && window.LexisCourt.detect) {
+            detectedCourt = window.LexisCourt.detect(text);
+        } else if (window.COURT_PATTERNS) {
+            const normalizedText = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             for (const court of window.COURT_PATTERNS) {
-                const regex = new RegExp(court.pattern, 'i');
-                if (regex.test(normalizedText)) {
-                    detectedCourt = court;
-                    break;
-                }
+                try { if (new RegExp(court.pattern, 'i').test(normalizedText)) { detectedCourt = court; break; } } catch (e) {}
             }
         }
         

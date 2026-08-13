@@ -496,15 +496,146 @@ const COURT_PATTERNS = [
   }
 ];
 
-// Jediný zdroj detekce soudu z textu (dřív byla tato smyčka zkopírovaná
-// v lexis-reply.js, lexis-datovka.js i lexis-ui.js). Vrací záznam z COURT_PATTERNS.
-function detectCourt(text) {
-    if (!text || !Array.isArray(COURT_PATTERNS)) return null;
-    const norm = String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    for (const c of COURT_PATTERNS) {
-        try { if (new RegExp(c.pattern, 'i').test(norm)) return c; } catch (e) {}
+// ─────────────────────────────────────────────────────────────────────────────
+//  DETEKCE SOUDU Z TEXTU — robustní, datově řízená (v3, 2026-08)
+//
+//  Dřívější detekce spoléhala na ruční regexy v COURT_PATTERNS, které matchovaly
+//  jen 1. pád města ("Brno", ne "Brně") → v reálných podáních („Krajskému soudu
+//  v Brně") NIC nedetekovaly a v jednom případě dokonce vracely ŠPATNÝ soud
+//  (České Budějovice → Český Krumlov). To je u přiřazení datové schránky vážné.
+//
+//  Nový algoritmus:
+//   1) rozpozná TYP soudu (nejvyšší/ústavní/vrchní/krajský/městský/obvodní/okresní),
+//   2) z názvů v registru (COURT_REGISTRY) staví tokeny lokusu tolerantní ke
+//      skloňování (kmeny + speciální případy Praha, Hradec, Plzeň, Frýdek-Místek…),
+//   3) vybere soud, jehož VŠECHNY tokeny se v textu vyskytují, a to ten
+//      NEJSPECIFIČTĚJŠÍ (nejvíc tokenů → Nový Jičín > Jičín, Ústí n. Labem vs
+//      n. Orlicí, Plzeň-jih/-město/-sever, Praha 1 vs 10),
+//   4) při nejednoznačnosti (0 nebo víc kandidátů se stejnou specificitou) vrací
+//      null — RADŠI NIC než špatná datovka.
+//  Pravidla ověřena testovací maticí (tests/unit/court-consistency.test.js).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _cdStrip(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+// Speciální kmeny měst s palatalizací / vkladným „e" (nominativ → ostatní pády).
+var _CD_STEM_SPECIAL = {
+    praha: 'prah|praz', plzen: 'plzen|plzn', hradec: 'hradec|hradc|hradci',
+    jablonec: 'jablonec|jablonc', liberec: 'liberec|liberc', litomerice: 'litomeric',
+    klatovy: 'klatov', karvina: 'karvin', teplice: 'teplic',
+    frydek: 'fryde?k', mistek: 'miste?k'
+};
+var _CD_LOCUS_STOP = { nad: 1, pod: 1, pri: 1, v: 1, ve: 1, pro: 1, a: 1 };
+
+function _cdWordStem(w) {
+    var b = _cdStrip(w).replace(/[^a-z0-9]/g, '');
+    if (!b) return null;
+    if (/^\d+$/.test(b)) return { num: b };
+    if (b.indexOf('prah') === 0 || b.indexOf('praz') === 0) return { rx: 'prah|praz' };
+    if (_CD_STEM_SPECIAL[b]) return { rx: _CD_STEM_SPECIAL[b] };
+    var stem = b.replace(/uv$/, '').replace(/[aeiouyů]+$/, '');
+    if (stem.length < 3) stem = b;
+    return { rx: stem };
+}
+
+function _cdNazevToType(nazev) {
+    var n = _cdStrip(nazev);
+    if (/nejvyss\w*\s+spravn/.test(n)) return 'nsspravni';
+    if (/nejvyss/.test(n)) return 'ns';
+    if (/ustavn/.test(n)) return 'us';
+    if (/vrchn/.test(n)) return 'vrchni';
+    if (/krajsk/.test(n)) return 'krajsky';
+    if (/mestsk/.test(n)) return 'mestsky';
+    if (/obvodn/.test(n)) return 'obvodni';
+    if (/okresn/.test(n)) return 'okresni';
+    return null;
+}
+
+function _cdTokensFromNazev(nazev) {
+    var n = _cdStrip(nazev)
+        .replace(/^(nejvyssi spravni soud|nejvyssi soud|ustavni soud|vrchni soud|krajsky soud|mestsky soud|obvodni soud|okresni soud)\s*/, '')
+        .replace(/^(v|ve|pro)\s+/, '')
+        .trim();
+    if (!n) return [];
+    var words = n.split(/[\s-]+/).filter(Boolean);
+    var toks = [];
+    for (var i = 0; i < words.length; i++) {
+        var wb = words[i].replace(/[^a-z0-9]/g, '');
+        if (!wb || _CD_LOCUS_STOP[wb]) continue;
+        var t = _cdWordStem(wb);
+        if (!t) continue;
+        var dup = toks.some(function (x) { return (x.num && t.num && x.num === t.num) || (x.rx && t.rx && x.rx === t.rx); });
+        if (!dup) toks.push(t);
+    }
+    return toks;
+}
+
+// Typy s jednoznačným soudem (nepotřebují město).
+var _CD_TYPE_SINGLE = { nsspravni: 'Nejvyšší správní soud', ns: 'Nejvyšší soud', us: 'Ústavní soud' };
+var _CD_TYPE_ORDER = [
+    ['nsspravni', /nejvyss\w*\s+spravn\w*\s+soud\w*/],
+    ['ns', /nejvyss\w*\s+soud\w*/],
+    ['us', /ustavn\w*\s+soud\w*/],
+    ['vrchni', /vrchn\w*\s+soud\w*/],
+    ['krajsky', /krajsk\w*\s+soud\w*/],
+    ['mestsky', /mestsk\w*\s+soud\w*/],
+    ['obvodni', /obvodn\w*\s+soud\w*/],
+    ['okresni', /okresn\w*\s+soud\w*/]
+];
+
+var _cdRulesCache = null;
+function _cdGetRegistry() {
+    if (typeof window !== 'undefined' && window.COURT_REGISTRY) return window.COURT_REGISTRY;
+    if (typeof module !== 'undefined' && module.exports) {
+        try { return require('./court-registry.js').COURT_REGISTRY; } catch (e) { return null; }
     }
     return null;
+}
+function _cdRules() {
+    if (_cdRulesCache) return _cdRulesCache;
+    var reg = _cdGetRegistry();
+    if (!reg) return null; // registr ještě nenačten → zkusíme příště
+    _cdRulesCache = reg.map(function (c) {
+        var toks = _cdTokensFromNazev(c.nazev);
+        return { nazev: c.nazev, isds: c.isds, type: _cdNazevToType(c.nazev), tokens: toks, spec: toks.length };
+    });
+    return _cdRulesCache;
+}
+
+function _cdTokenMatches(tok, text) {
+    if (tok.num) return new RegExp('(?<!\\d)' + tok.num + '(?!\\d)').test(text);
+    return new RegExp('\\b(?:' + tok.rx + ')[a-z]*', 'i').test(text);
+}
+
+// Jediný zdroj detekce soudu z textu (volají lexis-reply, lexis-datovka,
+// lexis-ui, lexis-ui-5). Vrací { nazev, isds } nebo null.
+function detectCourt(text) {
+    if (!text) return null;
+    var t = _cdStrip(text);
+    var type = null;
+    for (var i = 0; i < _CD_TYPE_ORDER.length; i++) {
+        if (_CD_TYPE_ORDER[i][1].test(t)) { type = _CD_TYPE_ORDER[i][0]; break; }
+    }
+    if (!type) return null;
+    if (_CD_TYPE_SINGLE[type]) {
+        var single = _cdGetRegistry() ? (_cdRules() || []).find(function (r) { return r.nazev === _CD_TYPE_SINGLE[type]; }) : null;
+        return { nazev: _CD_TYPE_SINGLE[type], isds: single ? single.isds : null };
+    }
+    var rules = _cdRules();
+    if (!rules) return null;
+    var best = [], bestScore = 0;
+    for (var j = 0; j < rules.length; j++) {
+        var r = rules[j];
+        if (r.type !== type || !r.tokens.length) continue;
+        var ok = r.tokens.every(function (tok) { return _cdTokenMatches(tok, t); });
+        if (!ok) continue;
+        if (r.spec > bestScore) { bestScore = r.spec; best = [r]; }
+        else if (r.spec === bestScore) best.push(r);
+    }
+    if (best.length === 1) return { nazev: best[0].nazev, isds: best[0].isds };
+    return null; // nejednoznačné → radši nic (riziko špatné datovky)
 }
 
 const LexisCourt = { detect: detectCourt, COURT_PATTERNS };

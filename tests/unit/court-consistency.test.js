@@ -84,22 +84,49 @@ describe('Soudy — unikátní ISDS (riziko doručení špatnému soudu)', () =>
   });
 });
 
-describe('Soudy — detekce nejvyšších soudů z textu', () => {
+describe('Soudy — detekce z textu (robustní, se skloňováním)', () => {
+  test('self-detekce: každý soud z registru se pozná podle svého názvu', () => {
+    const bad = [];
+    for (const c of COURT_REGISTRY) {
+      const d = detectCourt(c.nazev);
+      if (!d || d.nazev !== c.nazev) bad.push(`${c.nazev} → ${d && d.nazev}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  // Reálné pádové tvary z podání + záludné dvojice (riziko špatné datovky).
   const cases = [
     ['Podávám dovolání k Nejvyššímu soudu v Brně.', 'Nejvyšší soud', 'kccaa9t'],
     ['Kasační stížnost k Nejvyššímu správnímu soudu.', 'Nejvyšší správní soud', 'wwjaa4f'],
-    ['Ústavní stížnost podaná Ústavnímu soudu.', 'Ústavní soud', 'z2tadw5']
+    ['Ústavní stížnost podaná Ústavnímu soudu.', 'Ústavní soud', 'z2tadw5'],
+    ['Krajskému soudu v Brně', 'Krajský soud v Brně', '5wwaa9j'],
+    ['ke Krajskému soudu v Praze', 'Krajský soud v Praze', 'hvbabbq'],
+    ['Městskému soudu v Praze', 'Městský soud v Praze', 'snkabbm'],
+    ['Okresnímu soudu v Ostravě', 'Okresní soud Ostrava', '2mhaesg'],
+    ['Okresní soud v Českých Budějovicích', 'Okresní soud České Budějovice', 'ws6abvh'],
+    ['podání k Okresnímu soudu v Jindřichově Hradci', 'Okresní soud Jindřichův Hradec', 'c8kabvr'],
+    ['Okresní soud v Novém Jičíně', 'Okresní soud Nový Jičín', '79naery'],
+    ['Okresní soud v Jičíně', 'Okresní soud Jičín', 'n4qabm4'],
+    ['Okresní soud ve Frýdku-Místku', 'Okresní soud Frýdek-Místek', 'nn4aera'],
+    ['Okresní soud v Ústí nad Labem', 'Okresní soud Ústí nad Labem', 'r9uabnh'],
+    ['Okresní soud v Ústí nad Orlicí', 'Okresní soud Ústí nad Orlicí', 'rjrabj7'],
+    ['Obvodní soud pro Prahu 10', 'Obvodní soud pro Prahu 10', '8aiabyn'],
+    ['Obvodní soud pro Prahu 1', 'Obvodní soud pro Prahu 1', 'pd3ab3a']
   ];
   test.each(cases)('detekuje %j → správný soud i ISDS', (text, expectName, expectIsds) => {
     const d = detectCourt(text);
     expect(d).toBeTruthy();
     expect(d.nazev).toBe(expectName);
-    const { isds } = getCourtIsds(d.nazev);
-    expect(isds).toBe(expectIsds);
+    expect(getCourtIsds(d.nazev).isds).toBe(expectIsds);
   });
 
-  test('„Nejvyšší správní soud" se NEzamění za „Nejvyšší soud" (riziko špatné datovky)', () => {
-    const d = detectCourt('Nejvyšší správní soud');
-    expect(d && d.nazev).toBe('Nejvyšší správní soud');
+  test('„Nejvyšší správní soud" se NEzamění za „Nejvyšší soud"', () => {
+    expect(detectCourt('Nejvyšší správní soud').nazev).toBe('Nejvyšší správní soud');
+  });
+
+  test('nejednoznačnost i prostý text → null (radši nic než špatná datovka)', () => {
+    expect(detectCourt('Okresní soud v Plzni')).toBeNull();   // -jih/-město/-sever?
+    expect(detectCourt('Smlouva o dílo mezi stranami')).toBeNull();
+    expect(detectCourt('')).toBeNull();
   });
 });
