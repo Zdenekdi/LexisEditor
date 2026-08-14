@@ -100,6 +100,37 @@ function ensureSafeStorage() {
     } catch (e) { /* getSelectedStorageBackend nemusí být dostupné */ }
 }
 
+// Synchronní šifrování malých blobů pro renderer (šifrování dokumentů uložených
+// v localStorage at-rest — historie verzí, autosave). Renderer nemá šifrovací
+// klíč; šifrujeme systémovým safeStorage v MAIN procesu. Použit sendSync, aby
+// stávající synchronní ukládací kód nemusel být přepisován na async.
+ipcMain.on('secure-encrypt-sync', (event, plaintext) => {
+    try {
+        ensureSafeStorage();
+        event.returnValue = safeStorage.encryptString(String(plaintext == null ? '' : plaintext)).toString('base64');
+    } catch (e) { event.returnValue = null; }
+});
+ipcMain.on('secure-decrypt-sync', (event, b64) => {
+    try {
+        if (!b64) { event.returnValue = ''; return; }
+        event.returnValue = safeStorage.decryptString(Buffer.from(String(b64), 'base64'));
+    } catch (e) { event.returnValue = null; }
+});
+
+// Extrakce textu ze souboru (PDF) — pro vytažení č.j./sp. zn. z PŘÍLOH přijaté
+// datové zprávy (často jsou právě v PDF, ne v předmětu). Vrací { text }.
+ipcMain.handle('extract-file-text', async (event, filePath) => {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) return { text: '' };
+        if (!/\.pdf$/i.test(String(filePath))) return { text: '' }; // zatím jen PDF
+        const buf = fs.readFileSync(filePath);
+        const data = await pdf(buf);
+        return { text: (data && data.text) || '' };
+    } catch (e) {
+        return { text: '', error: e.message };
+    }
+});
+
 let mainWindow;
 
 // --- BIOMETRIC / TOUCH ID SUPPORT ---

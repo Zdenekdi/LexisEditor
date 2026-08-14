@@ -59,4 +59,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     keyRestore: () => ipcRenderer.invoke('key-restore'),
     // --- E-MAIL S PŘÍLOHOU přes nativního klienta ---
     composeEmailAttach: (opts) => ipcRenderer.invoke('compose-email-attach', opts),
+    // --- ŠIFROVÁNÍ BLOBŮ pro localStorage at-rest (synchronní) ---
+    secureEncrypt: (s) => { try { return ipcRenderer.sendSync('secure-encrypt-sync', s); } catch (e) { return null; } },
+    secureDecrypt: (b) => { try { return ipcRenderer.sendSync('secure-decrypt-sync', b); } catch (e) { return null; } },
+    // --- EXTRAKCE TEXTU Z PŘÍLOHY (PDF) pro náležitosti odpovědi ---
+    extractFileText: (filePath) => ipcRenderer.invoke('extract-file-text', filePath),
 });

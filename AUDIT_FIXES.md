@@ -37,11 +37,13 @@ research, helpers).
 **Dávka F (dřívější, commit)**
 - Soudní poplatek strop 250 mil.; `LexisStorage.get()` falsy; CSV parser kontaktů; `insertAresData` (core.quill); `saveDetectedDeadlineDate`; Ctrl+F guard zámku; příloha datovky allow-list přípon; mrtvá záloha klíče (preload most); falešné „Lhůta ✓"; escapování chyb importu ZFO.
 
-## ⏳ Zbývá (vyžaduje rozhodnutí / větší zásah — NEspěchat bez běhového testu)
+## ✅ Dokončeno i zbývající tři (dávka G)
 
-- **S4 — dokumenty v localStorage v plaintextu** (verze, autosave). Skutečná oprava = šifrování at-rest navázané na `lexis.key`; renderer dnes klíč nemá → je to architektonický úkol (šifrovaný store přes main/SafeStorage nebo přesun do šifrované DB). Doporučeno naplánovat samostatně.
-- **D4b — odpověď neumí vytáhnout č.j./sp. zn. z PDF přílohy** (přílohy nesou jen cestu, ne text). Vyžaduje extrakci textu z příloh (PDF parser) v pipeline příjmu.
-- **Mrtvý kód z override kolizí** (`lexis-ui.js` vs `lexis-ui-5.js`, ~33 metod). Úklid ~2000 řádků; nízké riziko funkční, ale vyšší riziko regrese → dělat opatrně s ověřením každé metody, ideálně samostatně.
+- **S4 — dokumenty v localStorage nyní ŠIFROVANÉ at-rest.** Historie verzí i autosave se šifrují systémovým safeStorage přes main proces (sync IPC `secure-encrypt/decrypt-sync`, prefix `enc:`, migrace starých plaintext dat). Bez šifrování (web) fallback na plaintext. — `main.js`, `preload.js`, `lexis-versions.js`, `lexis-actions.js`.
+- **D4b — odpověď vytáhne č.j./sp. zn. i z PDF příloh.** Nový `extract-file-text` (pdf-parse) v main + `extractFileText` v preloadu; reply-inbox hydratuje `f.text` z PDF příloh před extrakcí náležitostí; +testy. — `main.js`, `preload.js`, `lexis-reply-inbox.js`.
+- **Mrtvý kód — UKLIZENO.** Z `lexis-ui.js` odstraněno **10 přebitých metod** (620 řádků; 2092→1472) přes AST (acorn). Ověřeno harness porovnáním LexisUI.prototype před/po: **218 metod, 0 rozdílů** → funkčně beze změny. (Bonus: potvrzeno, že živá detekce jednání v `-5` už používá robustní `LexisCourt.detect` — dřívější úprava dead kopie neměla vliv, žádná mezera.)
+
+**Stav testů po dávce G:** `npm test` = **62/62** (8 sad).
 
 ## Zbývá mimo audit (dřívější)
 - Commit/push všech změn; DirectCase OAuth (Fáze 1b); doladit mapování polí LawGPT po spuštění; code signing (čeká na IČO).

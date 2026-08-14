@@ -37,9 +37,26 @@
 
         // Otevře modal s náležitostmi (předvyplněnými z přijaté zprávy) a po potvrzení
         // vloží koncept odpovědi do editoru. Zrcadlí chování createReplyFromDocument.
-        window.createReplyFromMessage = function (item) {
+        // Doplní f.text u PDF příloh (č.j./sp. zn. bývá právě v příloze, ne v
+        // předmětu). Bez toho zůstávaly náležitosti odpovědi prázdné.
+        var hydrateAttachmentText = function (item) {
+            var api = window.electronAPI;
+            if (!item || !Array.isArray(item.files) || !api || !api.extractFileText) return Promise.resolve();
+            var jobs = item.files.map(function (f) {
+                if (!f || f.text || !f.path) return Promise.resolve();
+                var isPdf = /\.pdf$/i.test(f.path) || (f.mimeType && /pdf/i.test(f.mimeType));
+                if (!isPdf) return Promise.resolve();
+                return api.extractFileText(f.path).then(function (r) {
+                    if (r && r.text) f.text = r.text;
+                }).catch(function () { /* ignore */ });
+            });
+            return Promise.all(jobs);
+        };
+
+        window.createReplyFromMessage = async function (item) {
             if (!window.lexisCore || !window.lexisCore.setContent) { toast('Editor není připraven.'); return; }
             if (!window.LexisReply || !window.LexisReply.buildReplyHtml) { toast('Modul odpovědí není načten.'); return; }
+            try { await hydrateAttachmentText(item); } catch (e) { /* pokračuj i bez příloh */ }
             var f = extractFrom(item) || {};
             if (!f.subject && item) f.subject = item.sender || item.senderId || '';
 

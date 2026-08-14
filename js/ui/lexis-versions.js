@@ -44,18 +44,45 @@
     }
 
     // ── Úložiště ───────────────────────────────────────────────────────────
+    // Snapshoty dokumentu jsou citlivá data → šifrujeme je at-rest systémovým
+    // safeStorage (přes main proces). Prefix „enc:" odlišuje šifrovaný obsah;
+    // starší nešifrovaná data (bez prefixu) se přečtou a při dalším uložení se
+    // automaticky přepíšou šifrovaně (migrace).
+    var ENC_PREFIX = 'enc:';
+    function readRaw() {
+        var raw = localStorage.getItem(KEY);
+        if (!raw) return '[]';
+        if (raw.indexOf(ENC_PREFIX) === 0) {
+            var api = window.electronAPI;
+            if (api && api.secureDecrypt) {
+                var dec = api.secureDecrypt(raw.slice(ENC_PREFIX.length));
+                return (dec == null || dec === '') ? '[]' : dec;
+            }
+            return '[]'; // šifrováno, ale bez možnosti dešifrovat (např. web)
+        }
+        return raw; // legacy plaintext
+    }
+    function writeRaw(jsonStr) {
+        var api = window.electronAPI;
+        if (api && api.secureEncrypt) {
+            var enc = api.secureEncrypt(jsonStr);
+            if (enc) { localStorage.setItem(KEY, ENC_PREFIX + enc); return; }
+        }
+        // Fallback bez šifrování (vývoj/web) — uloží plaintext.
+        localStorage.setItem(KEY, jsonStr);
+    }
     function load() {
-        try { var a = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(a) ? a : []; }
+        try { var a = JSON.parse(readRaw() || '[]'); return Array.isArray(a) ? a : []; }
         catch (e) { return []; }
     }
     function persist(list) {
         // Ořízni na MAX a zkoušej uložit; při překročení kvóty ubírej nejstarší.
         var arr = list.slice(-MAX);
         while (arr.length) {
-            try { localStorage.setItem(KEY, JSON.stringify(arr)); return; }
+            try { writeRaw(JSON.stringify(arr)); return; }
             catch (e) { arr.shift(); } // quota → zahoď nejstarší a zkus znovu
         }
-        try { localStorage.setItem(KEY, '[]'); } catch (e) { /* vzdej to */ }
+        try { writeRaw('[]'); } catch (e) { /* vzdej to */ }
     }
 
     // ── Pomůcky ──────────────────────────────────────────────────────────────

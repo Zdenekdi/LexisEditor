@@ -253,10 +253,19 @@
             if (!q) return;
             try {
                 // Bezpečná průběžná záloha do localStorage (nespouští dialog uložení).
-                localStorage.setItem('lexis_autosave_snapshot', JSON.stringify({
+                // Obsah dokumentu je citlivý → šifrujeme at-rest (safeStorage přes
+                // main proces); bez šifrování (web) fallback na plaintext.
+                var snapJson = JSON.stringify({
                     at: new Date().toISOString(),
                     html: (window.lexisCore && window.lexisCore.getContent) ? window.lexisCore.getContent() : q.root.innerHTML
-                }));
+                });
+                var _api = window.electronAPI;
+                var snapOut = snapJson;
+                if (_api && _api.secureEncrypt) {
+                    var encSnap = _api.secureEncrypt(snapJson);
+                    if (encSnap) snapOut = 'enc:' + encSnap;
+                }
+                localStorage.setItem('lexis_autosave_snapshot', snapOut);
             } catch (e) { /* ignore quota */ }
         }, minutes * 60 * 1000);
     }
