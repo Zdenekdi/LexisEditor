@@ -10,8 +10,11 @@
 'use strict';
 
 (function () {
-    // §-citace (volitelně odst., „zákona č. X/Y Sb." nebo navazující text).
-    const CITATION_SRC = '§\\s*\\d+[a-z]?(?:\\s+(?:odst\\.|odstavce)\\s*\\d+)?\\s*(?:zákona\\s+)?(?:č\\.\\s*)?(?:\\d+\\/\\d+\\s+Sb\\.|[a-zá-žA-Z0-9.\\s]{2,})';
+    // §-citace: „§ N[a]" + volitelně „odst. N", „písm. x)", a k tomu jen
+    // DOBŘE OHRANIČENÉ pokračování — buď zákon „č. X/Y Sb.", nebo „a násl.".
+    // (Dřív hltavý „[a-zá-žA-Z0-9.\\s]{2,}" pohlcoval libovolnou prózu za §,
+    //  např. „§ 5 se ruší a nahrazuje textem" → nesmyslný odkaz.)
+    const CITATION_SRC = '§\\s*\\d+[a-z]?(?:\\s+(?:odst\\.|odstavce)\\s*\\d+)?(?:\\s+písm\\.\\s*[a-z]\\))?(?:\\s+(?:zákona\\s+)?(?:č\\.\\s*)?\\d+\\/\\d+\\s+Sb\\.|\\s+a\\s+násl\\.)?';
     // Samostatný odkaz na zákon „zákon(a/u) č. X/Y Sb.".
     const LAW_SRC = 'zákon(?:a|u)?\\s+(?:č\\.\\s*)?\\d+\\/\\d+\\s*Sb\\.';
 
@@ -33,7 +36,7 @@
         let count = 0;
         const re = new RegExp('(' + CITATION_SRC + ')|(' + LAW_SRC + ')', 'gi');
         const html = String(text).replace(re, (m) => {
-            if (m.trim().length < 5) return m; // filtr šumu
+            if (!/\d/.test(m)) return m; // musí obsahovat číslo (filtr šumu)
             count++;
             return linkHtml(m, target);
         });

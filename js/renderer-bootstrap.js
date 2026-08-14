@@ -123,14 +123,16 @@
             repositionTabs();
         };
         window.requestStartupUnlock = async () => {
-            if (window.electronAPI && window.electronAPI.requestTouchID) {
-                const success = await window.electronAPI.requestTouchID();
-                if (success) {
-                    document.getElementById('startup-lock-screen').style.display = 'none';
-                }
-            } else {
-                // Fallback for browser
-                document.getElementById('startup-lock-screen').style.display = 'none';
+            const el = document.getElementById('startup-lock-screen');
+            // BEZPEČNOST: zámek se smí sundat JEN po úspěšném ověření. Dřívější kód
+            // volal neexistující requestTouchID a v else větvi zámek sundal BEZ
+            // ověření. Používáme reálné authenticateBiometric; bez něj zůstane
+            // obrazovka zobrazená (odemčení řeší heslo/PIN hlavního zámku).
+            if (window.electronAPI && window.electronAPI.authenticateBiometric) {
+                try {
+                    const ok = await window.electronAPI.authenticateBiometric('Odemknout LexisEditor');
+                    if (ok && el) el.style.display = 'none';
+                } catch (e) { /* neúspěch → zůstane zamčeno */ }
             }
         };
 
@@ -376,6 +378,12 @@
 
         // Missing Ribbon/Legal UI helpers
         window.customAlert = (text) => lexisUI.customAlert(text);
+        // customConfirm/customPrompt jsou v LexisUI callback-based; navenek je
+        // vystavíme jako Promise (tak je volají moduly jako Externí rešerše).
+        window.customConfirm = (text, ok = 'Potvrdit', cancel = 'Zrušit') =>
+            new Promise((res) => lexisUI.customConfirm(text, ok, cancel, res));
+        window.customPrompt = (title, def = '') =>
+            new Promise((res) => lexisUI.customPrompt(title, def, res));
         window.showQATMenu = (e) => lexisUI.showQATMenu(e);
         window.showProfileModal = () => lexisUI.showProfileModal();
         window.insertLetterhead = () => lexisUI.insertLetterhead();

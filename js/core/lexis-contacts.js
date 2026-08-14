@@ -39,10 +39,31 @@ class LexisContacts {
         await this.storage.set('settings', { key: 'contacts-db', value: all });
     }
 
+    // Rozdělí CSV řádek na pole; respektuje uvozovky a čárky uvnitř nich
+    // ("Novák, Jan" i "Václavské nám. 1, Praha" zůstanou jedno pole).
+    // Nahrazuje naivní split(','), který posouval sloupce.
+    _splitCsv(line) {
+        const out = [];
+        let cur = '', q = false;
+        for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (q) {
+                if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+                else cur += c;
+            } else {
+                if (c === ',') { out.push(cur); cur = ''; }
+                else if (c === '"') q = true;
+                else cur += c;
+            }
+        }
+        out.push(cur);
+        return out.map(s => s.trim());
+    }
+
     async importFromCsv(csvText) {
         const lines = csvText.trim().split('\n').filter(l => l.trim());
         if (lines.length < 2) return { added: 0, errors: [] };
-        const raw_headers = lines[0].split(',').map(h => h.trim().toLowerCase()
+        const raw_headers = this._splitCsv(lines[0]).map(h => h.trim().toLowerCase()
             .replace(/jméno|název|name/i, 'jmeno')
             .replace(/adresa|address/i, 'adresa')
             .replace(/město|city|obec/i, 'mesto')
@@ -60,7 +81,7 @@ class LexisContacts {
         const errors = [];
         for (let i = 1; i < lines.length; i++) {
             try {
-                const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const vals = this._splitCsv(lines[i]);
                 const contact = { skupiny: [] };
                 raw_headers.forEach((h, idx) => {
                     if (h === 'skupiny') contact.skupiny = (vals[idx] || '').split(';').filter(Boolean);

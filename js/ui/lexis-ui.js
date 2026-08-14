@@ -31,6 +31,18 @@ class LexisUI {
             const context = decodeURIComponent(encContext);
             this.promptAddDeadline(days, context);
         };
+        // Uložení lhůty s KONKRÉTNÍM datem (detekce data v textu, resp. lhůty
+        // v týdnech/měsících už převedené na ISO datum). Dřív odkazováno z UI,
+        // ale nebylo definováno → ReferenceError. Otevře dialog s daným datem.
+        window.saveDetectedDeadlineDate = (iso, encContext) => {
+            const context = decodeURIComponent(encContext || '');
+            const title = context ? ('Lhůta: ' + context).slice(0, 70) : 'Lhůta';
+            if (typeof window.showCalendarPicker === 'function') {
+                window.showCalendarPicker({ title: title, date: iso, description: context, reminderDays: 3 });
+            } else if (typeof window.openDeadlineDialog === 'function') {
+                window.openDeadlineDialog({ title: title, deliveredAt: iso, days: 0, description: context });
+            }
+        };
         window.removeActiveDeadline = (id) => {
             this.removeActiveDeadline(id);
         };
@@ -662,12 +674,12 @@ class LexisUI {
                     return `
                         <div class="isds-row" id="row-${msg.id}" style="padding: 12px 14px; border-radius: 8px; border: 1px solid #e2e8f0; background: white; cursor: pointer; transition: all 0.2s;" onclick="window.selectISDSMsg('${msg.id}')">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <div style="font-weight: 700; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${msg.senderName}</div>
-                                <span style="font-size: 10px; color: #94a3b8;">${msg.receivedDate}</span>
+                                <div style="font-weight: 700; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${window.escapeHTML(msg.senderName || '')}</div>
+                                <span style="font-size: 10px; color: #94a3b8;">${window.escapeHTML(msg.receivedDate || '')}</span>
                             </div>
-                            <div style="font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${msg.subject}</div>
+                            <div style="font-size: 11px; color: #64748b; line-height: 1.3; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${window.escapeHTML(msg.subject || '')}</div>
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${msg.senderId}</span>
+                                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">ID: ${window.escapeHTML(msg.senderId || '')}</span>
                                 ${dueHtml}
                             </div>
                         </div>
@@ -725,8 +737,8 @@ class LexisUI {
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <span style="font-size: 18px;">${att.type === 'html' ? '📄' : '📎'}</span>
                                     <div>
-                                        <div style="font-size: 12px; font-weight: 600; color: #334155;">${att.name}</div>
-                                        <div style="font-size: 10px; color: #94a3b8;">${att.type.toUpperCase()} ${att.size || ''}</div>
+                                        <div style="font-size: 12px; font-weight: 600; color: #334155;">${window.escapeHTML(att.name || '')}</div>
+                                        <div style="font-size: 10px; color: #94a3b8;">${window.escapeHTML(String(att.type || '').toUpperCase())} ${window.escapeHTML(String(att.size || ''))}</div>
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 6px;">
@@ -745,17 +757,17 @@ class LexisUI {
                         <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 15px; flex: 1; overflow-y: auto;">
                             <div>
                                 <span style="font-size: 9px; font-weight: 800; background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 3px 8px; border-radius: 4px; text-transform: uppercase;">Podrobnosti o zprávě</span>
-                                <h2 style="font-size: 16px; font-weight: 800; color: #1e293b; margin: 8px 0 4px; line-height: 1.3;">${msg.subject}</h2>
+                                <h2 style="font-size: 16px; font-weight: 800; color: #1e293b; margin: 8px 0 4px; line-height: 1.3;">${window.escapeHTML(msg.subject || '')}</h2>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: #64748b; margin-top: 10px; border-top: 1px solid #f1f5f9; padding-top: 10px;">
-                                    <div><strong>Odesílatel:</strong> ${msg.senderName}</div>
-                                    <div><strong>Datová schránka ID:</strong> <span style="font-family: monospace;">${msg.senderId}</span></div>
-                                    <div><strong>Datum doručení:</strong> ${msg.receivedDate}</div>
+                                    <div><strong>Odesílatel:</strong> ${window.escapeHTML(msg.senderName || '')}</div>
+                                    <div><strong>Datová schránka ID:</strong> <span style="font-family: monospace;">${window.escapeHTML(msg.senderId || '')}</span></div>
+                                    <div><strong>Datum doručení:</strong> ${window.escapeHTML(msg.receivedDate || '')}</div>
                                     <div><strong>Zpracování lhůty:</strong> ${msg.deadlineDays > 0 ? `Lhůta do ${msg.receivedDate} (${msg.deadlineDays} dní)` : 'Není sledována'}</div>
                                 </div>
                             </div>
                             
                             <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; background: #fafafb; font-size: 13px; line-height: 1.5; color: #334155; max-height: 150px; overflow-y: auto;">
-                                ${msg.body}
+                                ${typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(msg.body || '') : window.escapeHTML(msg.body || '')}
                             </div>
                             
                             <div>

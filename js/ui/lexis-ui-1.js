@@ -257,7 +257,9 @@ Object.assign(LexisUI.prototype, {
             const res = await window.electronAPI.importZfo(filePath);
             if (!res || !res.success) {
                 if (res && res.error) {
-                    this.customAlert(`❌ <b>Chyba importu</b><br><br>${res.error}`);
+                    // res.error může nést text z nedůvěryhodné datové zprávy → escapovat.
+                    const safe = window.escapeHTML ? window.escapeHTML(res.error) : String(res.error);
+                    this.customAlert(`❌ <b>Chyba importu</b><br><br>${safe}`);
                 }
                 return;
             }
@@ -328,7 +330,8 @@ Object.assign(LexisUI.prototype, {
 
         } catch (err) {
             console.error("ZFO Import error in frontend:", err);
-            this.customAlert(`❌ <b>Chyba importu</b><br><br>${err.message}`);
+            const safe = window.escapeHTML ? window.escapeHTML(err.message) : String(err.message);
+            this.customAlert(`❌ <b>Chyba importu</b><br><br>${safe}`);
         }
     },
 

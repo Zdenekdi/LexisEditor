@@ -321,7 +321,10 @@ class LexisCore {
         // Zpracování AI metadat pro spisovou značku
         const spisMatch = processHtml.match(/<meta\s+data-spis=["']([^"']+)["']\s*\/?>/i);
         if (spisMatch && spisMatch[1]) {
-            const spis = spisMatch[1];
+            // BEZPEČNOST: data-spis může přijít z nedůvěryhodného HTML (LexisConnect,
+            // datová zpráva) a vkládá se do innerHTML PŘED DOMPurify — bez escapování
+            // by `data-spis="<img onerror=…>"` obešel sanitizaci (XSS).
+            const spis = escapeHTML(spisMatch[1]);
             processHtml = processHtml.replace(spisMatch[0], '');
             
             const updateSpis = (el) => {

@@ -232,7 +232,7 @@ Object.assign(LexisUI.prototype, {
                                 ${insolvencyBadge}
                             </div>
                             <div style="font-size: 10px; color: #77716a; font-style: italic; background: #faf9f7; padding: 6px; border-radius: 4px; line-height: 1.3;">
-                                ${doc.summary}
+                                ${window.escapeHTML(doc.summary || '')}
                             </div>
                             ${reviewHtml}
                             <div style="display: flex; gap: 6px; margin-top: 4px;">
@@ -375,9 +375,9 @@ Object.assign(LexisUI.prototype, {
         
         // If empty input, attempt to fetch selection from editor
         if (!ico) {
-            const range = this.core.editor.getSelection();
+            const range = this.core.quill.getSelection();
             if (range && range.length > 0) {
-                const selectedText = this.core.editor.getText(range.index, range.length).trim();
+                const selectedText = this.core.quill.getText(range.index, range.length).trim();
                 const cleaned = selectedText.replace(/[^0-9]/g, '');
                 if (cleaned.length === 8) {
                     ico = cleaned;
@@ -400,11 +400,11 @@ Object.assign(LexisUI.prototype, {
                     const textToInsert = `${data.name}, se sídlem ${data.seat}, IČO: ${data.ico}`;
                     
                     // Insert into Editor
-                    const range = this.core.editor.getSelection(true);
+                    const range = this.core.quill.getSelection(true);
                     if (range) {
-                        this.core.editor.deleteText(range.index, range.length);
-                        this.core.editor.insertText(range.index, textToInsert);
-                        this.core.editor.setSelection(range.index + textToInsert.length);
+                        this.core.quill.deleteText(range.index, range.length);
+                        this.core.quill.insertText(range.index, textToInsert);
+                        this.core.quill.setSelection(range.index + textToInsert.length);
                     }
                     
                     // Clear the input

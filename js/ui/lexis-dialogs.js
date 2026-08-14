@@ -62,7 +62,7 @@ class LexisDialogs {
         modal.style = "background:#fff;padding:24px;border-radius:12px;width:320px;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
         modal.innerHTML = eIco(`
             <h3 style="margin:0 0 12px 0;font-size:14px;color:#2b2926;font-weight:600;">${window.LexisIcons ? window.LexisIcons.emojiToIcon(title) : title}</h3>
-            <input type="text" id="cp-input" value="${defaultValue}" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:6px;margin-bottom:20px;box-sizing:border-box;font-size:13px;outline:none;">
+            <input type="text" id="cp-input" value="${window.escapeHTML ? window.escapeHTML(defaultValue) : String(defaultValue == null ? '' : defaultValue)}" style="width:100%;padding:10px;border:1px solid #ddd6cb;border-radius:6px;margin-bottom:20px;box-sizing:border-box;font-size:13px;outline:none;">
             <div style="display:flex;justify-content:flex-end;gap:10px;">
                 <button id="cp-cancel" style="padding:8px 16px;background:#edeae4;color:#5c574f;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Zrušit</button>
                 <button id="cp-ok" style="padding:8px 16px;background:#9a5b22;color:#fff;font-weight:500;border:none;border-radius:6px;cursor:pointer;">Potvrdit</button>

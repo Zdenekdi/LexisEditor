@@ -117,7 +117,9 @@ class LexisStorage {
             const store = tx.objectStore(storeName);
             const req = store.get(key);
 
-            req.onsuccess = () => resolve(req.result ? req.result.value || req.result : null);
+            // Pozor: `value || req.result` by u falsy hodnot (0/false/''/null)
+            // vrátilo celý obalový objekt místo hodnoty. Rozlišujeme přítomnost pole.
+            req.onsuccess = () => resolve(req.result ? ('value' in req.result ? req.result.value : req.result) : null);
             req.onerror = () => reject(req.error);
         });
     }

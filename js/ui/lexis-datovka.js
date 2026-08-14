@@ -199,20 +199,53 @@
                 </div>`);
             suggestEl.querySelector('#dtv-suggest-add').onclick = async () => {
                 setStatus(`Ověřuji schránku: ${officialName}…`);
-                await findAndAdd({ firmName: officialName, dbType: 'OVM' }, officialName);
+                // Přednostně ověřené dbID z registru (jednoznačné), ne hledání dle jména.
+                const vIsds = courtVerifiedIsds(officialName);
+                if (vIsds) await findAndAdd({ dbID: vIsds, dbType: 'OVM' }, officialName, { expectedIsds: vIsds });
+                else await findAndAdd({ firmName: officialName, dbType: 'OVM' }, officialName);
             };
         })();
 
-        async function findAndAdd(query, label) {
+        // Ověřené ISDS soudu z registru (mojedatovaschranka.cz, ověřeno 2026-08).
+        function courtVerifiedIsds(name) {
+            try {
+                if (window.LexisCourtISDS && window.LexisCourtISDS.getCourtIsds) {
+                    const r = window.LexisCourtISDS.getCourtIsds(name);
+                    if (r && r.isds && r.valid) return r.isds;
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        // opts.expectedIsds = ověřené dbID (u soudů). Když je zadáno, přidá se
+        // POUZE schránka s tímto dbID; když ji ISDS nepotvrdí, nepřidá se NIC
+        // (radši nic než odeslání špatnému soudu). Bez expectedIsds a při více
+        // schránkách stejného jména/IČO se přidají, ale uživatel je varován, ať
+        // nesprávné odebere před odesláním.
+        async function findAndAdd(query, label, opts) {
+            opts = opts || {};
             setStatus('Ověřuji schránku…');
             try {
                 const res = await api().isdsFindDataBox(null, query);
                 if (!res || !res.success) { setStatus('❌ ' + ((res && res.error) || 'Vyhledání selhalo.')); return; }
                 if (!res.boxes || res.boxes.length === 0) { setStatus('⚠️ Nenalezeno: ' + (label || '')); return; }
+                let boxes = res.boxes;
+                if (opts.expectedIsds) {
+                    const match = boxes.find(b => b.dbID === opts.expectedIsds);
+                    if (!match) {
+                        setStatus(`⚠️ Ověřenou datovku „${label}" (${opts.expectedIsds}) se v ISDS nepodařilo potvrdit — zkontrolujte příjemce ručně.`);
+                        return;
+                    }
+                    boxes = [match];
+                } else if (boxes.length > 1) {
+                    setStatus(`⚠️ Nalezeno více schránek (${boxes.length}) pro „${label || ''}". Zkontrolujte a nesprávné odeberte (✕) před odesláním.`);
+                }
                 let added = 0;
-                res.boxes.forEach(b => { if (addRecipient(b)) added++; });
+                boxes.forEach(b => { if (addRecipient(b)) added++; });
                 renderList();
-                setStatus(added ? `✅ Přidáno: ${added}` : 'Schránka už je v seznamu.');
+                if (!(!opts.expectedIsds && boxes.length > 1)) {
+                    setStatus(added ? `✅ Přidáno: ${added}` : 'Schránka už je v seznamu.');
+                }
             } catch (e) { setStatus('❌ ' + e.message); }
         }
 
@@ -232,8 +265,13 @@
             } else if (mode === 'court') {
                 showCourtPicker(async (court) => {
                     setStatus(`Ověřuji schránku: ${court.nazev}…`);
-                    // Ověříme reálnou schránku soudu přes ISDS (ne smyšlené ISDS z registru).
-                    await findAndAdd({ firmName: court.nazev, dbType: 'OVM' }, court.nazev);
+                    // Registr má u všech 99 soudů ověřené ISDS → dotážeme přímo dbID
+                    // (jednoznačné), místo hledání dle jména (mohlo přidat i cizí soud).
+                    const vIsds = courtVerifiedIsds(court.nazev) ||
+                        (court.isds && window.LexisCourtISDS && window.LexisCourtISDS.isValidIsdsFormat
+                            && window.LexisCourtISDS.isValidIsdsFormat(court.isds) ? court.isds : null);
+                    if (vIsds) await findAndAdd({ dbID: vIsds, dbType: 'OVM' }, court.nazev, { expectedIsds: vIsds });
+                    else await findAndAdd({ firmName: court.nazev, dbType: 'OVM' }, court.nazev);
                 });
             } else if (mode === 'contacts') {
                 await addFromContacts(setStatus);
@@ -425,15 +463,19 @@
             listEl.querySelectorAll('.ib-deadline').forEach(btn => btn.onclick = () => {
                 const it = (window._ibItems || []).find(x => String(x.dmID) === btn.getAttribute('data-id'));
                 if (!it) return;
-                const delivered = it.deliveryTime ? String(it.deliveryTime).slice(0, 10) : '';
+                // Základ lhůty = okamžik DORUČENÍ (přihlášením nebo fikcí), tj.
+                // acceptanceTime; teprve když chybí, fallback na dodání do schránky.
+                const base = it.acceptanceTime || it.deliveryTime || '';
+                const delivered = base ? String(base).slice(0, 10) : '';
                 closeOverlay(overlay);
                 window.openDeadlineDialog({
                     title: it.annotation || ('Zpráva od ' + (it.sender || it.senderId || '')),
                     deliveredAt: delivered,
                     days: 15,
-                    description: `Datová zpráva od ${it.sender || it.senderId || ''} (dmID ${it.dmID}).`
+                    description: `Datová zpráva od ${it.sender || it.senderId || ''} (dmID ${it.dmID}).`,
+                    // Označit zprávu jako „lhůta vytvořena" AŽ po skutečném přidání.
+                    onCommit: () => { try { api().isdsInboxMarkDeadline(it.dmID); } catch (e) {} }
                 });
-                api().isdsInboxMarkDeadline(it.dmID);
             });
             listEl.querySelectorAll('.ib-forward').forEach(btn => btn.onclick = () => {
                 const it = (window._ibItems || []).find(x => String(x.dmID) === btn.getAttribute('data-id'));
@@ -555,6 +597,9 @@
                 description: (p.description || '') + (p.deliveredAt || card.querySelector('#dl-date').value ? `\nDoručeno: ${card.querySelector('#dl-date').value}` : ''),
                 reminderDays: remind
             });
+            // Potvrzení až po skutečném přidání lhůty (ne při pouhém otevření
+            // dialogu) — jinak by zrušený dialog omylem označil zprávu za vyřízenou.
+            if (typeof p.onCommit === 'function') { try { p.onCommit(); } catch (e) {} }
         };
     };
 })();

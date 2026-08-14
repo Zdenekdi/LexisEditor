@@ -680,31 +680,53 @@ Object.assign(LexisUI.prototype, {
             return;
         }
         
+        // Šablonu s placeholdery zachytíme JEDNOU. Dřívější kód přepisoval
+        // innerHTML při každém stisku — po prvním znaku byl placeholder pryč,
+        // takže se vložil jen první znak; navíc přímý zápis do innerHTML
+        // rozbíjel Delta model Quillu (undo/redo, kurzor). Nově skládáme celý
+        // dokument z původní šablony se všemi aktuálními hodnotami (escapovanými)
+        // a aplikujeme přes Quill.
+        const originalHtml = this.core.quill.root.innerHTML;
+        const values = {};
+
+        const applyValues = () => {
+            let out = originalHtml;
+            variables.forEach(v => {
+                const raw = values[v];
+                if (raw) {
+                    const rep = this._esc ? this._esc(raw) : String(raw);
+                    out = out.split(`[${v}]`).join(rep).split(`{{${v}}}`).join(rep);
+                }
+            });
+            try {
+                if (this.core.quill.clipboard && this.core.quill.clipboard.dangerouslyPasteHTML) {
+                    this.core.quill.clipboard.dangerouslyPasteHTML(out);
+                } else {
+                    this.core.quill.root.innerHTML = out;
+                }
+            } catch (e) {
+                this.core.quill.root.innerHTML = out;
+            }
+        };
+
         variables.forEach(varName => {
             const container = document.createElement('div');
             container.style = "display:flex; flex-direction:column; gap:4px; margin-bottom:10px;";
-            
+
             const label = document.createElement('label');
             label.style = "font-size:10px; font-weight:700; color:#5c574f; text-transform:uppercase;";
             label.innerText = varName;
-            
+
             const input = document.createElement('input');
             input.type = 'text';
             input.placeholder = `Vyplňte ${varName}...`;
             input.style = "padding:6px; border:1px solid #ddd6cb; border-radius:4px; font-size:12px;";
-            
+
             input.addEventListener('input', () => {
-                const val = input.value;
-                if (!val) return;
-                
-                let currentText = this.core.quill.root.innerHTML;
-                const updatedHtml = currentText
-                    .split(`[${varName}]`).join(val)
-                    .split(`{{${varName}}}`).join(val);
-                
-                this.core.quill.root.innerHTML = eIco(updatedHtml);
+                values[varName] = input.value;
+                applyValues();
             });
-            
+
             container.appendChild(label);
             container.appendChild(input);
             form.appendChild(container);

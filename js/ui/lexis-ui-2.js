@@ -487,8 +487,10 @@ Object.assign(LexisUI.prototype, {
             const response = await this.core.callAI(promptText, systemPrompt);
             clearInterval(timerId);
             
-            // Format response (support simple markdown-like bold/italic and newlines)
-            const formattedResponse = response
+            // Format response (support simple markdown-like bold/italic and newlines).
+            // BEZPEČNOST: nejdřív escapovat syrovou odpověď (prompt-injection přes
+            // obsah dokumentu může vrátit <img onerror=…>), teprve pak markdown.
+            const formattedResponse = (window.escapeHTML ? window.escapeHTML(response) : String(response || ''))
                 .replace(/\n/g, '<br>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>');

@@ -8,14 +8,18 @@
 
 (function () {
     // Soudní poplatek z peněžitého plnění (zjednodušená procentní sazba dle
-    // zák. č. 549/1991 Sb.): do 20 000 Kč pevně 1000; do 40 mil. 5 %; nad to
-    // 2 000 000 + 1 % z části nad 40 mil. Vrací Kč (zaokrouhleno nahoru) nebo null.
+    // zák. č. 549/1991 Sb., pol. 1): do 20 000 Kč pevně 1000; do 40 mil. 5 %;
+    // nad to 2 000 000 + 1 % z části nad 40 mil., přičemž k částce přesahující
+    // 250 000 000 Kč se NEPŘIHLÍŽÍ (strop poplatku 4 100 000 Kč).
+    // Vrací Kč (zaokrouhleno nahoru) nebo null.
     function soudniPoplatek(amount) {
         const val = Number(amount);
         if (!isFinite(val) || val < 0) return null;
         if (val <= 20000) return 1000;
         if (val <= 40000000) return Math.ceil(val * 0.05);
-        return 2000000 + Math.ceil((val - 40000000) * 0.01);
+        // Základ pro 1% pásmo je omezen stropem 250 mil. Kč.
+        const capped = Math.min(val, 250000000);
+        return 2000000 + Math.ceil((capped - 40000000) * 0.01);
     }
 
     // Sazba za JEDEN úkon právní služby dle § 7 advokátního tarifu (177/1996 Sb.).

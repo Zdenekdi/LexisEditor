@@ -5,10 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportDocx: (htmlContent, headerHtml, footerHtml) => ipcRenderer.invoke('export-docx', htmlContent, headerHtml, footerHtml),
     searchAres: (ico) => ipcRenderer.invoke('search-ares', ico),
     getTemplates: () => ipcRenderer.invoke('get-templates'),
-    getTemplateContent: (type) => ipcRenderer.invoke('get-template-content', type),
-    // Licencování (entitlement) — neaktivní, dokud LICENSING_ENABLED=false v main.js.
-    getLicenseStatus: () => ipcRenderer.invoke('get-license-status'),
-    licenseEdition: (() => { try { return ipcRenderer.sendSync('get-license-edition-sync') || ''; } catch (e) { return ''; } })(),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
     resetTemplates: () => ipcRenderer.invoke('reset-templates'),
     getAppVersion: () => ipcRenderer.invoke('get-version'),
@@ -17,10 +13,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exportBundle: (html, css, headerHtml, footerHtml, watermarkHtml) => ipcRenderer.invoke('export-bundle', html, css, headerHtml, footerHtml, watermarkHtml),
     saveIsdsConfig: (config) => ipcRenderer.invoke('save-isds-config', config),
     getIsdsConfig: () => ipcRenderer.invoke('get-isds-config'),
-    pickIsdsCert: () => ipcRenderer.invoke('pick-isds-cert'),
-    keyStatus: () => ipcRenderer.invoke('key-status'),
-    keyBackup: () => ipcRenderer.invoke('key-backup'),
-    keyRestore: () => ipcRenderer.invoke('key-restore'),
     savePostConfig: (config) => ipcRenderer.invoke('save-post-config', config),
     getPostConfig: () => ipcRenderer.invoke('get-post-config'),
     testIsdsConnection: (creds) => ipcRenderer.invoke('test-isds-connection', creds),
@@ -35,7 +27,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onIsdsOutboxChanged: (callback) => ipcRenderer.on('isds-outbox-changed', () => callback()),
     renderPdfBase64: (html, css, headerHtml, footerHtml) => ipcRenderer.invoke('render-pdf-base64', html, css, headerHtml, footerHtml),
     openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
-    composeEmailAttach: (opts) => ipcRenderer.invoke('compose-email-attach', opts),
     calendarOpenIcs: (ics, name) => ipcRenderer.invoke('calendar-open-ics', ics, name),
     calendarSaveIcs: (ics, name) => ipcRenderer.invoke('calendar-save-ics', ics, name),
     isdsInboxRefresh: (mode, fromTime) => ipcRenderer.invoke('isds-inbox-refresh', mode, fromTime),
@@ -61,7 +52,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     lockDeleteConfig: () => ipcRenderer.invoke('lock-delete-config'),
     lockVerifyPassword: (password) => ipcRenderer.invoke('lock-verify-password', password),
     lockTouchIdAvailable: () => ipcRenderer.invoke('lock-touchid-available'),
-    // --- LexisLocal API token (čte se z lokálního souboru, žádné ruční vkládání) ---
-    getLexisLocalToken: () => ipcRenderer.invoke('get-lexislocal-token'),
-    lexisLocalToken: (() => { try { return ipcRenderer.sendSync('get-lexislocal-token-sync') || ''; } catch (e) { return ''; } })(),
+    // --- ZÁLOHA ŠIFROVACÍHO KLÍČE --- (main.js handlery existují, chyběl most →
+    // funkce byla mrtvá a hrozila nevratná ztráta dat při ztrátě lexis.key)
+    keyStatus: () => ipcRenderer.invoke('key-status'),
+    keyBackup: () => ipcRenderer.invoke('key-backup'),
+    keyRestore: () => ipcRenderer.invoke('key-restore'),
+    // --- E-MAIL S PŘÍLOHOU přes nativního klienta ---
+    composeEmailAttach: (opts) => ipcRenderer.invoke('compose-email-attach', opts),
 });

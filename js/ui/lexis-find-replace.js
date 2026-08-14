@@ -222,10 +222,19 @@
         current = -1;
     }
 
+    // Zjistí, zda je aplikace zamčená (zámek #lock-screen překrývá dokument).
+    function isAppLocked() {
+        const ls = document.getElementById('lock-screen');
+        return !!(ls && ls.style.display && ls.style.display !== 'none');
+    }
+
     // Ctrl/Cmd+F otevře panel a potlačí nativní hledání prohlížeče.
+    // BEZPEČNOST: při zamčené aplikaci se panel NESMÍ otevřít — jinak by přes
+    // Najít/Nahradit šlo číst i přepisovat dokument bez odemčení (obejití zámku).
     document.addEventListener('keydown', (e) => {
         const key = (e.key || '').toLowerCase();
         if ((e.ctrlKey || e.metaKey) && key === 'f') {
+            if (isAppLocked()) { e.preventDefault(); return; }
             const inEditor = document.getElementById('app-container');
             if (inEditor && inEditor.style.display !== 'none') {
                 e.preventDefault();

@@ -129,13 +129,21 @@ class IsdsOutbox {
                     it.sentAt = this.now();
                     it.lastError = null;
                     sent++;
+                } else if (res && res.retriable === true && it.attempts < this.maxAttempts) {
+                    // Chyba PROKAZATELNĚ před vytvořením zprávy (spojení se nenavázalo,
+                    // validace vstupu) → zpráva NEVZNIKLA, je bezpečné auto-opakovat.
+                    it.lastError = (res && res.error) || 'Chyba odeslání.';
+                    it.status = 'pending';
+                    this.save();
+                    break; // backoff řeší volající
                 } else {
+                    // Nejistý výsledek: zpráva MOHLA být v ISDS vytvořena, ale odpověď
+                    // se ztratila (timeout/přerušení). Automatické opakování by mohlo
+                    // odeslat podání DVAKRÁT → převádíme do 'review' (ruční ověření
+                    // v Odeslaných), nikdy ne tiché auto-resend.
                     it.lastError = (res && res.error) || 'Neznámá chyba odeslání.';
-                    it.status = it.attempts >= this.maxAttempts ? 'failed' : 'pending';
-                    if (it.status === 'failed') failed++;
-                    // Aby 'pending' po chybě nezacyklil okamžitě, dá se sem vložit
-                    // backoff na úrovni volajícího; zde jen necháme na další běh.
-                    if (it.status === 'pending') { this.save(); break; }
+                    it.status = 'review';
+                    failed++;
                 }
                 this.save();
             }
@@ -157,7 +165,12 @@ class IsdsOutbox {
             if (!c) continue;
             it.dmMessageStatus = c.status;
             it.statusLabel = c.statusLabel;
+            const undeliverable = Number(c.status) === 7 || /nedoručiteln/i.test(String(c.statusLabel || ''));
             if (c.delivered && it.status !== 'delivered') { it.status = 'delivered'; updated++; }
+            else if (undeliverable && it.status !== 'failed') {
+                // Nedoručitelná (stav 7) je TERMINÁLNÍ — nesmí zůstat „odesláno".
+                it.status = 'failed'; updated++;
+            }
             else if (!c.delivered && it.status === 'sent') { updated++; }
         }
         if (updated) this.save();

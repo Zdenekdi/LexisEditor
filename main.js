@@ -89,6 +89,15 @@ function ensureSafeStorage() {
     if (!safeStorage.isEncryptionAvailable()) {
         throw new Error('Systémové šifrování (Keychain/DPAPI) není na tomto zařízení dostupné, citlivé údaje nebyly uloženy.');
     }
+    // Na Linuxu bez keyringu používá Electron backend „basic_text" = jen
+    // obfuskace, ne šifrování (isEncryptionAvailable přesto vrací true).
+    // Upozorníme (neblokujeme — jinak by na takových systémech nešlo uložit nic).
+    try {
+        if (process.platform === 'linux' && typeof safeStorage.getSelectedStorageBackend === 'function'
+            && safeStorage.getSelectedStorageBackend() === 'basic_text') {
+            console.warn('[SafeStorage] Linux: backend „basic_text" — citlivé údaje NEJSOU silně šifrovány (chybí systémový keyring).');
+        }
+    } catch (e) { /* getSelectedStorageBackend nemusí být dostupné */ }
 }
 
 let mainWindow;
@@ -638,17 +647,26 @@ ipcMain.handle('save-isds-config', async (event, config) => {
     try {
         // Šifrování hesla pomocí systému (Windows DPAPI / Mac Keychain)
         ensureSafeStorage();
-        const encryptedPassword = safeStorage.encryptString(config.password || '');
+        // Formulář heslo NEpředvyplňuje (nevrací se do rendereru). Prázdné pole
+        // proto znamená „ponech dříve uložené heslo", ne „smaž ho".
+        let prev = null;
+        try { if (fs.existsSync(isdsConfigPath)) prev = JSON.parse(fs.readFileSync(isdsConfigPath, 'utf-8')); } catch (e) { /* ignore */ }
+        const encryptedPassword = config.password
+            ? safeStorage.encryptString(config.password).toString('base64')
+            : (prev && prev.password ? prev.password : safeStorage.encryptString('').toString('base64'));
         const configToSave = {
             login: config.login,
-            password: encryptedPassword.toString('base64'),
+            password: encryptedPassword,
             environment: config.environment || 'production'
         };
         // Volitelné přihlášení klientským certifikátem (.p12/.pfx). Heslo k certifikátu
-        // se šifruje stejně jako heslo k datovce; cesta k souboru se ukládá jako reference.
+        // se šifruje stejně; prázdné pole zachová dříve uložené (stejně jako heslo).
         if (config.certPath) configToSave.certPath = config.certPath;
+        else if (prev && prev.certPath) configToSave.certPath = prev.certPath;
         if (config.certPassphrase) {
             configToSave.certPassphrase = safeStorage.encryptString(config.certPassphrase).toString('base64');
+        } else if (prev && prev.certPassphrase) {
+            configToSave.certPassphrase = prev.certPassphrase;
         }
         fs.writeFileSync(isdsConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
         return { success: true };
@@ -673,11 +691,12 @@ ipcMain.handle('get-isds-config', async () => {
     try {
         if (fs.existsSync(isdsConfigPath)) {
             const rawData = JSON.parse(fs.readFileSync(isdsConfigPath, 'utf-8'));
-            // Dešifrování hesla zpět pro použití v API
-            const decryptedPassword = safeStorage.decryptString(Buffer.from(rawData.password, 'base64'));
+            // BEZPEČNOST: heslo se NIKDY nevrací do rendereru (jinak by ho mohlo
+            // vyexfiltrovat případné XSS). Odesílání i test čtou heslo v main
+            // procesu (readIsdsCreds). Renderer dostane jen příznak hasPassword.
             return {
                 login: rawData.login,
-                password: decryptedPassword,
+                hasPassword: !!rawData.password,
                 environment: rawData.environment,
                 certPath: rawData.certPath || '',
                 hasCert: !!rawData.certPath,
@@ -1002,8 +1021,27 @@ ipcMain.handle('isds-inbox-download', async (event, dmID) => {
 });
 
 // Otevře uloženou přílohu příchozí zprávy.
+// BEZPEČNOST: přílohy z datové schránky mohou od kohokoli přijít jako
+// spustitelné soubory (Rozsudek.pdf.exe, faktura.hta…). Přímé shell.openPath by
+// je na Windows spustilo. Otevíráme jen bezpečné dokumentové typy; ostatní jen
+// ukážeme ve složce, ať uživatel vidí, co to je, a nespustí to omylem.
+const SAFE_OPEN_EXT = new Set([
+    '.pdf', '.zfo', '.txt', '.rtf', '.odt', '.ods', '.odp',
+    '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.png', '.jpg', '.jpeg', '.gif', '.tif', '.tiff', '.bmp', '.svg',
+    '.csv', '.xml', '.html', '.htm', '.eml', '.msg'
+]);
 ipcMain.handle('isds-inbox-open-file', async (event, filePath) => {
-    try { await shell.openPath(filePath); return { success: true }; }
+    try {
+        const ext = path.extname(String(filePath || '')).toLowerCase();
+        if (!SAFE_OPEN_EXT.has(ext)) {
+            // Nebezpečný/neznámý typ — neotevírat, jen ukázat ve složce.
+            try { shell.showItemInFolder(filePath); } catch (e) {}
+            return { success: false, error: 'Z bezpečnostních důvodů se tento typ souboru (' + (ext || 'bez přípony') + ') neotevírá přímo. Zobrazil jsem ho ve složce k ruční kontrole.' };
+        }
+        await shell.openPath(filePath);
+        return { success: true };
+    }
     catch (e) { return { success: false, error: e.message }; }
 });
 
@@ -1018,10 +1056,15 @@ const postConfigPath = path.join(app.getPath('userData'), 'post_config.json');
 ipcMain.handle('save-post-config', async (event, config) => {
     try {
         ensureSafeStorage();
-        const encryptedPassword = safeStorage.encryptString(config.password);
+        // Prázdné pole hesla = ponech dříve uložené (formulář ho nepředvyplňuje).
+        let prev = null;
+        try { if (fs.existsSync(postConfigPath)) prev = JSON.parse(fs.readFileSync(postConfigPath, 'utf-8')); } catch (e) { /* ignore */ }
+        const encryptedPassword = config.password
+            ? safeStorage.encryptString(config.password).toString('base64')
+            : (prev && prev.password ? prev.password : safeStorage.encryptString('').toString('base64'));
         const configToSave = {
             login: config.login,
-            password: encryptedPassword.toString('base64'),
+            password: encryptedPassword,
             environment: config.environment || 'production'
         };
         fs.writeFileSync(postConfigPath, JSON.stringify(configToSave, null, 2), 'utf-8');
@@ -1036,10 +1079,10 @@ ipcMain.handle('get-post-config', async () => {
     try {
         if (fs.existsSync(postConfigPath)) {
             const rawData = JSON.parse(fs.readFileSync(postConfigPath, 'utf-8'));
-            const decryptedPassword = safeStorage.decryptString(Buffer.from(rawData.password, 'base64'));
+            // BEZPEČNOST: heslo se do rendereru nevrací (viz get-isds-config).
             return {
                 login: rawData.login,
-                password: decryptedPassword,
+                hasPassword: !!rawData.password,
                 environment: rawData.environment || 'production',
                 hasConfig: true
             };
@@ -1053,6 +1096,20 @@ ipcMain.handle('get-post-config', async () => {
 // --- ISDS CONNECTION TEST ---
 ipcMain.handle('test-isds-connection', async (event, creds) => {
     try {
+        // Když formulář heslo nepředal (uloženo, uživatel ho nepřepsal), doplníme
+        // ho z bezpečně uloženého configu v MAIN procesu — do rendereru se
+        // nevrací. Cert (pfx/passphrase) doplníme také, pokud nebyl zadán ručně.
+        creds = creds || {};
+        if (creds.login && !creds.pass) {
+            const stored = readIsdsCreds();
+            if (stored && stored.login === creds.login && stored.pass) {
+                creds = Object.assign({}, creds, {
+                    pass: stored.pass,
+                    certPfx: creds.certPfx || stored.certPfx,
+                    certPass: creds.certPass || stored.certPass
+                });
+            }
+        }
         const soapBody = isdsClient.buildGetOwnerInfoRequest();
         const res = await isdsCall(creds, 'manage', 'GetOwnerInfoFromLogin', soapBody);
         const parsed = isdsClient.parseGetOwnerInfoResponse(res.text);
@@ -1614,8 +1671,21 @@ ipcMain.handle('start-lexis-link', async () => {
             res.end(remoteHtml);
         } else if (pathName === '/api/command') {
             applyCors(req, res);
+            // BEZPEČNOST: jen POST (ne GET), token, a příkaz z pevného allow-listu —
+            // ať přes LAN nejde poslat libovolný příkaz do rendereru.
+            if (req.method !== 'POST') {
+                res.writeHead(405, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Method Not Allowed' }));
+                return;
+            }
             if (!requireToken(req, res, parsedUrl)) return;
             const cmd = parsedUrl.searchParams.get('cmd');
+            const ALLOWED_CMDS = ['summarize', 'logic'];
+            if (!ALLOWED_CMDS.includes(cmd)) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Neznámý příkaz' }));
+                return;
+            }
             if (mainWindow) {
                 mainWindow.webContents.send('lexis-link-command', cmd);
             }

@@ -46,7 +46,7 @@
             <div style="border:1px solid #e0dbd3; border-radius:10px; padding:12px; margin-bottom:12px;">
                 <div style="font-size:12px; font-weight:700; color:#4a453f; margin-bottom:8px;">Přihlášení jménem a heslem</div>
                 <input id="is-login" placeholder="Přihlašovací jméno" value="${esc(cfg.login)}" style="width:100%; box-sizing:border-box; padding:9px; margin-bottom:8px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
-                <input id="is-pass" type="password" placeholder="Heslo" value="${esc(cfg.password)}" style="width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
+                <input id="is-pass" type="password" placeholder="${cfg.hasPassword ? '•••••• (uloženo — vyplňte pro změnu)' : 'Heslo'}" value="" autocomplete="off" style="width:100%; box-sizing:border-box; padding:9px; border:1px solid #ddd6cb; border-radius:8px; font-size:13px;">
             </div>
 
             <div style="border:1px solid #e0dbd3; border-radius:10px; padding:12px; margin-bottom:16px;">

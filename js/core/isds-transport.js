@@ -33,9 +33,20 @@ function tlsOptions(creds, certPfx) {
         : { cert: creds.certPem, key: creds.keyPem, passphrase: pass };
 }
 
+// BEZPEČNOST (SSRF): override hostu smí mířit jen na oficiální ISDS domény.
+// Bez tohoto by renderer mohl přesměrovat SOAP + Basic auth (přihlašovací údaje
+// k datové schránce) na libovolný server.
+const ISDS_ALLOWED_HOST = /(^|\.)(mojedatovaschranka\.cz|czebox\.cz)$/i;
+function isAllowedIsdsHost(host) {
+    return !host || ISDS_ALLOWED_HOST.test(String(host).trim());
+}
+
 // Override endpointu z formuláře (host/basePath), jinak null (výchozí dle prostředí).
+// Override na NEoficiální host se ignoruje (použije se výchozí endpoint).
 function endpointOverride(creds) {
-    return (creds && (creds.host || creds.basePath)) ? { host: creds.host, basePath: creds.basePath } : null;
+    if (!creds || (!creds.host && !creds.basePath)) return null;
+    if (creds.host && !isAllowedIsdsHost(creds.host)) return null;
+    return { host: creds.host, basePath: creds.basePath };
 }
 
 // Sestaví vše potřebné kromě I/O: { env, useCert, url, headers, tls, override }.
@@ -57,5 +68,5 @@ function buildRequest(creds, service, operation, opts) {
     return { env: env, useCert: useCert, url: url, headers: headers, tls: tlsOptions(creds, certPfx), override: override };
 }
 
-module.exports = { resolveEnv, basicAuthHeader, shouldUseCert, tlsOptions, endpointOverride, buildRequest };
+module.exports = { resolveEnv, basicAuthHeader, shouldUseCert, tlsOptions, endpointOverride, buildRequest, isAllowedIsdsHost };
 if (typeof window !== 'undefined') window.LexisIsdsTransport = module.exports;

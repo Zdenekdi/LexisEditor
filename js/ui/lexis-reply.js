@@ -37,10 +37,18 @@
     function extract(text) {
         // Spisová značka — varianty „sp. zn.", „spis. zn.", „spisová značka",
         // „Naše/Vaše sp. zn." + samostatný vzor „12 C 34/2026".
-        const spzn = firstMatch(text, [
-            /(?:na[šs]e\s+|va[šs]e\s+)?sp(?:\.|is(?:\.|ov[áa]))?\s*zn(?:\.|a[čc]ka)?\s*[:.]?\s*([0-9]+\s*[A-Za-zÀ-ž]{1,6}\s*[0-9]+\s*\/\s*[0-9]{2,4})/i,
-            /\b([0-9]+\s+[A-Za-zÀ-ž]{1,5}\s+[0-9]+\s*\/\s*[0-9]{2,4})\b/
+        // Nejdřív spisovou značku s NÁVĚŠTÍM (sp. zn. …) — kdekoli v textu.
+        let spzn = firstMatch(text, [
+            /(?:na[šs]e\s+|va[šs]e\s+)?sp(?:\.|is(?:\.|ov[áa]))?\s*zn(?:\.|a[čc]ka)?\s*[:.]?\s*([0-9]+\s*[A-Za-zÀ-ž]{1,6}\s*[0-9]+\s*\/\s*[0-9]{2,4})/i
         ]);
+        // Bez návěští (holý vzor „12 C 34/2026") jen v HLAVIČCE dokumentu
+        // (prvních ~400 znaků), kde bývá vlastní sp. zn. — ne v těle, kde se
+        // často cituje CIZÍ spisová značka (rozsudky, judikatura).
+        if (!spzn) {
+            spzn = firstMatch(String(text).slice(0, 400), [
+                /\b([0-9]+\s+[A-Za-zÀ-ž]{1,5}\s+[0-9]+\s*\/\s*[0-9]{2,4})\b/
+            ]);
+        }
         // Číslo jednací — MUSÍ mu předcházet označení: „č.j.", „č. j.", „čj",
         // „Č.j." nebo text „číslo jednací" (volitelně s „Naše/Vaše"). Bez tohoto
         // označení se č.j. nebere (holé číslo v textu není č.j.).

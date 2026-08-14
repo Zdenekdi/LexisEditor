@@ -405,13 +405,13 @@ Object.assign(LexisUI.prototype, {
                             return `
                                 <div style="background: white; border: 1px solid #d9e6d0; border-radius: 6px; padding: 8px; margin-bottom: 6px; font-size: 11px; color: #33562a;">
                                     <div style="font-weight: bold; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                        <span>⚖️ ${type}</span>
+                                        <span>⚖️ ${window.escapeHTML(type)}</span>
                                         ${statusPill}
                                     </div>
-                                    <div style="margin-bottom: 3px;"><b>Sp. zn.:</b> ${detectedSpzn.fullText}</div>
-                                    <div style="margin-bottom: 3px;"><b>Termín:</b> ${dateStr} v ${timeStr}</div>
-                                    <div style="margin-bottom: 3px;"><b>Místo:</b> ${data.organizace || detectedCourt.nazev}, síň ${room}</div>
-                                    <div style="margin-bottom: 5px;"><b>Soudce:</b> ${judge}</div>
+                                    <div style="margin-bottom: 3px;"><b>Sp. zn.:</b> ${window.escapeHTML(detectedSpzn.fullText)}</div>
+                                    <div style="margin-bottom: 3px;"><b>Termín:</b> ${window.escapeHTML(dateStr)} v ${window.escapeHTML(timeStr)}</div>
+                                    <div style="margin-bottom: 3px;"><b>Místo:</b> ${window.escapeHTML(data.organizace || detectedCourt.nazev)}, síň ${window.escapeHTML(room)}</div>
+                                    <div style="margin-bottom: 5px;"><b>Soudce:</b> ${window.escapeHTML(judge)}</div>
                                     ${!isCancelled ? `
                                         <button onclick="window.saveHearingToCalendar('${encodeURIComponent(JSON.stringify(hearingData))}')" style="background: #5a8a4a; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; width: 100%; text-align: center;">📅 Zapsat do kalendáře</button>
                                     ` : ''}
@@ -805,8 +805,8 @@ Object.assign(LexisUI.prototype, {
         const headers = Object.keys(records[0]);
         preview.innerHTML = eIco(`
             <table class="campaign-recipients-table">
-                <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}<th>Adresát č.</th></tr></thead>
-                <tbody>${records.map((r, i) => `<tr><td>${headers.map(h => r[h]).join('</td><td>')}</td><td>#${i+1}</td></tr>`).join('')}</tbody>
+                <thead><tr>${headers.map(h => `<th>${this._esc(h)}</th>`).join('')}<th>Adresát č.</th></tr></thead>
+                <tbody>${records.map((r, i) => `<tr><td>${headers.map(h => this._esc(r[h])).join('</td><td>')}</td><td>#${i+1}</td></tr>`).join('')}</tbody>
             </table>
         `);
     },
@@ -815,7 +815,7 @@ Object.assign(LexisUI.prototype, {
         let html = templateHtml;
         for (const [key, val] of Object.entries(record)) {
             const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-            html = html.replace(regex, `<span class="filled-var">${val}</span>`);
+            html = html.replace(regex, `<span class="filled-var">${this._esc(val)}</span>`);
         }
         return html;
     },
