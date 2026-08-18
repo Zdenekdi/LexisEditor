@@ -178,6 +178,10 @@
         window.signDigital = () => lexisUI.signDigital();
         
         window.insertFootnote = () => lexisUI.insertFootnote();
+        // Word-parita: porovnání s externím .docx (redline), recenzní panel a komentář k výběru.
+        window.compareWithFile = () => lexisUI.compareWithFile();
+        window.openReviewPanel = () => lexisUI.openReviewPanel();
+        window.insertCommentOnSelection = () => lexisUI.insertComment();
         window.openLexisLink = () => lexisUI.openLexisLink();
         window.switchSidebarTab = (tab) => lexisUI.switchSidebarTab(tab);
         window.switchAITab = (tab, el) => lexisUI.switchAITab(tab, el);

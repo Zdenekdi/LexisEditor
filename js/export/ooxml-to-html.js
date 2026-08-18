@@ -73,21 +73,43 @@ function _runToHtml(runXml, footnotes) {
     return h;
 }
 
-// Sekvenčně projde obsah odstavce a v pořadí zpracuje w:ins / w:del / w:r.
-function _processInline(xml, footnotes) {
+// word/comments.xml → mapa id → { author, date, body }.
+function parseComments(cXml) {
+    const map = {};
+    if (!cXml) return map;
+    const re = /<w:comment\b([^>]*)>([\s\S]*?)<\/w:comment>/g;
+    let m;
+    while ((m = re.exec(cXml)) !== null) {
+        const id = (m[1].match(/w:id="(-?\d+)"/) || [])[1];
+        if (id == null) continue;
+        const author = (m[1].match(/w:author="([^"]*)"/) || [])[1] || '';
+        map[id] = { author: _decode(author), body: _extractText(m[2]) };
+    }
+    return map;
+}
+
+// Sekvenčně projde obsah odstavce a v pořadí zpracuje w:ins / w:del / w:r a
+// obalený rozsah komentáře (commentwrap, vzniklý v pre-passu _paragraphToHtml).
+function _processInline(xml, ctx) {
     let out = '';
-    const re = /<w:(ins|del|r)\b[^>]*>([\s\S]*?)<\/w:\1>/g;
+    const re = /<w:(ins|del|r|commentwrap)\b([^>]*)>([\s\S]*?)<\/w:\1>/g;
     let m;
     while ((m = re.exec(xml)) !== null) {
         const tag = m[1];
-        if (tag === 'r') out += _runToHtml(m[0], footnotes);
-        else if (tag === 'ins') out += `<span class="ql-insertion">${_processInline(m[2], footnotes)}</span>`;
-        else if (tag === 'del') out += `<span class="ql-deletion">${_processInline(m[2], footnotes)}</span>`;
+        if (tag === 'r') out += _runToHtml(m[0], ctx.footnotes);
+        else if (tag === 'ins') out += `<span class="ql-insertion">${_processInline(m[3], ctx)}</span>`;
+        else if (tag === 'del') out += `<span class="ql-deletion">${_processInline(m[3], ctx)}</span>`;
+        else if (tag === 'commentwrap') {
+            const id = (m[2].match(/w:id="(\d+)"/) || [])[1];
+            const c = (ctx.comments && ctx.comments[id]) || {};
+            const tip = (c.author ? c.author + ': ' : '') + (c.body || '');
+            out += `<span class="comment-highlight" data-comment-id="${id}" data-comment-author="${_escAttr(c.author || '')}" data-comment-text="${_escAttr(c.body || '')}" title="${_escAttr(tip)}">${_processInline(m[3], ctx)}</span>`;
+        }
     }
     return out;
 }
 
-function _paragraphToHtml(pXml, footnotes) {
+function _paragraphToHtml(pXml, ctx) {
     const pPr = (pXml.match(/<w:pPr>([\s\S]*?)<\/w:pPr>/) || [])[1] || '';
     const styleVal = (pPr.match(/<w:pStyle\b[^>]*w:val="([^"]+)"/) || [])[1] || '';
     const jc = (pPr.match(/<w:jc\b[^>]*w:val="([^"]+)"/) || [])[1] || '';
@@ -97,7 +119,13 @@ function _paragraphToHtml(pXml, footnotes) {
     const end = pXml.indexOf('</w:pPr>');
     if (end >= 0) content = pXml.slice(end + '</w:pPr>'.length);
 
-    const body = _processInline(content, footnotes) || '<br>';
+    // Pre-pass: obal rozsah komentáře (v rámci odstavce) do <w:commentwrap>.
+    content = content.replace(
+        /<w:commentRangeStart\b[^>]*w:id="(\d+)"\s*\/>([\s\S]*?)<w:commentRangeEnd\b[^>]*w:id="\1"\s*\/>/g,
+        (mm, id, inner) => `<w:commentwrap w:id="${id}">${inner}</w:commentwrap>`
+    );
+
+    const body = _processInline(content, ctx) || '<br>';
     const alignMap = { center: 'center', right: 'right', both: 'justify', justify: 'justify' };
     const align = alignMap[jc];
     const styleAttr = align ? ` style="text-align:${align}"` : '';
@@ -108,17 +136,28 @@ function _paragraphToHtml(pXml, footnotes) {
     return `<${tag}${styleAttr}>${body}</${tag}>`;
 }
 
-function ooxmlToHtml(docXml, fnXml) {
-    const footnotes = parseFootnotes(fnXml);
+function ooxmlToHtml(docXml, fnXml, commentsXml) {
+    const ctx = { footnotes: parseFootnotes(fnXml), comments: parseComments(commentsXml) };
     const bodyM = docXml.match(/<w:body\b[^>]*>([\s\S]*)<\/w:body>/);
     const body = bodyM ? bodyM[1] : docXml;
     let html = '';
     const pre = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
     let pm;
     while ((pm = pre.exec(body)) !== null) {
-        html += _paragraphToHtml(pm[0], footnotes);
+        html += _paragraphToHtml(pm[0], ctx);
     }
     return html || '<p><br></p>';
 }
 
-module.exports = { ooxmlToHtml, parseFootnotes };
+// Prostý text dokumentu (řádek na odstavec) — pro porovnání verzí (Compare).
+function ooxmlToText(docXml) {
+    const bodyM = docXml.match(/<w:body\b[^>]*>([\s\S]*)<\/w:body>/);
+    const body = bodyM ? bodyM[1] : docXml;
+    const lines = [];
+    const pre = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+    let pm;
+    while ((pm = pre.exec(body)) !== null) lines.push(_extractText(pm[0]));
+    return lines.join('\n');
+}
+
+module.exports = { ooxmlToHtml, ooxmlToText, parseFootnotes, parseComments };

@@ -20,8 +20,50 @@ const docx = require('docx');
 const {
     Document, Packer, Paragraph, TextRun, InsertedTextRun, DeletedTextRun,
     FootnoteReferenceRun, ExternalHyperlink, TableOfContents, HeadingLevel,
-    AlignmentType, LevelFormat, PageNumber, Header, Footer
+    AlignmentType, LevelFormat, PageNumber, Header, Footer, ImageRun,
+    CommentRangeStart, CommentRangeEnd, CommentReference
 } = docx;
+
+// Výchozí písmo dokumentu — Times New Roman 12 (český soudní standard). Řeší i
+// nesoulad s html-to-docx cestou (ta má TNR), aby text bez explicitního písma
+// nevyšel jednou cestou Calibri a druhou TNR.
+const DEFAULT_STYLES = {
+    default: {
+        document: { run: { font: 'Times New Roman', size: 24 } }
+    }
+};
+
+// Zjistí typ, data a rozměry obrázku z data-URL (bez závislostí). Šířku omezí na
+// obsahovou šířku A4 (≈ 468 pt) se zachováním poměru stran.
+function _imageInfo(dataUrl) {
+    const m = /^data:image\/(png|jpe?g|gif|bmp);base64,([\s\S]+)$/i.exec(String(dataUrl || ''));
+    if (!m) return null;
+    let type = m[1].toLowerCase();
+    if (type === 'jpeg') type = 'jpg';
+    const buffer = Buffer.from(m[2], 'base64');
+    let width = 0, height = 0;
+    try {
+        if (type === 'png' && buffer.length > 24) {
+            width = buffer.readUInt32BE(16); height = buffer.readUInt32BE(20);
+        } else if (type === 'gif' && buffer.length > 10) {
+            width = buffer.readUInt16LE(6); height = buffer.readUInt16LE(8);
+        } else if (type === 'jpg') {
+            let i = 2;
+            while (i < buffer.length - 9) {
+                if (buffer[i] !== 0xFF) { i++; continue; }
+                const marker = buffer[i + 1];
+                if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+                    height = buffer.readUInt16BE(i + 5); width = buffer.readUInt16BE(i + 7); break;
+                }
+                i += 2 + buffer.readUInt16BE(i + 2);
+            }
+        }
+    } catch (e) { /* fallback níže */ }
+    if (!width || !height) { width = 400; height = 300; }
+    const MAXW = 468;
+    if (width > MAXW) { height = Math.round(height * MAXW / width); width = MAXW; }
+    return { buffer, type: type, width, height };
+}
 
 // A4 (210×297 mm) a okraje 2,5 cm v twip — shodné s buildDocxOptions v main.js.
 const PAGE = {
@@ -59,6 +101,14 @@ function buildRun(run) {
     if (run.footnoteId != null) {
         return new FootnoteReferenceRun(run.footnoteId);
     }
+    // Obrázek (Quill embed → ImageRun; vloží se do word/media).
+    if (run.image) {
+        const info = _imageInfo(run.image);
+        if (info) {
+            return new ImageRun({ data: info.buffer, transformation: { width: info.width, height: info.height }, type: info.type });
+        }
+        return new TextRun('');
+    }
     const text = run.text != null ? String(run.text) : '';
     const base = Object.assign({ text: text }, runProps(run));
 
@@ -87,13 +137,35 @@ function buildParagraph(para) {
     if (para.type === 'toc') {
         return new TableOfContents('Obsah', { hyperlink: true, headingStyleRange: '1-3' });
     }
-    const opts = { children: (para.runs || []).map(buildRun) };
+    const opts = { children: buildRunsWithComments(para.runs) };
     if (HEADINGS[para.type]) opts.heading = HEADINGS[para.type];
     if (para.align && ALIGN[para.align]) opts.alignment = ALIGN[para.align];
     if (para.list === 'bullet') opts.bullet = { level: Math.min(para.indent || 0, 8) };
     else if (para.list === 'ordered') opts.numbering = { reference: OL_REF, level: Math.min(para.indent || 0, 8) };
     else if (para.indent) opts.indent = { left: para.indent * 720 }; // 0,5" na úroveň
     return new Paragraph(opts);
+}
+
+// Sestaví běhy odstavce a kolem souvislých běhů se stejným commentId vloží
+// značky komentáře (CommentRangeStart/End + reference) → Word komentář.
+function buildRunsWithComments(runs) {
+    const children = [];
+    let open = null;
+    const close = () => {
+        children.push(new CommentRangeEnd(open));
+        children.push(new TextRun({ children: [new CommentReference(open)] }));
+    };
+    (runs || []).forEach(r => {
+        const cid = (r.commentId != null) ? r.commentId : null;
+        if (cid !== open) {
+            if (open != null) close();
+            if (cid != null) children.push(new CommentRangeStart(cid));
+            open = cid;
+        }
+        children.push(buildRun(r));
+    });
+    if (open != null) close();
+    return children;
 }
 
 function buildParas(arr) {
@@ -112,9 +184,25 @@ function buildFootnotes(footnotes) {
 /**
  * Sestaví .docx buffer z modelu. Vrací Promise<Buffer>.
  */
+// Word komentáře (word/comments.xml). Datum se převádí na Date (běží v Node).
+function buildComments(comments) {
+    const children = [];
+    Object.keys(comments || {}).forEach(id => {
+        const c = comments[id] || {};
+        children.push({
+            id: parseInt(id, 10),
+            author: c.author || 'Advokát',
+            date: c.date ? new Date(c.date) : new Date(),
+            children: [new Paragraph({ children: [new TextRun(String(c.body || ''))] })]
+        });
+    });
+    return children;
+}
+
 function modelToDocxBuffer(model) {
     model = model || {};
     const footnotes = buildFootnotes(model.footnotes);
+    const commentsChildren = buildComments(model.comments);
 
     const sectionChildren = buildParas(model.body && model.body.length ? model.body : [{ type: 'normal', runs: [{ text: '' }] }]);
 
@@ -123,25 +211,35 @@ function modelToDocxBuffer(model) {
     // Zápatí: buď z modelu, nebo aspoň číslo stránky (parita s dosavadním pageNumber:true).
     const footerChildren = model.footer && model.footer.length
         ? buildParas(model.footer)
-        : [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ children: [PageNumber.CURRENT] })] })];
+        : [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+                new TextRun('Strana '), new TextRun({ children: [PageNumber.CURRENT] }),
+                new TextRun(' z '), new TextRun({ children: [PageNumber.TOTAL_PAGES] })
+            ]
+        })];
 
     const doc = new Document({
         creator: 'LexisEditor',
         title: model.title || '',
+        styles: DEFAULT_STYLES, // výchozí Times New Roman 12
         features: { updateFields: true }, // Word po otevření přepočítá TOC
         numbering: {
             config: [{
                 reference: OL_REF,
+                // Víceúrovňové právní číslování: kumulativní „1. / 1.1. / 1.1.1."
+                // (úroveň l zobrazí %1.%2.…%(l+1)). Odsazení roste s úrovní.
                 levels: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(l => ({
                     level: l,
                     format: LevelFormat.DECIMAL,
-                    text: `%${l + 1}.`,
+                    text: Array.from({ length: l + 1 }, (_, k) => `%${k + 1}`).join('.') + '.',
                     alignment: AlignmentType.START,
                     style: { paragraph: { indent: { left: (l + 1) * 720, hanging: 360 } } }
                 }))
             }]
         },
         footnotes: footnotes,
+        comments: commentsChildren.length ? { children: commentsChildren } : undefined,
         sections: [{
             properties: { page: { size: PAGE.size, margin: PAGE.margin } },
             headers: headers,

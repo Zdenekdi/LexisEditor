@@ -76,8 +76,20 @@ function deltaToParagraphs(delta, startFootnoteId) {
     const ops = (delta && delta.ops) || [];
     const paragraphs = [];
     const footnotes = {};
+    const comments = {};            // numericId → { author, date, body }
+    const commentMap = {};          // zdrojové id komentáře → numericId
+    let commentCounter = 0;         // komentáře v OOXML číslují od 0
     let fnCounter = startFootnoteId || 1;
     let hasUnsupported = false;
+
+    const resolveComment = (c) => {
+        const src = c.id || ('c:' + (c.text || c.body || '') + ':' + (c.author || ''));
+        if (commentMap[src] != null) return commentMap[src];
+        const id = commentCounter++;
+        commentMap[src] = id;
+        comments[id] = { author: c.author || 'Advokát', date: c.date || null, body: String(c.text || c.body || '') };
+        return id;
+    };
 
     let runs = [];
     const flush = (attr) => {
@@ -110,7 +122,11 @@ function deltaToParagraphs(delta, startFootnoteId) {
                     if (attr.footnote && typeof attr.footnote === 'object') {
                         addFootnote(attr.footnote);
                     } else {
-                        runs.push(_makeRun(part, attr));
+                        const run = _makeRun(part, attr);
+                        if (attr.comment && typeof attr.comment === 'object') {
+                            run.commentId = resolveComment(attr.comment);
+                        }
+                        runs.push(run);
                     }
                 }
                 if (i < parts.length - 1) flush(attr);
@@ -121,8 +137,11 @@ function deltaToParagraphs(delta, startFootnoteId) {
             } else if (op.insert.toc) {
                 if (runs.length) flush(attr);
                 paragraphs.push({ type: 'toc', runs: [] });
+            } else if (op.insert.image) {
+                // Obrázek (Quill embed) → image run; rozměry/typ dořeší model-to-docx.
+                runs.push({ image: op.insert.image });
             } else {
-                // image, video, tabulka apod. — v nativním exportu (zatím) nepodporováno.
+                // video, vzorec apod. — v nativním exportu (zatím) nepodporováno.
                 hasUnsupported = true;
             }
         }
@@ -130,7 +149,7 @@ function deltaToParagraphs(delta, startFootnoteId) {
     // Zbytek bez koncového \n.
     if (runs.length) flush({});
 
-    return { paragraphs, footnotes, hasUnsupported };
+    return { paragraphs, footnotes, comments, hasUnsupported };
 }
 
 // Hlavička/patička jsou v editoru prosté HTML divy (ne Quill) — do modelu je
@@ -160,6 +179,7 @@ function deltaToModel(main, opts) {
         header: header,
         footer: footer,
         footnotes: body.footnotes,
+        comments: body.comments || {},
         body: body.paragraphs,
         hasUnsupported: hasUnsupported
     };
@@ -171,7 +191,7 @@ function needsNativeExport(delta) {
     const ops = (delta && delta.ops) || [];
     return ops.some(op => {
         const a = op.attributes || {};
-        if (a.insertion || a.deletion || a.footnote) return true;
+        if (a.insertion || a.deletion || a.footnote || a.comment) return true;
         if (op.insert && typeof op.insert === 'object' && (op.insert.footnote || op.insert.toc)) return true;
         return false;
     });

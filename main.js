@@ -481,14 +481,31 @@ ipcMain.handle('import-docx-native', async (event, arrayBuffer) => {
         const docXml = await docFile.async('string');
         const fnFile = zip.file('word/footnotes.xml');
         const fnXml = fnFile ? await fnFile.async('string') : '';
-        // Nativní cesta má smysl jen když dokument obsahuje revize/poznámky —
-        // jinak je mammoth (tabulky, obrázky, seznamy) věrnější. Renderer se dle
-        // `hasTracked` rozhodne.
-        const hasTracked = /<w:ins\b|<w:del\b|<w:footnoteReference\b/.test(docXml);
-        const html = ooxmlToHtml(docXml, fnXml);
+        const cFile = zip.file('word/comments.xml');
+        const commentsXml = cFile ? await cFile.async('string') : '';
+        // Nativní cesta má smysl jen když dokument obsahuje revize / poznámky /
+        // komentáře — jinak je mammoth (tabulky, obrázky, seznamy) věrnější.
+        const hasTracked = /<w:ins\b|<w:del\b|<w:footnoteReference\b|<w:commentRangeStart\b/.test(docXml);
+        const html = ooxmlToHtml(docXml, fnXml, commentsXml);
         return { success: true, html, hasTracked };
     } catch (error) {
         console.error('Nativní import DOCX selhal:', error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+// Word-parita: extrakce prostého textu z .docx pro „Porovnat dokumenty" (Compare).
+ipcMain.handle('docx-extract-text', async (event, arrayBuffer) => {
+    try {
+        const JSZip = require('jszip');
+        const { ooxmlToText } = require('./js/export/ooxml-to-html');
+        const zip = await JSZip.loadAsync(Buffer.from(arrayBuffer));
+        const docFile = zip.file('word/document.xml');
+        if (!docFile) return { success: false, error: 'Neplatný .docx (chybí document.xml).' };
+        const docXml = await docFile.async('string');
+        return { success: true, text: ooxmlToText(docXml) };
+    } catch (error) {
+        console.error('Extrakce textu z DOCX selhala:', error.message);
         return { success: false, error: error.message };
     }
 });

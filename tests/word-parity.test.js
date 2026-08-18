@@ -44,6 +44,38 @@ describe('delta-to-model (čistý transform)', () => {
         expect(model.body[2].list).toBe('ordered');
         expect(model.header[0].runs[0].text).toBe('Soud');
     });
+
+    test('obrázek → image run, komentář → commentId + model.comments', () => {
+        const delta = { ops: [
+            { insert: 'a ' },
+            { insert: 'sporné', attributes: { comment: { id: 'k1', text: 'Ověřit.', author: 'X' } } },
+            { insert: ' b' },
+            { insert: { image: 'data:image/png;base64,AAAA' } },
+            { insert: '\n' }
+        ] };
+        const model = deltaToModel(delta, {});
+        const p = model.body[0];
+        expect(p.runs.some(r => r.commentId === 0)).toBe(true);
+        expect(model.comments[0].body).toBe('Ověřit.');
+        expect(p.runs.some(r => r.image)).toBe(true);
+    });
+});
+
+describe('compare (porovnání verzí → redline)', () => {
+    const { compareTexts } = require('../js/export/compare');
+    test('změna slova → ql-deletion + ql-insertion, beze změny zůstává text', () => {
+        const html = compareTexts('Zaplatit 100 Kč.\nBeze změny.', 'Zaplatit 200 Kč.\nBeze změny.', { author: 'X' });
+        expect(html).toContain('ql-deletion');
+        expect(html).toContain('ql-insertion');
+        expect(html).toContain('Beze změny.');
+        // nezměněný odstavec nesmí být označen
+        expect(html).toMatch(/<p>Beze změny\.<\/p>/);
+    });
+    test('přidaný odstavec → celý vložený, odebraný → celý smazaný', () => {
+        const html = compareTexts('A\nB', 'A\nB\nC', { author: 'X' });
+        expect(html).toContain('<span class="ql-insertion"');
+        expect(html).toContain('>C</span>');
+    });
 });
 
 describe('ooxml-to-html (import revizí a poznámek)', () => {
@@ -97,5 +129,52 @@ describeOoxml('OOXML round-trip (docx + jszip)', () => {
         expect(html).toContain('ql-insertion');
         expect(html).toContain('ql-deletion');
         expect(html).toContain('footnote-ref');
+    });
+
+    test('komentář + obrázek + výchozí písmo: export a zpětný import', async () => {
+        const { modelToDocxBuffer } = require('../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        const delta = { ops: [
+            { insert: 'a ' },
+            { insert: 'sporná pasáž', attributes: { comment: { id: 'k1', text: 'Přeformulovat.', author: 'Mgr. X', date: '2026-08-18T10:00:00Z' } } },
+            { insert: ' b\n' },
+            { insert: { image: png } },
+            { insert: '\n' }
+        ] };
+        const model = deltaToModel(delta, { title: 'C' });
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const docXml = await zip.file('word/document.xml').async('string');
+        const cXml = await zip.file('word/comments.xml').async('string');
+        const stylesXml = await zip.file('word/styles.xml').async('string');
+
+        expect(docXml).toMatch(/<w:commentRangeStart\b/);
+        expect(cXml).toContain('Přeformulovat.');
+        expect(stylesXml).toContain('Times New Roman'); // výchozí písmo
+        // obrázek v media
+        expect(Object.keys(zip.files).some(f => f.startsWith('word/media/'))).toBe(true);
+        // "Strana X z Y" v zápatí
+        const footer = await zip.file('word/footer1.xml').async('string');
+        expect(footer).toContain('Strana');
+
+        const html = ooxmlToHtml(docXml, cXml, cXml);
+        expect(html).toContain('comment-highlight');
+        expect(html).toContain('data-comment-text="Přeformulovat."');
+    });
+
+    test('víceúrovňové číslování: numbering.xml má kumulativní úrovně (1.1.)', async () => {
+        const { modelToDocxBuffer } = require('../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const delta = { ops: [
+            { insert: 'První' }, { insert: '\n', attributes: { list: 'ordered' } },
+            { insert: 'Podbod' }, { insert: '\n', attributes: { list: 'ordered', indent: 1 } }
+        ] };
+        // list samotný nespouští nativní cestu, proto model sestavíme přímo:
+        const model = deltaToModel(delta, {});
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const numbering = await zip.file('word/numbering.xml').async('string');
+        expect(numbering).toContain('%1.%2.'); // kumulativní 2. úroveň
     });
 });

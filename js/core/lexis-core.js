@@ -228,6 +228,34 @@ class LexisCore {
         TocBlot.tagName = 'DIV';
         TocBlot.className = 'lexis-toc';
 
+        // Komentář (recenzní bublina) — nese text, autora, datum; exportuje se jako
+        // Word komentář (word/comments.xml). Render: zvýrazněný rozsah s tooltipem.
+        class CommentBlot extends Inline {
+            static create(value) {
+                const n = super.create();
+                n.classList.add('comment-highlight');
+                if (value && typeof value === 'object') {
+                    if (value.id) n.setAttribute('data-comment-id', value.id);
+                    if (value.text) n.setAttribute('data-comment-text', value.text);
+                    if (value.author) n.setAttribute('data-comment-author', value.author);
+                    if (value.date) n.setAttribute('data-comment-date', value.date);
+                    n.setAttribute('title', (value.author ? value.author + ': ' : '') + (value.text || ''));
+                }
+                return n;
+            }
+            static formats(node) {
+                const v = {};
+                if (node.getAttribute('data-comment-id')) v.id = node.getAttribute('data-comment-id');
+                if (node.getAttribute('data-comment-text')) v.text = node.getAttribute('data-comment-text');
+                if (node.getAttribute('data-comment-author')) v.author = node.getAttribute('data-comment-author');
+                if (node.getAttribute('data-comment-date')) v.date = node.getAttribute('data-comment-date');
+                return Object.keys(v).length ? v : true;
+            }
+        }
+        CommentBlot.blotName = 'comment';
+        CommentBlot.tagName = 'SPAN';
+        CommentBlot.className = 'comment-highlight';
+
         class PlaceholderBlot extends Inline {
             static create(value) {
                 let node = super.create();
@@ -290,6 +318,7 @@ class LexisCore {
         Quill.register(CitationBlot);
         Quill.register(FootnoteBlot);
         Quill.register(TocBlot);
+        Quill.register(CommentBlot);
     }
 
     getKeyboardBindings() {
@@ -395,6 +424,77 @@ class LexisCore {
     }
     acceptChangeAtCursor() { this._resolveChangeAtCursor('accept'); }
     rejectChangeAtCursor() { this._resolveChangeAtCursor('reject'); }
+
+    // Vloží komentář (recenzní bublinu) k aktuálnímu výběru. Vrací false bez výběru.
+    insertComment(text) {
+        const range = this.quill.getSelection();
+        if (!range || range.length === 0) return false;
+        const meta = {
+            id: 'k' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            text: String(text || ''),
+            author: this.trackAuthor || 'Advokát',
+            date: new Date().toISOString()
+        };
+        this.quill.formatText(range.index, range.length, 'comment', meta, 'user');
+        return true;
+    }
+
+    // Seznam revizních položek (vložení / smazání / komentáře) s autorem, časem,
+    // textem a pozicí — podklad pro recenzní panel. Souvislé běhy se slučují.
+    listReviewItems() {
+        const contents = this.quill.getContents();
+        const items = [];
+        let idx = 0, cur = null;
+        const flush = () => { if (cur) { items.push(cur); cur = null; } };
+        contents.ops.forEach(op => {
+            const len = typeof op.insert === 'string' ? op.insert.length : 1;
+            const a = op.attributes || {};
+            const text = typeof op.insert === 'string' ? op.insert : '';
+            let kind = null, meta = null;
+            if (a.insertion) { kind = 'ins'; meta = typeof a.insertion === 'object' ? a.insertion : {}; }
+            else if (a.deletion) { kind = 'del'; meta = typeof a.deletion === 'object' ? a.deletion : {}; }
+            else if (a.comment) { kind = 'comment'; meta = typeof a.comment === 'object' ? a.comment : {}; }
+            if (kind) {
+                const key = kind + '|' + (meta.id || '') + '|' + (meta.author || '');
+                if (cur && cur.key === key && cur.end === idx) {
+                    cur.text += text; cur.end = idx + len;
+                } else {
+                    flush();
+                    cur = { key: key, kind: kind, author: meta.author || 'Advokát', date: meta.date || '', text: text, commentText: meta.text || '', start: idx, end: idx + len };
+                }
+            } else {
+                flush();
+            }
+            idx += len;
+        });
+        flush();
+        return items;
+    }
+
+    // Vyřeší jednu revizní položku (z panelu). U komentáře „accept" = vyřešit/odebrat.
+    resolveReviewItem(item, mode) {
+        if (!item) return;
+        const len = item.end - item.start;
+        if (item.kind === 'comment') {
+            this.quill.formatText(item.start, len, 'comment', false, 'user');
+            return;
+        }
+        const removeText = (mode === 'accept') ? (item.kind === 'del') : (item.kind === 'ins');
+        if (removeText) {
+            this.quill.deleteText(item.start, len, 'user');
+        } else {
+            this.quill.formatText(item.start, len, item.kind === 'ins' ? 'insertion' : 'deletion', false, 'user');
+        }
+    }
+
+    // Stabilní barva pro autora revize (pro barevné odlišení v panelu i textu).
+    authorColor(author) {
+        const palette = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#d97706', '#0891b2', '#be185d'];
+        let h = 0;
+        const s = String(author || '');
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return palette[h % palette.length];
+    }
 
     // Vloží blok automatického obsahu (TOC) na pozici kurzoru.
     insertTableOfContents() {

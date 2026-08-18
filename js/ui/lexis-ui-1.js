@@ -619,6 +619,93 @@ Object.assign(LexisUI.prototype, {
         if (this.core.rejectAllChanges) this.core.rejectAllChanges();
     },
 
+    // Komentář k výběru (Word-parita: exportuje se do word/comments.xml).
+    insertComment() {
+        const range = this.core.quill.getSelection();
+        if (!range || range.length === 0) {
+            this.customAlert('Nejdřív označ text, ke kterému chceš přidat komentář.');
+            return;
+        }
+        const text = prompt('Komentář:');
+        if (text === null) return;
+        this.core.insertComment(text);
+    },
+
+    // Recenzní panel: seznam změn a komentářů s autorem/časem, barvami dle autora
+    // a tlačítky přijmout/odmítnout (obdoba podokna revizí ve Wordu).
+    openReviewPanel() { this.renderReviewPanel(); },
+    renderReviewPanel() {
+        let panel = document.getElementById('lexis-review-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'lexis-review-panel';
+            panel.style.cssText = 'position:fixed;top:70px;right:16px;width:320px;max-height:70vh;overflow:auto;background:#fff;border:1px solid #d9d3c8;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.15);z-index:9999;font-family:Inter,sans-serif;font-size:13px;color:#2b2926;';
+            document.body.appendChild(panel);
+        }
+        const items = this.core.listReviewItems ? this.core.listReviewItems() : [];
+        const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const kindLabel = { ins: 'Vloženo', del: 'Smazáno', comment: 'Komentář' };
+        let html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #eee;font-weight:600;">Revize a komentáře (' + items.length + ')<span style="cursor:pointer;opacity:.6;" onclick="document.getElementById(\'lexis-review-panel\').remove()">✕</span></div>';
+        if (!items.length) html += '<div style="padding:16px;opacity:.6;">Žádné změny ani komentáře.</div>';
+        items.forEach((it, i) => {
+            const col = this.core.authorColor ? this.core.authorColor(it.author) : '#666';
+            const snippet = esc((it.kind === 'comment' ? it.commentText : it.text) || '').slice(0, 140);
+            const ctx = it.kind === 'comment' ? ('„' + esc(it.text).slice(0, 60) + '“') : '';
+            html += '<div style="padding:10px 12px;border-bottom:1px solid #f0ede7;">'
+                + '<div style="display:flex;gap:6px;align-items:center;"><span style="width:9px;height:9px;border-radius:50%;background:' + col + ';display:inline-block;"></span>'
+                + '<b>' + esc(it.author) + '</b> <span style="opacity:.5;">' + esc((it.date || '').split('T')[0]) + '</span>'
+                + '<span style="margin-left:auto;font-size:11px;opacity:.6;">' + kindLabel[it.kind] + '</span></div>'
+                + '<div style="margin:6px 0;color:#333;">' + snippet + (ctx ? ' <span style="opacity:.55;">' + ctx + '</span>' : '') + '</div>'
+                + '<div style="display:flex;gap:6px;">'
+                + '<button data-i="' + i + '" class="lexis-rev-accept" style="font-size:11px;padding:3px 8px;border:1px solid #cbe3cb;background:#eefaee;border-radius:6px;cursor:pointer;">' + (it.kind === 'comment' ? 'Vyřešit' : 'Přijmout') + '</button>'
+                + (it.kind === 'comment' ? '' : '<button data-i="' + i + '" class="lexis-rev-reject" style="font-size:11px;padding:3px 8px;border:1px solid #f0cccc;background:#fdeeee;border-radius:6px;cursor:pointer;">Odmítnout</button>')
+                + '</div></div>';
+        });
+        panel.innerHTML = html;
+        const self = this;
+        panel.querySelectorAll('.lexis-rev-accept').forEach(b => b.onclick = () => { self.core.resolveReviewItem(items[+b.getAttribute('data-i')], 'accept'); self.renderReviewPanel(); });
+        panel.querySelectorAll('.lexis-rev-reject').forEach(b => b.onclick = () => { self.core.resolveReviewItem(items[+b.getAttribute('data-i')], 'reject'); self.renderReviewPanel(); });
+    },
+
+    // Porovnat dokumenty (Word-parita „Compare"): vybraný soubor = STARŠÍ verze,
+    // aktuální dokument = MOJE (novější). Rozdíly se zobrazí jako sledované změny.
+    compareWithFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.docx,.txt';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            if (file.name.endsWith('.docx') && window.electronAPI && window.electronAPI.docxExtractText) {
+                reader.onload = async (re) => {
+                    const res = await window.electronAPI.docxExtractText(re.target.result);
+                    if (!res || !res.success) {
+                        this.customAlert('Nepodařilo se načíst dokument k porovnání: ' + (res && res.error || '')); return;
+                    }
+                    this._runCompare(res.text, file.name);
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = (re) => this._runCompare(String(re.target.result || ''), file.name);
+                reader.readAsText(file);
+            }
+        };
+        input.click();
+    },
+    _runCompare(originalText, fileName) {
+        if (typeof window.LexisCompare === 'undefined' || !window.LexisCompare.compareTexts) {
+            this.customAlert('Modul porovnání (compare.js) není načten.'); return;
+        }
+        const revisedText = this.core.getText();
+        const author = (this.core && this.core.trackAuthor) || 'Advokát';
+        const html = window.LexisCompare.compareTexts(originalText, revisedText, { author: author, date: new Date().toISOString() });
+        this.core.setContent(html);
+        if (this.setDocumentStatus) this.setDocumentStatus(null, true);
+        if (this.saveActiveDocumentState) this.saveActiveDocumentState();
+        this.customAlert('📝 Porovnáno se souborem „' + fileName + '".<br><br>Rozdíly (vybraný soubor → aktuální dokument) jsou zobrazené jako <b>sledované změny</b>. Projdi je v recenzním panelu a přijmi/odmítni.');
+    },
+
     updateTrackChangesUI(isActive) {
         const btn = document.getElementById('btn-track-changes');
         if (btn) {

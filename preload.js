@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // se zachováním revizí a poznámek pod čarou.
     exportDocxV2: (payload) => ipcRenderer.invoke('export-docx-v2', payload),
     importDocxNative: (arrayBuffer) => ipcRenderer.invoke('import-docx-native', arrayBuffer),
+    docxExtractText: (arrayBuffer) => ipcRenderer.invoke('docx-extract-text', arrayBuffer),
     searchAres: (ico) => ipcRenderer.invoke('search-ares', ico),
     getTemplates: () => ipcRenderer.invoke('get-templates'),
     saveTemplate: (type, content) => ipcRenderer.invoke('save-template', type, content),
