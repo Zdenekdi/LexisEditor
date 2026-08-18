@@ -182,6 +182,27 @@
         window.compareWithFile = () => lexisUI.compareWithFile();
         window.openReviewPanel = () => lexisUI.openReviewPanel();
         window.insertCommentOnSelection = () => lexisUI.insertComment();
+        // AI redline: AI přepíše výběr a rozdíl vloží jako sledované změny (přijmout/odmítnout).
+        window.reviseSelectionAsRedline = (instr) => lexisUI.reviseSelectionAsRedline(instr);
+        // AI anotace výběru: poznámka pod čarou s pramenem / redakční komentář.
+        window.aiFootnoteForSelection = () => lexisUI.aiAnnotateSelection('footnote');
+        window.aiCommentForSelection = () => lexisUI.aiAnnotateSelection('comment');
+        // Word-parita: Ctrl+Alt+M = komentář k výběru; Ctrl+Alt+R = AI revize výběru (redline).
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'm' || e.key === 'M' || e.code === 'KeyM')) {
+                e.preventDefault();
+                if (lexisUI && typeof lexisUI.insertComment === 'function') lexisUI.insertComment();
+            } else if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
+                e.preventDefault();
+                if (!lexisUI || typeof lexisUI.reviseSelectionAsRedline !== 'function') return;
+                const range = lexisCore && lexisCore.quill.getSelection();
+                if (!range || range.length === 0) { lexisUI.reviseSelectionAsRedline(); return; }
+                // Nepovinný pokyn (co má AI udělat); prázdné = obecné vylepšení.
+                lexisUI.customPrompt('Jak má AI text upravit? (nepovinné — např. „zkrať", „formálněji", „doplň sankci")', '', (instr) => {
+                    lexisUI.reviseSelectionAsRedline(instr || '');
+                });
+            }
+        });
         window.openLexisLink = () => lexisUI.openLexisLink();
         window.switchSidebarTab = (tab) => lexisUI.switchSidebarTab(tab);
         window.switchAITab = (tab, el) => lexisUI.switchAITab(tab, el);

@@ -256,6 +256,42 @@ class LexisCore {
         CommentBlot.tagName = 'SPAN';
         CommentBlot.className = 'comment-highlight';
 
+        // Tabulka jako blok (BlockEmbed) — Quill jinak <table> zahodí. Buňky jsou
+        // editovatelné (contenteditable); hodnota nese mřížku textů. Export přes
+        // html-to-docx (HTML tabulka) i nativní OOXML (viz model-to-docx buildTable).
+        class TableBlot extends BlockEmbed {
+            static create(value) {
+                const node = super.create();
+                node.classList.add('lexis-table');
+                node.setAttribute('contenteditable', 'false');
+                const rows = (value && Array.isArray(value.rows) && value.rows.length) ? value.rows : [['', ''], ['', '']];
+                let html = '<table style="border-collapse:collapse;width:100%;margin:8px 0;" border="1">';
+                rows.forEach(r => {
+                    html += '<tr>';
+                    (r || []).forEach(c => {
+                        const safe = (c == null ? '' : String(c)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        html += '<td contenteditable="true" style="border:1px solid #999;padding:4px 8px;min-width:48px;">' + safe + '</td>';
+                    });
+                    html += '</tr>';
+                });
+                html += '</table>';
+                node.innerHTML = html;
+                return node;
+            }
+            static value(node) {
+                const rows = [];
+                node.querySelectorAll('tr').forEach(tr => {
+                    const cells = [];
+                    tr.querySelectorAll('td').forEach(td => cells.push(td.innerText));
+                    rows.push(cells);
+                });
+                return { rows: rows.length ? rows : [['']] };
+            }
+        }
+        TableBlot.blotName = 'table';
+        TableBlot.tagName = 'DIV';
+        TableBlot.className = 'lexis-table';
+
         class PlaceholderBlot extends Inline {
             static create(value) {
                 let node = super.create();
@@ -319,6 +355,7 @@ class LexisCore {
         Quill.register(FootnoteBlot);
         Quill.register(TocBlot);
         Quill.register(CommentBlot);
+        Quill.register(TableBlot);
     }
 
     getKeyboardBindings() {
@@ -439,6 +476,40 @@ class LexisCore {
         return true;
     }
 
+    // AI redline: nahradí VÝBĚR (nebo daný rozsah) revidovaným zněním jako SLEDOVANÉ
+    // ZMĚNY (ql-insertion / ql-deletion). Staví na LexisCompare (diff po slovech), takže
+    // původní text zůstane přeškrtnutý a nový podtržený — advokát je pak přijme/odmítne
+    // v recenzním panelu. Autora/datum zapíšeme do blotů, takže export do w:ins/w:del je
+    // zachovává. Vrací true při úspěchu; false, když není výběr nebo chybí modul.
+    // opts: { range?, author?, compare? } — compare kvůli testovatelnosti bez window.
+    insertRedlineFromRevision(revisedText, opts) {
+        opts = opts || {};
+        const LC = opts.compare || (typeof window !== 'undefined' ? window.LexisCompare : null);
+        if (!LC || typeof LC.compareTexts !== 'function') {
+            console.error('LexisCompare (compare.js) není načten — nelze vytvořit AI revizi.');
+            return false;
+        }
+        const range = opts.range || this.quill.getSelection(true);
+        if (!range || range.length === 0) return false;
+
+        const index = range.index;
+        const len = range.length;
+        const original = this.quill.getText(index, len);
+        if (original == null || original === '') return false;
+
+        const author = opts.author || this.trackAuthor || 'AI asistent';
+        // Sestavení redline + „inline" odstavcové odlehčení řeší compare.js (čistá,
+        // testovatelná funkce). changed=false ⇒ AI vrátila stejné znění → nevkládáme.
+        const rl = (typeof LC.buildRedline === 'function')
+            ? LC.buildRedline(original, revisedText, { author: author, date: new Date().toISOString() })
+            : { html: LC.compareTexts(original, revisedText, { author: author, date: new Date().toISOString() }), changed: true };
+        if (!rl.changed || !rl.html) return false;
+
+        this.quill.deleteText(index, len, 'user');
+        this.safePasteHTML(index, rl.html);
+        return true;
+    }
+
     // Seznam revizních položek (vložení / smazání / komentáře) s autorem, časem,
     // textem a pozicí — podklad pro recenzní panel. Souvislé běhy se slučují.
     listReviewItems() {
@@ -494,6 +565,17 @@ class LexisCore {
         const s = String(author || '');
         for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
         return palette[h % palette.length];
+    }
+
+    // Vloží tabulku (mřížka prázdných buněk) na pozici kurzoru.
+    insertTable(rows, cols) {
+        const r = Math.max(1, Math.min(parseInt(rows, 10) || 3, 50));
+        const c = Math.max(1, Math.min(parseInt(cols, 10) || 3, 12));
+        const grid = Array.from({ length: r }, () => Array.from({ length: c }, () => ''));
+        const range = this.quill.getSelection(true);
+        const index = range ? range.index : this.quill.getLength();
+        this.quill.insertEmbed(index, 'table', { rows: grid }, 'user');
+        this.quill.setSelection(index + 1, 0);
     }
 
     // Vloží blok automatického obsahu (TOC) na pozici kurzoru.

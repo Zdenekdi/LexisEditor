@@ -706,6 +706,138 @@ Object.assign(LexisUI.prototype, {
         this.customAlert('📝 Porovnáno se souborem „' + fileName + '".<br><br>Rozdíly (vybraný soubor → aktuální dokument) jsou zobrazené jako <b>sledované změny</b>. Projdi je v recenzním panelu a přijmi/odmítni.');
     },
 
+    // AI redline (Word-parita „Rewrite" + revize): AI přepíše OZNAČENÝ text a rozdíl
+    // se vloží jako SLEDOVANÉ ZMĚNY (původní přeškrtnuté, návrh podtržený). Advokát je
+    // přijme/odmítne v recenzním panelu; export je uloží jako w:ins/w:del. Volitelný
+    // `instruction` upřesní záměr (zkrátit, formálněji, doplnit…).
+    async reviseSelectionAsRedline(instruction) {
+        const range = this.core.quill.getSelection();
+        if (!range || range.length === 0) {
+            this.customAlert('ℹ️ <b>Žádný výběr</b><br><br>Nejdřív označ text, který má AI přepsat jako <b>sledovanou změnu</b>.');
+            return;
+        }
+        if (typeof window.LexisCompare === 'undefined' || !window.LexisCompare.compareTexts) {
+            this.customAlert('Modul porovnání (compare.js) není načten — AI revizi nelze vytvořit.');
+            return;
+        }
+        const original = this.core.quill.getText(range.index, range.length);
+        if (!original || !original.trim()) {
+            this.customAlert('Vybraný text je prázdný.');
+            return;
+        }
+        const savedRange = { index: range.index, length: range.length };
+        const instr = (instruction && String(instruction).trim())
+            || 'Vylepši stylistiku, srozumitelnost a právní přesnost. Význam a odstavce zachovej.';
+        const systemPrompt = 'Jsi špičkový český právní redaktor. Dostaneš úsek textu a pokyn k úpravě. '
+            + 'Vrať POUZE upravené znění téhož úseku — bez uvozovek, bez úvodu, bez komentářů a bez vysvětlení. '
+            + 'Zachovej členění na odstavce i smysl; měň jen to, co je pro splnění pokynu nutné.';
+        const userPrompt = `Pokyn: ${instr}\n\nText k úpravě:\n${original}`;
+
+        const busy = this._showRedlineBusy();
+        let revised;
+        try {
+            revised = await this.core.callAI(userPrompt, systemPrompt);
+        } catch (e) {
+            this._hideRedlineBusy(busy);
+            this.customAlert('AI se nepodařilo oslovit: ' + (e && e.message || e));
+            return;
+        }
+        this._hideRedlineBusy(busy);
+
+        revised = String(revised || '').trim()
+            .replace(/^["„»“]+/, '').replace(/["“«»]+$/, '').trim(); // občas model obalí odpověď uvozovkami
+        if (!revised) {
+            this.customAlert('AI vrátila prázdnou odpověď — revize se nevkládá.');
+            return;
+        }
+
+        const author = (this.core && this.core.trackAuthor) || 'Advokát';
+        const ok = this.core.insertRedlineFromRevision(revised, { range: savedRange, author: 'AI · ' + author });
+        if (!ok) {
+            this.customAlert('Beze změny — AI navrhla prakticky stejné znění, revize se nevkládá.');
+            return;
+        }
+        if (this.setDocumentStatus) this.setDocumentStatus(null, true);
+        if (this.saveActiveDocumentState) this.saveActiveDocumentState();
+        this.openReviewPanel();
+        this.customAlert('📝 <b>AI revize vložena jako sledované změny.</b><br><br>Původní znění je přeškrtnuté, návrh AI podtržený. Projdi je v recenzním panelu a <b>přijmi/odmítni</b>. Export do Wordu je uloží jako <code>w:ins</code>/<code>w:del</code>.');
+    },
+
+    // AI anotace výběru: nechá agenta vygenerovat POZNÁMKU POD ČAROU (mode='footnote')
+    // s právním pramenem, nebo REDAKČNÍ KOMENTÁŘ (mode='comment') k označené pasáži.
+    // Staví na existující infrastruktuře (core.insertFootnote / core.insertComment →
+    // export do footnotes.xml / comments.xml). Word-parita: „Vložit poznámku / komentář".
+    async aiAnnotateSelection(mode) {
+        mode = (mode === 'comment') ? 'comment' : 'footnote';
+        const range = this.core.quill.getSelection();
+        if (!range || range.length === 0) {
+            this.customAlert('ℹ️ <b>Žádný výběr</b><br><br>Nejdřív označ tvrzení / pasáž, ke které má AI '
+                + (mode === 'footnote' ? 'doplnit <b>poznámku pod čarou</b>.' : 'napsat <b>komentář</b>.'));
+            return;
+        }
+        const selText = this.core.quill.getText(range.index, range.length);
+        if (!selText || !selText.trim()) { this.customAlert('Vybraný text je prázdný.'); return; }
+        const savedRange = { index: range.index, length: range.length };
+
+        const systemPrompt = (mode === 'footnote')
+            ? 'Jsi český právní expert. K zadanému tvrzení navrhni stručnou POZNÁMKU POD ČAROU s relevantním právním '
+              + 'pramenem (např. § a zákon, případně judikatura NS/ÚS). Vrať POUZE text poznámky — bez uvozovek, '
+              + 'bez úvodu, jedna až dvě věty. Pokud si pramenem nejsi jistý, napiš obecné „Srov." a oblast úpravy, nevymýšlej si čísla.'
+            : 'Jsi zkušený český advokát-kontrolor. K zadané pasáži napiš stručný REDAKČNÍ KOMENTÁŘ (co ověřit, '
+              + 'zpřesnit nebo jaké je riziko). Vrať POUZE text komentáře — bez uvozovek a bez úvodu, jedna až dvě věty.';
+        const userPrompt = (mode === 'footnote' ? 'Tvrzení:\n' : 'Pasáž:\n') + selText;
+
+        const busy = this._showRedlineBusy(mode === 'footnote' ? 'AI hledá pramen k poznámce…' : 'AI píše komentář…');
+        let out;
+        try {
+            out = await this.core.callAI(userPrompt, systemPrompt);
+        } catch (e) {
+            this._hideRedlineBusy(busy);
+            this.customAlert('AI se nepodařilo oslovit: ' + (e && e.message || e));
+            return;
+        }
+        this._hideRedlineBusy(busy);
+
+        out = String(out || '').trim().replace(/^["„»“]+/, '').replace(/["“«»]+$/, '').trim();
+        if (!out) { this.customAlert('AI vrátila prázdnou odpověď.'); return; }
+
+        if (mode === 'footnote') {
+            // Referenci umísti ZA výběr (za dané tvrzení).
+            this.core.quill.setSelection(savedRange.index + savedRange.length, 0, 'silent');
+            if (typeof this.core.insertFootnote === 'function') this.core.insertFootnote(out);
+        } else {
+            this.core.quill.setSelection(savedRange.index, savedRange.length, 'silent');
+            const ok = this.core.insertComment(out);
+            if (!ok) { this.customAlert('Komentář se nepodařilo vložit (ztracený výběr).'); return; }
+            this.openReviewPanel();
+        }
+        if (this.setDocumentStatus) this.setDocumentStatus(null, true);
+        if (this.saveActiveDocumentState) this.saveActiveDocumentState();
+        this.customAlert(mode === 'footnote'
+            ? '📎 <b>AI poznámka pod čarou vložena.</b><br><br>Návrh zkontroluj — <b>ověř právní pramen</b> u zdroje. Export ji uloží do <code>footnotes.xml</code>.'
+            : '💬 <b>AI komentář vložen.</b><br><br>Najdeš ho v recenzním panelu; export ho uloží do <code>comments.xml</code>.');
+    },
+
+    // Nemodální „AI přemýšlí" indikátor pro redline (aby uživatel věděl, že se něco děje).
+    _showRedlineBusy(label) {
+        let el = document.getElementById('lexis-redline-busy');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'lexis-redline-busy';
+            el.style.cssText = 'position:fixed;top:70px;right:16px;z-index:10000;background:#fff;border:1px solid #d9d3c8;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.15);padding:10px 14px;font-family:Inter,sans-serif;font-size:13px;color:#2b2926;display:flex;align-items:center;gap:8px;';
+            el.innerHTML = '<span style="width:12px;height:12px;border:2px solid #ddd6cb;border-top:2px solid var(--accent,#9a5b22);border-radius:50%;display:inline-block;animation:spin 1s linear infinite;"></span><span class="lexis-redline-busy-label">AI připravuje revizi…</span>';
+            document.body.appendChild(el);
+        }
+        const lbl = el.querySelector('.lexis-redline-busy-label');
+        if (lbl) lbl.textContent = label || 'AI připravuje revizi…';
+        el.style.display = 'flex';
+        return el;
+    },
+    _hideRedlineBusy(el) {
+        const node = el || document.getElementById('lexis-redline-busy');
+        if (node && node.parentNode) node.parentNode.removeChild(node);
+    },
+
     updateTrackChangesUI(isActive) {
         const btn = document.getElementById('btn-track-changes');
         if (btn) {

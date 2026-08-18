@@ -97,7 +97,22 @@
         return html || '<p><br></p>';
     }
 
-    const api = { compareTexts, _lcsDiff };
+    // buildRedline — redline pro AI revizi VÝBĚRU. Jako compareTexts, ale když jsou
+    // obě strany jednořádkové (typický výběr uvnitř odstavce), sundá vnější <p>, ať se
+    // dá vložit inline bez rozbití odstavce. Vrací { html, changed }.
+    function buildRedline(originalText, revisedText, opts) {
+        const o = String(originalText == null ? '' : originalText).replace(/\n+$/, '');
+        const r = String(revisedText == null ? '' : revisedText).replace(/\n+$/, '');
+        if (r === o) return { html: '', changed: false };
+        let html = compareTexts(o, r, opts || {});
+        if (o.indexOf('\n') === -1 && r.indexOf('\n') === -1) {
+            const m = html.match(/^\s*<p>([\s\S]*?)<\/p>\s*$/);
+            if (m) html = m[1];
+        }
+        return { html: html, changed: true };
+    }
+
+    const api = { compareTexts, buildRedline, _lcsDiff };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.LexisCompare = api;
 })(typeof window !== 'undefined' ? window : null);
