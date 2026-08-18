@@ -178,15 +178,55 @@ class LexisCore {
         SectionBlot.tagName = 'P';
         SectionBlot.className = 'ql-legal-section';
 
-        class InsertionBlot extends Inline {}
+        // Sledované změny nesou AUTORA a DATUM (Word je vyžaduje u w:ins/w:date).
+        // Hodnota formátu je objekt {author,date,id}; pro zpětnou kompatibilitu se
+        // starým boolean vrací `true`, když metadata chybí.
+        function _changeCreate(node, value) {
+            if (value && typeof value === 'object') {
+                if (value.author) node.setAttribute('data-author', value.author);
+                if (value.date) node.setAttribute('data-date', value.date);
+                if (value.id) node.setAttribute('data-cid', value.id);
+            }
+            return node;
+        }
+        function _changeFormats(node) {
+            const v = {};
+            if (node.getAttribute('data-author')) v.author = node.getAttribute('data-author');
+            if (node.getAttribute('data-date')) v.date = node.getAttribute('data-date');
+            if (node.getAttribute('data-cid')) v.id = node.getAttribute('data-cid');
+            return Object.keys(v).length ? v : true;
+        }
+        class InsertionBlot extends Inline {
+            static create(value) { const n = super.create(); n.classList.add('ql-insertion'); return _changeCreate(n, value); }
+            static formats(node) { return _changeFormats(node); }
+        }
         InsertionBlot.blotName = 'insertion';
         InsertionBlot.tagName = 'SPAN';
         InsertionBlot.className = 'ql-insertion';
 
-        class DeletionBlot extends Inline {}
+        class DeletionBlot extends Inline {
+            static create(value) { const n = super.create(); n.classList.add('ql-deletion'); return _changeCreate(n, value); }
+            static formats(node) { return _changeFormats(node); }
+        }
         DeletionBlot.blotName = 'deletion';
         DeletionBlot.tagName = 'SPAN';
         DeletionBlot.className = 'ql-deletion';
+
+        // Blok automatického obsahu (TOC) — do .docx se exportuje jako pole { TOC },
+        // které Word po otevření přepočítá (viz delta-to-model / model-to-docx).
+        const BlockEmbed = Quill.import('blots/block/embed');
+        class TocBlot extends BlockEmbed {
+            static create() {
+                const node = super.create();
+                node.setAttribute('contenteditable', 'false');
+                node.classList.add('lexis-toc');
+                node.innerHTML = '<div style="border:1px dashed #b9b3a8;border-radius:8px;padding:10px 14px;color:#6b6459;font-size:13px;background:#faf9f7;">📖 Automatický obsah — vygeneruje se ve Wordu po otevření (pole { TOC }).</div>';
+                return node;
+            }
+        }
+        TocBlot.blotName = 'toc';
+        TocBlot.tagName = 'DIV';
+        TocBlot.className = 'lexis-toc';
 
         class PlaceholderBlot extends Inline {
             static create(value) {
@@ -249,6 +289,7 @@ class LexisCore {
         Quill.register(PlaceholderBlot);
         Quill.register(CitationBlot);
         Quill.register(FootnoteBlot);
+        Quill.register(TocBlot);
     }
 
     getKeyboardBindings() {
@@ -258,11 +299,11 @@ class LexisCore {
                 handler: (range, context) => {
                     if (!this.isTrackChangesActive) return true;
                     if (range.length > 0) {
-                        this.quill.formatText(range.index, range.length, 'deletion', true, 'user');
+                        this.quill.formatText(range.index, range.length, 'deletion', this._changeMeta(), 'user');
                         this.quill.setSelection(range.index + range.length, 0);
                         return false;
                     } else if (range.index > 0) {
-                        this.quill.formatText(range.index - 1, 1, 'deletion', true, 'user');
+                        this.quill.formatText(range.index - 1, 1, 'deletion', this._changeMeta(), 'user');
                         return false;
                     }
                     return true;
@@ -273,11 +314,11 @@ class LexisCore {
                 handler: (range, context) => {
                     if (!this.isTrackChangesActive) return true;
                     if (range.length > 0) {
-                        this.quill.formatText(range.index, range.length, 'deletion', true, 'user');
+                        this.quill.formatText(range.index, range.length, 'deletion', this._changeMeta(), 'user');
                         this.quill.setSelection(range.index, 0);
                         return false;
                     } else {
-                        this.quill.formatText(range.index, 1, 'deletion', true, 'user');
+                        this.quill.formatText(range.index, 1, 'deletion', this._changeMeta(), 'user');
                         return false;
                     }
                 }
@@ -290,10 +331,77 @@ class LexisCore {
         delta.ops.forEach(op => {
             if (op.retain) index += op.retain;
             if (op.insert && typeof op.insert === 'string') {
-                this.quill.formatText(index, op.insert.length, 'insertion', true, 'silent');
+                this.quill.formatText(index, op.insert.length, 'insertion', this._changeMeta(), 'silent');
                 index += op.insert.length;
             }
         });
+    }
+
+    // Metadata sledované změny (autor + čas). Autora nastavuje UI z profilu advokáta
+    // (this.trackAuthor); bez něj se použije neutrální „Advokát".
+    _changeMeta() {
+        return {
+            author: this.trackAuthor || 'Advokát',
+            date: new Date().toISOString(),
+            id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+        };
+    }
+
+    // Přijmout/odmítnout VŠECHNY sledované změny. Přijmout: vložení → normální text,
+    // smazání → text pryč. Odmítnout: vložení → text pryč, smazání → text zůstává.
+    _resolveAllChanges(mode) {
+        const Delta = Quill.import('delta');
+        const contents = this.quill.getContents();
+        const out = new Delta();
+        contents.ops.forEach(op => {
+            const a = Object.assign({}, op.attributes || {});
+            const isIns = !!a.insertion, isDel = !!a.deletion;
+            if (mode === 'accept') {
+                if (isDel) return;
+                delete a.insertion;
+            } else {
+                if (isIns) return;
+                delete a.deletion;
+            }
+            out.push({ insert: op.insert, attributes: Object.keys(a).length ? a : undefined });
+        });
+        this.quill.setContents(out, 'user');
+    }
+    acceptAllChanges() { this._resolveAllChanges('accept'); }
+    rejectAllChanges() { this._resolveAllChanges('reject'); }
+
+    // Přijmout/odmítnout jednu změnu pod kurzorem.
+    _resolveChangeAtCursor(mode) {
+        const sel = this.quill.getSelection();
+        if (!sel) return;
+        const contents = this.quill.getContents();
+        let idx = 0, target = null;
+        for (const op of contents.ops) {
+            const len = typeof op.insert === 'string' ? op.insert.length : 1;
+            const a = op.attributes || {};
+            if ((a.insertion || a.deletion) && sel.index >= idx && sel.index <= idx + len) {
+                target = { start: idx, len: len, ins: !!a.insertion };
+                break;
+            }
+            idx += len;
+        }
+        if (!target) return;
+        const removeText = (mode === 'accept') ? !target.ins : target.ins;
+        if (removeText) {
+            this.quill.deleteText(target.start, target.len, 'user');
+        } else {
+            this.quill.formatText(target.start, target.len, target.ins ? 'insertion' : 'deletion', false, 'user');
+        }
+    }
+    acceptChangeAtCursor() { this._resolveChangeAtCursor('accept'); }
+    rejectChangeAtCursor() { this._resolveChangeAtCursor('reject'); }
+
+    // Vloží blok automatického obsahu (TOC) na pozici kurzoru.
+    insertTableOfContents() {
+        const range = this.quill.getSelection(true);
+        const index = range ? range.index : this.quill.getLength();
+        this.quill.insertEmbed(index, 'toc', true, 'user');
+        this.quill.setSelection(index + 1, 0);
     }
 
     insertFootnote(text) {

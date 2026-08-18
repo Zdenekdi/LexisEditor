@@ -1190,6 +1190,13 @@ Object.assign(LexisUI.prototype, {
     },
 
     insertTOC() {
+        // Word-parita: vloží skutečné pole obsahu (TOC), které Word po otevření
+        // přepočítá a do .docx se exportuje jako { TOC } (viz model-to-docx).
+        // Původní statický HTML obsah je ponechán níže jako nedostupná záloha.
+        if (this.core && typeof this.core.insertTableOfContents === 'function') {
+            this.core.insertTableOfContents();
+            return;
+        }
         const text = this.core.quill.getText();
         const lines = text.split('\n');
         let headings = [];

@@ -376,6 +376,26 @@ app.on('window-all-closed', function () {
     if (process.platform !== 'darwin') app.quit();
 });
 
+// Sdílené nastavení DOCX exportu — cílí na český soudní standard: formát A4,
+// okraje 2,5 cm (záhlaví/zápatí 1,25 cm), čeština (`cs-CZ` → dělení slov a
+// kontrola pravopisu ve Wordu) a stránkování. Písmo, velikost a řádkování se
+// záměrně NEvnucují — přebírají se z obsahu editoru (WYSIWYG), aby se náhled
+// na obrazovce a výsledné .docx nerozcházely. Dřív se exportoval formát
+// US Letter (default knihovny), což pro česká podání k soudu neodpovídá.
+function buildDocxOptions(headerHtml, footerHtml, extra) {
+    return Object.assign({
+        orientation: 'portrait',
+        pageSize: { width: 11906, height: 16838 }, // A4 210×297 mm v twip (1 mm ≈ 56,693 twip)
+        margins: { top: 1417, right: 1417, bottom: 1417, left: 1417, header: 708, footer: 708, gutter: 0 },
+        lang: 'cs-CZ',
+        creator: 'LexisEditor',
+        table: { row: { cantSplit: true } },
+        header: !!headerHtml,
+        footer: !!footerHtml,
+        pageNumber: true,
+    }, extra || {});
+}
+
 // Zpracování požadavku z UI na export do DOCX
 ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml) => {
     try {
@@ -390,12 +410,7 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
         if (filePath) {
             // Konverze HTML (z Quill editoru) do čistého DOCX bufferu.
             // header:true je nutné, jinak se předaná hlavička do DOCX nevloží.
-            const fileBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
-                table: { row: { cantSplit: true } },
-                header: !!headerHtml,
-                footer: !!footerHtml,
-                pageNumber: true,
-            }, footerHtml || null);
+            const fileBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, buildDocxOptions(headerHtml, footerHtml), footerHtml || null);
             
             // Fyzický zápis souboru na lokální disk
             fs.writeFileSync(filePath, fileBuffer);
@@ -404,6 +419,76 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
         return { success: false, canceled: true };
     } catch (error) {
         console.error('Chyba při generování DOCX:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Word-parita: CHYTRÝ export do DOCX. Pro dokumenty se sledovanými změnami,
+// poznámkami pod čarou nebo obsahem (TOC) použije nativní OOXML cestu (knihovna
+// `docx`), která tyto konstrukce umí (w:ins/w:del, word/footnotes.xml, pole TOC).
+// Pro běžné dokumenty i při jakékoli chybě padá zpět na osvědčený html-to-docx.
+ipcMain.handle('export-docx-v2', async (event, payload) => {
+    payload = payload || {};
+    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, title } = payload;
+    try {
+        const { filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Uložit dokument',
+            defaultPath: (title ? title.replace(/[^\w\sá-žÁ-Ž.-]/g, '').trim() : 'Dokument_LexisEditor') + '.docx',
+            filters: [{ name: 'Word Dokument', extensions: ['docx'] }]
+        });
+        if (!filePath) return { success: false, canceled: true };
+
+        let useNative = false;
+        try {
+            const { needsNativeExport } = require('./js/export/delta-to-model');
+            useNative = !!(deltaOps && needsNativeExport({ ops: deltaOps }));
+        } catch (e) { useNative = false; }
+
+        let buffer;
+        let usedNative = false;
+        if (useNative) {
+            try {
+                const { deltaToModel } = require('./js/export/delta-to-model');
+                const { modelToDocxBuffer } = require('./js/export/model-to-docx');
+                const model = deltaToModel({ ops: deltaOps }, { title, headerLines, footerLines });
+                buffer = await modelToDocxBuffer(model);
+                usedNative = true;
+            } catch (e) {
+                console.error('Nativní OOXML export selhal, fallback na html-to-docx:', e.message);
+            }
+        }
+        if (!buffer) {
+            buffer = await HTMLToDOCX(html, headerHtml || null, buildDocxOptions(headerHtml, footerHtml), footerHtml || null);
+        }
+        fs.writeFileSync(filePath, buffer);
+        return { success: true, path: filePath, native: usedNative };
+    } catch (error) {
+        console.error('Chyba při chytrém generování DOCX:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Word-parita: nativní IMPORT z .docx se zachováním sledovaných změn (w:ins/w:del)
+// a poznámek pod čarou — to mammoth zahazuje. Vrací HTML pro editor. Volá se jen
+// když dokument revize/poznámky obsahuje; jinak zůstává mammoth (viz importDocument).
+ipcMain.handle('import-docx-native', async (event, arrayBuffer) => {
+    try {
+        const JSZip = require('jszip');
+        const { ooxmlToHtml } = require('./js/export/ooxml-to-html');
+        const zip = await JSZip.loadAsync(Buffer.from(arrayBuffer));
+        const docFile = zip.file('word/document.xml');
+        if (!docFile) return { success: false, error: 'Neplatný .docx (chybí document.xml).' };
+        const docXml = await docFile.async('string');
+        const fnFile = zip.file('word/footnotes.xml');
+        const fnXml = fnFile ? await fnFile.async('string') : '';
+        // Nativní cesta má smysl jen když dokument obsahuje revize/poznámky —
+        // jinak je mammoth (tabulky, obrázky, seznamy) věrnější. Renderer se dle
+        // `hasTracked` rozhodne.
+        const hasTracked = /<w:ins\b|<w:del\b|<w:footnoteReference\b/.test(docXml);
+        const html = ooxmlToHtml(docXml, fnXml);
+        return { success: true, html, hasTracked };
+    } catch (error) {
+        console.error('Nativní import DOCX selhal:', error.message);
         return { success: false, error: error.message };
     }
 });
@@ -603,12 +688,7 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtm
             const pdfPath = basePath + '.pdf';
 
             // 1. Export DOCX (header:true jinak hlavička vypadne)
-            const docxBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, {
-                table: { row: { cantSplit: true } },
-                header: !!headerHtml,
-                footer: !!footerHtml,
-                pageNumber: true,
-            }, footerHtml || null);
+            const docxBuffer = await HTMLToDOCX(htmlContent, headerHtml || null, buildDocxOptions(headerHtml, footerHtml), footerHtml || null);
             fs.writeFileSync(docxPath, docxBuffer);
 
             // 2. Export PDF přes skryté okno

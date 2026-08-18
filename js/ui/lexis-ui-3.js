@@ -826,16 +826,34 @@ Object.assign(LexisUI.prototype, {
     },
 
     async exportToDocx() {
-        if (window.electronAPI && window.electronAPI.exportDocx) {
+        if (window.electronAPI && (window.electronAPI.exportDocxV2 || window.electronAPI.exportDocx)) {
             const html = this.core.getContent();
+            const quill = this.core.quill;
+            const deltaOps = (quill && quill.getContents) ? quill.getContents().ops : null;
             const headerArea = document.getElementById('header-area');
             const footerArea = document.getElementById('footer-area');
             const headerHtml = headerArea ? headerArea.innerHTML : '';
             const footerHtml = footerArea ? footerArea.innerHTML : '';
+            const linesOf = (el) => el ? String(el.innerText || '').split('\n').map(s => s.trim()).filter(Boolean) : [];
+            const titleEl = document.getElementById('window-doc-title');
+            const title = (titleEl && titleEl.innerText) || this.currentDocumentTitle || 'Dokument';
             try {
-                const result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);
+                let result;
+                if (window.electronAPI.exportDocxV2) {
+                    // Chytrý export: main podle obsahu zvolí nativní OOXML (revize/poznámky/
+                    // obsah) nebo html-to-docx. Delta nese revize a poznámky strukturovaně.
+                    result = await window.electronAPI.exportDocxV2({
+                        deltaOps: deltaOps, html: html,
+                        headerHtml: headerHtml, footerHtml: footerHtml,
+                        headerLines: linesOf(headerArea), footerLines: linesOf(footerArea),
+                        title: title
+                    });
+                } else {
+                    result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);
+                }
                 if (result && result.success) {
-                    this.customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}`);
+                    const nativeNote = result.native ? '\n\n✔ Zachovány sledované změny / poznámky pod čarou / obsah.' : '';
+                    this.customAlert(`Dokument byl úspěšně uložen do:\n\n${result.path}${nativeNote}`);
                 } else if (result && !result.canceled) {
                     this.customAlert(`Chyba při ukládání dokumentu:\n\n${result.error}`);
                 }

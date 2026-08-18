@@ -225,8 +225,43 @@ Object.assign(LexisUI.prototype, {
             
             const reader = new FileReader();
             if (file.name.endsWith('.docx')) {
-                reader.onload = (re) => {
-                    mammoth.convertToHtml({ arrayBuffer: re.target.result })
+                reader.onload = async (re) => {
+                    const arrayBuffer = re.target.result;
+                    // Word-parita: má-li dokument sledované změny / poznámky pod čarou,
+                    // použij nativní OOXML import (mammoth by je zahodil). Ostatní
+                    // dokumenty (tabulky, obrázky, seznamy) jdou přes mammoth.
+                    if (window.electronAPI && window.electronAPI.importDocxNative) {
+                        try {
+                            const nat = await window.electronAPI.importDocxNative(arrayBuffer);
+                            if (nat && nat.success && nat.hasTracked && nat.html) {
+                                this.core.setContent(nat.html);
+                                this.setDocumentStatus(null, true);
+                                this.saveActiveDocumentState();
+                                return;
+                            }
+                        } catch (e) { /* fallback na mammoth níže */ }
+                    }
+                    // styleMap zvyšší věrnost importu z Wordu: zachová nadpisy
+                    // (české i anglické názvy stylů), podtržení a přeškrtnutí, které
+                    // mammoth ve výchozím stavu zahazuje. Tučné/kurzíva/seznamy/tabulky
+                    // řeší výchozí mapa (includeDefaultStyleMap).
+                    mammoth.convertToHtml({ arrayBuffer: arrayBuffer }, {
+                        includeDefaultStyleMap: true,
+                        styleMap: [
+                            "u => u",
+                            "strike => s",
+                            "p[style-name='Nadpis 1'] => h1:fresh",
+                            "p[style-name='Nadpis 2'] => h2:fresh",
+                            "p[style-name='Nadpis 3'] => h3:fresh",
+                            "p[style-name='Nadpis 4'] => h4:fresh",
+                            "p[style-name='Nadpis'] => h1:fresh",
+                            "p[style-name='Heading 1'] => h1:fresh",
+                            "p[style-name='Heading 2'] => h2:fresh",
+                            "p[style-name='Heading 3'] => h3:fresh",
+                            "p[style-name='Heading 4'] => h4:fresh",
+                            "p[style-name='Title'] => h1:fresh"
+                        ]
+                    })
                         .then(result => {
                             this.core.setContent(result.value);
                             this.setDocumentStatus(null, true);
@@ -562,7 +597,26 @@ Object.assign(LexisUI.prototype, {
 
     toggleTrackChanges() {
         this.core.isTrackChangesActive = !this.core.isTrackChangesActive;
+        // Autor sledovaných změn = jméno z profilu advokáta (pro w:author v .docx).
+        try {
+            const prof = (typeof this.readLawyerProfile === 'function') ? this.readLawyerProfile() : null;
+            if (prof && (prof.jmeno || prof.name)) this.core.trackAuthor = prof.jmeno || prof.name;
+        } catch (e) { /* volitelné */ }
         this.updateTrackChangesUI(this.core.isTrackChangesActive);
+    },
+
+    // Přijmout/odmítnout sledované změny (redlining). Bez výběru „vše", jinak pod kurzorem.
+    acceptChange() {
+        if (this.core.acceptChangeAtCursor) this.core.acceptChangeAtCursor();
+    },
+    rejectChange() {
+        if (this.core.rejectChangeAtCursor) this.core.rejectChangeAtCursor();
+    },
+    acceptAllChanges() {
+        if (this.core.acceptAllChanges) this.core.acceptAllChanges();
+    },
+    rejectAllChanges() {
+        if (this.core.rejectAllChanges) this.core.rejectAllChanges();
     },
 
     updateTrackChangesUI(isActive) {
