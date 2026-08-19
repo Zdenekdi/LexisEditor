@@ -847,6 +847,15 @@ Object.assign(LexisUI.prototype, {
                     watermark = { type: 'text', text: wmText, color: wmLayer.getAttribute('data-watermark-color') || 'd0d0d0' };
                 }
             }
+            // Bohatší hlavička/patička: z HTML uděláme model (tučné/kurzíva/podtržení,
+            // zarovnání, logo), aby to nativní export zachoval. Fallback = prosté řádky.
+            let headerModel = null, footerModel = null;
+            if (window.LexisHeaderModel && window.LexisHeaderModel.htmlToHeaderModel) {
+                try {
+                    headerModel = window.LexisHeaderModel.htmlToHeaderModel(headerHtml, document);
+                    footerModel = window.LexisHeaderModel.htmlToHeaderModel(footerHtml, document);
+                } catch (e) { headerModel = null; footerModel = null; }
+            }
             try {
                 let result;
                 if (window.electronAPI.exportDocxV2) {
@@ -856,6 +865,7 @@ Object.assign(LexisUI.prototype, {
                         deltaOps: deltaOps, html: html,
                         headerHtml: headerHtml, footerHtml: footerHtml,
                         headerLines: linesOf(headerArea), footerLines: linesOf(footerArea),
+                        headerModel: headerModel, footerModel: footerModel,
                         title: title, watermark: watermark
                     });
                 } else {

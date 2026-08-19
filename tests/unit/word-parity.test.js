@@ -272,6 +272,34 @@ describeOoxml('OOXML round-trip (docx + jszip)', () => {
         expect(header).toContain('Soud');
     });
 
+    test('bohatší hlavička: headerModel (tučné + zarovnání + logo) → w:b, jc, media', async () => {
+        const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        const headerModel = [
+            { type: 'normal', align: 'center', runs: [{ image: png }] },
+            { type: 'normal', align: 'center', runs: [{ text: 'Advokátní kancelář Dias', bold: true }] },
+            { type: 'normal', align: 'right', runs: [{ text: 'V Brně dne 14. 7. 2026' }] }
+        ];
+        const model = deltaToModel({ ops: [{ insert: 'Tělo.\n' }] }, { headerModel: headerModel });
+        // headerModel má přednost před headerLines
+        expect(model.header).toBe(headerModel);
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const header = await zip.file('word/header1.xml').async('string');
+        expect(header).toContain('Advokátní kancelář Dias');
+        expect(header).toMatch(/<w:b\b/);              // tučné
+        expect(header).toContain('w:val="center"');    // zarovnání na střed
+        expect(header).toContain('w:val="right"');     // zarovnání vpravo
+        // logo skončí v word/media
+        expect(Object.keys(zip.files).some(f => f.startsWith('word/media/'))).toBe(true);
+    });
+
+    test('bohatší hlavička: prázdný headerModel → fallback na headerLines', () => {
+        const model = deltaToModel({ ops: [{ insert: 'x\n' }] }, { headerModel: [], headerLines: ['Náhradní řádek'] });
+        expect(model.header).toEqual([{ type: 'normal', runs: [{ text: 'Náhradní řádek' }] }]);
+    });
+
     test('AI redline: revize s autorem „AI · …" → export do w:ins/w:del se zachovaným autorem', async () => {
         const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
         const JSZip = require('jszip');

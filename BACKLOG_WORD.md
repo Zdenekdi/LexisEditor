@@ -37,7 +37,16 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
 - [ ] **Endnoty** (poznámky na konci) — dnes jen poznámky pod čarou.
 - [ ] **Pole nad rámec TOC:** křížové odkazy, popisky/číslování obrázků,
   rejstřík (u práva „table of authorities" = seznam citované judikatury).
-- [ ] **Bohatší hlavička/patička** — dnes prostý text; formátování, taby, logo.
+- [x] **HOTOVO — Bohatší hlavička/patička.** Nativní export dosud bral hlavičku/patičku
+  jen jako prostý text (innerText). Nově se HTML hlavičky/patičky převede na model
+  odstavců zachovávající **tučné/kurzívu/podtržení**, **zarovnání** (vlevo/střed/vpravo/
+  do bloku) a **logo** (obrázek `data:` → do `word/media`). Nový UMD modul
+  `js/export/html-header-model.js` (`htmlToHeaderModel`, běží v rendereru nad DOM),
+  `delta-to-model` preferuje `headerModel`/`footerModel` (fallback na prosté řádky),
+  `main.js` je předá, `exportToDocx` je spočítá. Kryto 7 jsdom testy parseru + 2 OOXML
+  testy (formátovaná hlavička → `w:b`/zarovnání/media, prázdný model → fallback).
+  Pozn.: taby (tab-stopy) nedělám — zarovnání per-odstavec pokrývá typické razítko
+  „firma vlevo / datum vpravo".
 - [x] **HOTOVO — Vodoznak do .docx.** Textový vodoznak (KONCEPT/NEPLATNÉ/VZOR…)
   nastavený na pozadí editoru se nově přenáší i do exportu do Wordu jako pravý
   wordovský WordArt (VML shape `#_x0000_t136`) v hlavičce: úhlopříčně (rotace 315°),
@@ -79,3 +88,6 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   z kontextového menu → text se opraví (a undo funguje); vyzkoušej „Přidat do slovníku"
   a tlačítko „Pravopis" (zap/vyp). Na macOS měj v Nastavení systému povolenou češtinu
   pro pravopis (nebo „Automaticky podle jazyka").
+- [ ] Runtime smoke test HLAVIČKY/PATIČKY: do hlavičky dej tučný název kanceláře, logo
+  a vpravo zarovnané datum → export do Wordu → ověř, že se formátování i logo zachovaly
+  (dřív se přenášel jen holý text).

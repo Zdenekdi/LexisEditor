@@ -180,8 +180,10 @@ function deltaToModel(main, opts) {
     const body = deltaToParagraphs(main, 1);
     let hasUnsupported = body.hasUnsupported;
 
-    const header = _linesToParas(opts.headerLines);
-    const footer = _linesToParas(opts.footerLines);
+    // Bohatší hlavička/patička: pokud volající předá už hotový MODEL (z HTML hlavičky —
+    // formátování, zarovnání, logo), použij ho; jinak fallback na prosté textové řádky.
+    const header = (opts.headerModel && opts.headerModel.length) ? opts.headerModel : _linesToParas(opts.headerLines);
+    const footer = (opts.footerModel && opts.footerModel.length) ? opts.footerModel : _linesToParas(opts.footerLines);
 
     return {
         title: opts.title || '',

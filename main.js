@@ -458,7 +458,7 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
 // Pro běžné dokumenty i při jakékoli chybě padá zpět na osvědčený html-to-docx.
 ipcMain.handle('export-docx-v2', async (event, payload) => {
     payload = payload || {};
-    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, title, watermark } = payload;
+    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, headerModel, footerModel, title, watermark } = payload;
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Uložit dokument',
@@ -481,7 +481,7 @@ ipcMain.handle('export-docx-v2', async (event, payload) => {
             try {
                 const { deltaToModel } = require('./js/export/delta-to-model');
                 const { modelToDocxBuffer } = require('./js/export/model-to-docx');
-                const model = deltaToModel({ ops: deltaOps || [] }, { title, headerLines, footerLines, watermark: hasWatermark ? watermark : null });
+                const model = deltaToModel({ ops: deltaOps || [] }, { title, headerLines, footerLines, headerModel, footerModel, watermark: hasWatermark ? watermark : null });
                 buffer = await modelToDocxBuffer(model);
                 usedNative = true;
             } catch (e) {
