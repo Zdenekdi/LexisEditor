@@ -48,8 +48,17 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   napojeno přes `delta-to-model`, `main.js export-docx-v2` a `exportToDocx`. Kryto
   4 testy (WordArt v hlavičce, rotace/vystředění, escapování, pořadí vůči hlavičce).
   Pozn.: obrázkový vodoznak (`applyImageWatermark`) zůstává zatím jen na obrazovce.
-- [ ] **In-editor česká kontrola pravopisu** (zbývá z původní položky „vodoznak +
-  pravopis") — potřebuje slovník/hunspell integraci, odloženo.
+- [x] **HOTOVO — In-editor česká kontrola pravopisu.** Místo hunspellu využívá
+  vestavěný Chromium spellchecker Electronu (žádný bundlovaný slovník): chybná slova
+  se v editoru červeně podtrhnou. Na Win/Linux se vybere čeština (+ angličtina) z
+  `availableSpellCheckerLanguages`; na macOS jazyk řídí systém (NSSpellChecker). Tlačítko
+  „Pravopis" nově reálně **zapíná/vypíná** kontrolu (dřív jen falešně hlásilo, že běží).
+  Návrhy oprav: pravé kliknutí na podtržené slovo → vlastní kontextové menu je doplní
+  (hlavní proces posílá `misspelledWord` + `dictionarySuggestions` přes IPC). Oprava se
+  provede přes Quill na rozsahu zachyceném při kliknutí (synchronní model + undo), s
+  fallbackem na `replaceMisspelling`; k dispozici i „Přidat do slovníku". Čistá pomůcka
+  `js/spellcheck-langs.js` (výběr jazyků) je kryta 6 testy; zbytek je Electron runtime
+  (main IPC + preload most + `lexis-ui initContextMenu`), ověřeno proti typům Electronu 42.
 
 ## Nutné u uživatele (ne kód)
 - [ ] `npm install` (přibylo `docx`, `jszip`).
@@ -65,3 +74,8 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   clipboard zachovává bloty ins/del i autora; zbývá jen vizuální kontrola v editoru.)
 - [ ] Runtime smoke test VODOZNAKU: nastav vodoznak (KONCEPT) → export do Wordu →
   otevřít v MS Wordu a ověřit úhlopříčný šedý nápis za textem na každé stránce.
+- [ ] Runtime smoke test PRAVOPISU: napiš schválně překlep (např. „pravnický" místo
+  „právnický") → ověř červené podtržení; pravým kliknutím na slovo vyber návrh opravy
+  z kontextového menu → text se opraví (a undo funguje); vyzkoušej „Přidat do slovníku"
+  a tlačítko „Pravopis" (zap/vyp). Na macOS měj v Nastavení systému povolenou češtinu
+  pro pravopis (nebo „Automaticky podle jazyka").

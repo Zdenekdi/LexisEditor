@@ -216,6 +216,7 @@
         window.changeCase = (type) => lexisUI.changeCase(type);
         window.showFindReplace = () => lexisUI.showFindReplace();
         window.applyWatermark = () => lexisUI.applyWatermark();
+        window.toggleSpellcheck = () => lexisUI.toggleSpellcheck();
         
         window.sendViaEmail = () => lexisUI.sendViaEmail();
         window.saveAsTemplateDialog = () => lexisUI.saveAsTemplateDialog();

@@ -206,12 +206,41 @@ function createWindow() {
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            spellcheck: true // Chromium kontrola pravopisu (čeština + angličtina)
         }
     });
 
     mainWindow.loadFile('index.html');
     // mainWindow.webContents.openDevTools();
+
+    // --- Kontrola pravopisu (nativní Chromium spellchecker) --------------------
+    // Chybná slova se v editoru (contenteditable) červeně podtrhnou; návrhy oprav
+    // řešíme přes vlastní kontextové menu (viz context-menu níže + IPC handlery).
+    try {
+        const ses = mainWindow.webContents.session;
+        // macOS má systémový spellchecker řízený OS (setSpellCheckerLanguages je bez
+        // efektu). Na Win/Linux vybereme češtinu (+ angličtinu) z dostupných jazyků.
+        if (process.platform !== 'darwin' && typeof ses.setSpellCheckerLanguages === 'function') {
+            const { pickSpellLanguages } = require('./js/spellcheck-langs');
+            const langs = pickSpellLanguages(ses.availableSpellCheckerLanguages, ['cs', 'en-US']);
+            if (langs.length) ses.setSpellCheckerLanguages(langs);
+        }
+        if (typeof ses.setSpellCheckerEnabled === 'function') ses.setSpellCheckerEnabled(true);
+    } catch (e) {
+        console.warn('Inicializace kontroly pravopisu selhala:', e.message);
+    }
+
+    // Pravé kliknutí na chybné slovo → pošli slovo + návrhy do rendereru, který je
+    // vloží do vlastního (HTML) kontextového menu. Mimo chybné slovo je word prázdné.
+    mainWindow.webContents.on('context-menu', (event, params) => {
+        try {
+            mainWindow.webContents.send('spellcheck-context', {
+                word: params.misspelledWord || '',
+                suggestions: Array.isArray(params.dictionarySuggestions) ? params.dictionarySuggestions.slice(0, 6) : []
+            });
+        } catch (e) { /* okno se možná zavírá */ }
+    });
 }
 
 app.setName('LexisEditor');
@@ -468,6 +497,35 @@ ipcMain.handle('export-docx-v2', async (event, payload) => {
         console.error('Chyba při chytrém generování DOCX:', error);
         return { success: false, error: error.message };
     }
+});
+
+// --- Kontrola pravopisu: oprava chybného slova / do slovníku / zap-vyp / stav -----
+ipcMain.handle('spellcheck-replace', (event, text) => {
+    try { event.sender.replaceMisspelling(String(text == null ? '' : text)); return { success: true }; }
+    catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('spellcheck-add-word', (event, word) => {
+    try { event.sender.session.addWordToSpellCheckerDictionary(String(word == null ? '' : word)); return { success: true }; }
+    catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('spellcheck-set-enabled', (event, enabled) => {
+    try {
+        const ses = event.sender.session;
+        if (typeof ses.setSpellCheckerEnabled === 'function') ses.setSpellCheckerEnabled(!!enabled);
+        const on = typeof ses.isSpellCheckerEnabled === 'function' ? ses.isSpellCheckerEnabled() : !!enabled;
+        return { success: true, enabled: on };
+    } catch (e) { return { success: false, error: e.message }; }
+});
+ipcMain.handle('spellcheck-status', (event) => {
+    try {
+        const ses = event.sender.session;
+        return {
+            success: true,
+            enabled: typeof ses.isSpellCheckerEnabled === 'function' ? ses.isSpellCheckerEnabled() : true,
+            languages: typeof ses.getSpellCheckerLanguages === 'function' ? ses.getSpellCheckerLanguages() : [],
+            platform: process.platform
+        };
+    } catch (e) { return { success: false, error: e.message }; }
 });
 
 // Word-parita: nativní IMPORT z .docx se zachováním sledovaných změn (w:ins/w:del)

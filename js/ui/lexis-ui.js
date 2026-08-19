@@ -246,12 +246,121 @@ class LexisUI {
         const contextMenu = document.getElementById('editor-context-menu');
         if (!editorEl || !contextMenu) return;
 
+        // Kontrola pravopisu: hlavní proces pošle při pravém kliknutí chybné slovo
+        // + návrhy oprav (viz main.js webContents 'context-menu'). Uložíme je a když
+        // je menu otevřené, doplníme návrhy nahoru. (IPC dorazí o tik po DOM události.)
+        this._spellCtx = { word: '', suggestions: [] };
+        if (window.electronAPI && typeof window.electronAPI.onSpellcheckContext === 'function') {
+            window.electronAPI.onSpellcheckContext((data) => {
+                this._spellCtx = data || { word: '', suggestions: [] };
+                if (contextMenu.style.display === 'block') this._renderSpellItems(contextMenu);
+            });
+        }
+
         editorEl.addEventListener('contextmenu', (e) => {
             e.preventDefault();
+            // Zachyť výběr HNED — Chromium při pravém kliknutí na chybné slovo označí
+            // celé slovo; klik do našeho HTML menu by DOM výběr shodil, proto si Quill
+            // rozsah uložíme teď a opravu pak provedeme přes Quill (viz _applySpellFix).
+            this._spellSel = (this.core && this.core.quill) ? this.core.quill.getSelection() : null;
+            this._clearSpellItems(contextMenu); // z předchozího otevření
             contextMenu.style.display = 'block';
             contextMenu.style.left = `${e.clientX}px`;
             contextMenu.style.top = `${e.clientY}px`;
+            // Návrhy, pokud IPC dorazil dřív; jinak je doplní listener výše.
+            this._renderSpellItems(contextMenu);
         });
+    }
+
+    // Provede opravu překlepu. Preferuje Quill (synchronizuje model + undo) na rozsahu
+    // zachyceném při pravém kliknutí; když nesedí, spolehne se na Chromium replaceMisspelling.
+    _applySpellFix(suggestion) {
+        const sel = this._spellSel;
+        const word = (this._spellCtx && this._spellCtx.word) || '';
+        try {
+            if (sel && sel.length > 0 && this.core && this.core.quill) {
+                const selText = this.core.quill.getText(sel.index, sel.length);
+                if (selText === word || selText.trim() === word) {
+                    this.core.quill.deleteText(sel.index, sel.length, 'user');
+                    this.core.quill.insertText(sel.index, suggestion, 'user');
+                    this.core.quill.setSelection(sel.index + suggestion.length, 0, 'silent');
+                    return;
+                }
+            }
+        } catch (e) { /* fallback níže */ }
+        if (window.electronAPI && window.electronAPI.spellcheckReplace) {
+            window.electronAPI.spellcheckReplace(suggestion);
+        }
+    }
+
+    // Odstraní dříve vložené položky návrhů pravopisu z kontextového menu.
+    _clearSpellItems(menu) {
+        menu.querySelectorAll('.lexis-spell-item, .lexis-spell-sep').forEach(n => n.remove());
+    }
+
+    // Vloží na začátek kontextového menu návrhy oprav pro aktuální chybné slovo
+    // (this._spellCtx). Klik → oprava přes Chromium (replaceMisspelling) nebo přidání
+    // do slovníku. Bez chybného slova nic nedělá.
+    _renderSpellItems(menu) {
+        this._clearSpellItems(menu);
+        const ctx = this._spellCtx || {};
+        const word = ctx.word || '';
+        if (!word || !(window.electronAPI && window.electronAPI.spellcheckReplace)) return;
+        const esc = (s) => (window.escapeHTML ? window.escapeHTML(String(s)) : String(s));
+        const hide = () => { menu.style.display = 'none'; this._clearSpellItems(menu); };
+        const frag = document.createDocumentFragment();
+        const suggestions = Array.isArray(ctx.suggestions) ? ctx.suggestions.slice(0, 6) : [];
+
+        if (suggestions.length) {
+            suggestions.forEach(sugg => {
+                const it = document.createElement('div');
+                it.className = 'context-menu-item lexis-spell-item';
+                it.innerHTML = `<span class="icon" style="color:#c0392b;">✓</span> <b>${esc(sugg)}</b>`;
+                it.onclick = () => { this._applySpellFix(sugg); hide(); };
+                frag.appendChild(it);
+            });
+        } else {
+            const none = document.createElement('div');
+            none.className = 'context-menu-item lexis-spell-item';
+            none.style.opacity = '0.6';
+            none.style.cursor = 'default';
+            none.innerHTML = `<span class="icon">🔤</span> Žádné návrhy oprav`;
+            frag.appendChild(none);
+        }
+        // Přidat do slovníku (aby se slovo příště nehlásilo jako chyba).
+        const add = document.createElement('div');
+        add.className = 'context-menu-item lexis-spell-item';
+        add.innerHTML = `<span class="icon">＋</span> Přidat „${esc(word)}" do slovníku`;
+        add.onclick = () => { if (window.electronAPI.spellcheckAddWord) window.electronAPI.spellcheckAddWord(word); hide(); };
+        frag.appendChild(add);
+
+        const sep = document.createElement('div');
+        sep.className = 'context-menu-sep lexis-spell-sep';
+        frag.appendChild(sep);
+
+        menu.insertBefore(frag, menu.firstChild);
+    }
+
+    // Přepínač kontroly pravopisu (tlačítko „Pravopis" na pásu). Vrací honest stav.
+    async toggleSpellcheck() {
+        if (!(window.electronAPI && window.electronAPI.spellcheckStatus)) {
+            this.customAlert('🔤 <b>Kontrola pravopisu</b><br><br>Je dostupná jen v desktopové (Electron) verzi LexisEditoru.');
+            return;
+        }
+        try {
+            const st = await window.electronAPI.spellcheckStatus();
+            const newEnabled = !(st && st.enabled);
+            const res = await window.electronAPI.spellcheckSetEnabled(newEnabled);
+            const on = !!(res && res.enabled);
+            const langInfo = (st && st.platform === 'darwin')
+                ? 'Jazyk řídí systém macOS (Nastavení → Klávesnice → Text → automaticky podle jazyka, případně přidej češtinu).'
+                : ((st && st.languages && st.languages.length) ? ('Aktivní jazyky: ' + st.languages.join(', ') + '.') : 'Jazyk: výchozí.');
+            this.customAlert(on
+                ? ('🔤 <b>Kontrola pravopisu zapnuta.</b><br><br>Chybná slova se v textu jemně červeně podtrhnou; návrhy oprav najdeš po <b>pravém kliknutí</b> na podtržené slovo.<br><br>' + langInfo)
+                : '🔕 <b>Kontrola pravopisu vypnuta.</b><br><br>Červené podtržení překlepů se skryje.');
+        } catch (e) {
+            this.customAlert('Kontrolu pravopisu se nepodařilo přepnout: ' + (e && e.message || e));
+        }
     }
 
     showConflictResolutionDialog() {

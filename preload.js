@@ -70,4 +70,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     secureDecrypt: (b) => { try { return ipcRenderer.sendSync('secure-decrypt-sync', b); } catch (e) { return null; } },
     // --- EXTRAKCE TEXTU Z PŘÍLOHY (PDF) pro náležitosti odpovědi ---
     extractFileText: (filePath) => ipcRenderer.invoke('extract-file-text', filePath),
+    // --- KONTROLA PRAVOPISU (Chromium spellchecker) ---
+    onSpellcheckContext: (callback) => ipcRenderer.on('spellcheck-context', (_e, data) => callback(data)),
+    spellcheckReplace: (text) => ipcRenderer.invoke('spellcheck-replace', text),
+    spellcheckAddWord: (word) => ipcRenderer.invoke('spellcheck-add-word', word),
+    spellcheckSetEnabled: (enabled) => ipcRenderer.invoke('spellcheck-set-enabled', enabled),
+    spellcheckStatus: () => ipcRenderer.invoke('spellcheck-status'),
 });
