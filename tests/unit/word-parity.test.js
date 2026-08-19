@@ -221,6 +221,57 @@ describeOoxml('OOXML round-trip (docx + jszip)', () => {
         expect(numbering).toContain('%1.%2.'); // kumulativní 2. úroveň
     });
 
+    test('vodoznak: model.watermark → WordArt (t136) v hlavičce, rotace 315°, za textem', async () => {
+        const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const delta = { ops: [{ insert: 'Koncept smlouvy.\n' }] };
+        const model = deltaToModel(delta, { title: 'Koncept', watermark: { type: 'text', text: 'KONCEPT', color: '#c0c0c0' } });
+        expect(model.watermark).toEqual({ type: 'text', text: 'KONCEPT', color: '#c0c0c0' });
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const header = await zip.file('word/header1.xml').async('string');
+        expect(header).toContain('#_x0000_t136');       // WordArt shape
+        expect(header).toContain('rotation:315');        // úhlopříčně
+        expect(header).toContain('string="KONCEPT"');    // text vodoznaku
+        expect(header).toContain('fillcolor="#c0c0c0"'); // barva bez #
+        expect(header).toContain('mso-position-horizontal:center'); // vystředěno
+        expect(header).not.toMatch(/<w:p><w:p>/);        // nerozbije strukturu
+    });
+
+    test('vodoznak: nevalidní barva → výchozí šeď, text se XML-escapuje', async () => {
+        const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const model = deltaToModel({ ops: [{ insert: 'x\n' }] }, { watermark: { type: 'text', text: 'A & <B>', color: 'zzz' } });
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const header = await zip.file('word/header1.xml').async('string');
+        expect(header).toContain('fillcolor="#d0d0d0"');        // fallback šeď
+        expect(header).toContain('string="A &amp; &lt;B&gt;"'); // escapováno
+    });
+
+    test('vodoznak + hlavička: vodoznak je PŘED textem hlavičky (obojí zůstane)', async () => {
+        const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const model = deltaToModel({ ops: [{ insert: 'x\n' }] }, { headerLines: ['Okresní soud v Brně'], watermark: { type: 'text', text: 'VZOR' } });
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const header = await zip.file('word/header1.xml').async('string');
+        expect(header).toContain('string="VZOR"');
+        expect(header).toContain('Okresní soud v Brně');
+        expect(header.indexOf('_x0000_t136')).toBeLessThan(header.indexOf('Okresní soud'));
+    });
+
+    test('bez vodoznaku: hlavička beze změny (žádný t136)', async () => {
+        const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
+        const JSZip = require('jszip');
+        const model = deltaToModel({ ops: [{ insert: 'x\n' }] }, { headerLines: ['Soud'] });
+        const buf = await modelToDocxBuffer(model);
+        const zip = await JSZip.loadAsync(buf);
+        const header = await zip.file('word/header1.xml').async('string');
+        expect(header).not.toContain('_x0000_t136');
+        expect(header).toContain('Soud');
+    });
+
     test('AI redline: revize s autorem „AI · …" → export do w:ins/w:del se zachovaným autorem', async () => {
         const { modelToDocxBuffer } = require('../../js/export/model-to-docx');
         const JSZip = require('jszip');

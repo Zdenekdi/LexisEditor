@@ -837,16 +837,26 @@ Object.assign(LexisUI.prototype, {
             const linesOf = (el) => el ? String(el.innerText || '').split('\n').map(s => s.trim()).filter(Boolean) : [];
             const titleEl = document.getElementById('window-doc-title');
             const title = (titleEl && titleEl.innerText) || this.currentDocumentTitle || 'Dokument';
+            // Vodoznak (KONCEPT/NEPLATNÉ/…) čteme z vrstvy na pozadí editoru a přeneseme
+            // do .docx jako wordovský WordArt v hlavičce (nativní cesta ho vykreslí).
+            const wmLayer = document.getElementById('watermark-layer');
+            let watermark = null;
+            if (wmLayer && wmLayer.getAttribute('data-watermark-type') === 'text') {
+                const wmText = wmLayer.getAttribute('data-watermark-text') || '';
+                if (wmText.trim()) {
+                    watermark = { type: 'text', text: wmText, color: wmLayer.getAttribute('data-watermark-color') || 'd0d0d0' };
+                }
+            }
             try {
                 let result;
                 if (window.electronAPI.exportDocxV2) {
                     // Chytrý export: main podle obsahu zvolí nativní OOXML (revize/poznámky/
-                    // obsah) nebo html-to-docx. Delta nese revize a poznámky strukturovaně.
+                    // obsah/vodoznak) nebo html-to-docx. Delta nese revize a poznámky strukturovaně.
                     result = await window.electronAPI.exportDocxV2({
                         deltaOps: deltaOps, html: html,
                         headerHtml: headerHtml, footerHtml: footerHtml,
                         headerLines: linesOf(headerArea), footerLines: linesOf(footerArea),
-                        title: title
+                        title: title, watermark: watermark
                     });
                 } else {
                     result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);

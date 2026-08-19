@@ -140,6 +140,15 @@ function deltaToParagraphs(delta, startFootnoteId) {
             } else if (op.insert.image) {
                 // Obrázek (Quill embed) → image run; rozměry/typ dořeší model-to-docx.
                 runs.push({ image: op.insert.image });
+            } else if (op.insert.table && Array.isArray(op.insert.table.rows)) {
+                // Tabulka (Quill BlockEmbed) → blok typu 'table'; buňky jako prostý text.
+                if (runs.length) flush(attr);
+                paragraphs.push({
+                    type: 'table',
+                    rows: op.insert.table.rows.map(r => (r || []).map(cell => ({
+                        runs: [{ text: cell == null ? '' : String(cell) }]
+                    })))
+                });
             } else {
                 // video, vzorec apod. — v nativním exportu (zatím) nepodporováno.
                 hasUnsupported = true;
@@ -181,6 +190,7 @@ function deltaToModel(main, opts) {
         footnotes: body.footnotes,
         comments: body.comments || {},
         body: body.paragraphs,
+        watermark: opts.watermark || null, // {type:'text', text, color} → vodoznak v hlavičce
         hasUnsupported: hasUnsupported
     };
 }

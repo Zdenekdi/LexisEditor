@@ -21,8 +21,52 @@ const {
     Document, Packer, Paragraph, TextRun, InsertedTextRun, DeletedTextRun,
     FootnoteReferenceRun, ExternalHyperlink, TableOfContents, HeadingLevel,
     AlignmentType, LevelFormat, PageNumber, Header, Footer, ImageRun,
-    CommentRangeStart, CommentRangeEnd, CommentReference
+    CommentRangeStart, CommentRangeEnd, CommentReference,
+    Table, TableRow, TableCell, WidthType, BorderStyle, ImportedXmlComponent
 } = docx;
+
+// XML/VML escape (atributy i text). VML „string" je atribut → escapujeme i uvozovky.
+function _xmlEsc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// Vodoznak jako wordovský WordArt (VML shape type #_x0000_t136) — stejný útvar,
+// jaký generuje funkce „Vodoznak" ve Wordu: úhlopříčně přes stránku, za textem,
+// opakuje se na každé stránce (proto patří do hlavičky). Vrací ImportedXmlComponent,
+// nebo null když není co vykreslit. Barva = 6-místný hex bez #, jinak výchozí šeď.
+function _watermarkChild(wm) {
+    if (!wm || wm.type !== 'text') return null;
+    const text = String(wm.text == null ? '' : wm.text).trim();
+    if (!text) return null;
+    let color = String(wm.color || '').replace(/^#/, '');
+    if (!/^[0-9a-fA-F]{6}$/.test(color)) color = 'd0d0d0';
+    const font = wm.font ? String(wm.font) : 'Times New Roman';
+    const vml =
+        '<w:p><w:r><w:pict>' +
+        '<v:shape id="LexisWatermark" o:spid="_x0000_s2049" type="#_x0000_t136" ' +
+        'style="position:absolute;margin-left:0;margin-top:0;width:468pt;height:100pt;' +
+        'rotation:315;z-index:-251654144;mso-position-horizontal:center;' +
+        'mso-position-horizontal-relative:margin;mso-position-vertical:center;' +
+        'mso-position-vertical-relative:margin" fillcolor="#' + color + '" stroked="f">' +
+        '<v:fill opacity=".5"/>' +
+        '<v:textpath style="font-family:&quot;' + _xmlEsc(font) + '&quot;;font-size:1pt" ' +
+        'string="' + _xmlEsc(text) + '"/>' +
+        '</v:shape>' +
+        '</w:pict></w:r></w:p>';
+    try {
+        return ImportedXmlComponent.fromXmlString(vml);
+    } catch (e) {
+        return null;
+    }
+}
+
+const _TBL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+const _TBL_BORDERS = {
+    top: _TBL_BORDER, bottom: _TBL_BORDER, left: _TBL_BORDER, right: _TBL_BORDER,
+    insideHorizontal: _TBL_BORDER, insideVertical: _TBL_BORDER
+};
 
 // Výchozí písmo dokumentu — Times New Roman 12 (český soudní standard). Řeší i
 // nesoulad s html-to-docx cestou (ta má TNR), aby text bez explicitního písma
@@ -132,8 +176,25 @@ function buildRun(run) {
     return plain;
 }
 
+// --- Tabulka → docx Table (100 % šířky, plné ohraničení) --------------------
+function buildTable(el) {
+    const rows = (el.rows || []).map(cells => new TableRow({
+        children: (cells || []).map(cell => new TableCell({
+            children: [new Paragraph({ children: buildRunsWithComments(cell.runs || []) })]
+        }))
+    }));
+    return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: _TBL_BORDERS,
+        rows: rows.length ? rows : [new TableRow({ children: [new TableCell({ children: [new Paragraph('')] })] })]
+    });
+}
+
 // --- Para → docx Paragraph --------------------------------------------------
 function buildParagraph(para) {
+    if (para.type === 'table') {
+        return buildTable(para);
+    }
     if (para.type === 'toc') {
         return new TableOfContents('Obsah', { hyperlink: true, headingStyleRange: '1-3' });
     }
@@ -206,8 +267,12 @@ function modelToDocxBuffer(model) {
 
     const sectionChildren = buildParas(model.body && model.body.length ? model.body : [{ type: 'normal', runs: [{ text: '' }] }]);
 
-    const headers = model.header && model.header.length
-        ? { default: new Header({ children: buildParas(model.header) }) } : undefined;
+    // Hlavička = případný vodoznak (za textem, opakuje se na každé stránce) + text hlavičky.
+    const wmChild = _watermarkChild(model.watermark);
+    const headerParas = (model.header && model.header.length) ? buildParas(model.header) : [];
+    const headerChildren = wmChild ? [wmChild].concat(headerParas) : headerParas;
+    const headers = headerChildren.length
+        ? { default: new Header({ children: headerChildren }) } : undefined;
     // Zápatí: buď z modelu, nebo aspoň číslo stránky (parita s dosavadním pageNumber:true).
     const footerChildren = model.footer && model.footer.length
         ? buildParas(model.footer)

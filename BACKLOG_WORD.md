@@ -38,10 +38,30 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
 - [ ] **Pole nad rámec TOC:** křížové odkazy, popisky/číslování obrázků,
   rejstřík (u práva „table of authorities" = seznam citované judikatury).
 - [ ] **Bohatší hlavička/patička** — dnes prostý text; formátování, taby, logo.
-- [ ] **Vodoznak do .docx**, in-editor česká kontrola pravopisu.
+- [x] **HOTOVO — Vodoznak do .docx.** Textový vodoznak (KONCEPT/NEPLATNÉ/VZOR…)
+  nastavený na pozadí editoru se nově přenáší i do exportu do Wordu jako pravý
+  wordovský WordArt (VML shape `#_x0000_t136`) v hlavičce: úhlopříčně (rotace 315°),
+  vystředěný přes stránku, za textem, opakuje se na každé straně — stejný útvar jako
+  funkce „Vodoznak" ve Wordu. Barva se přebírá z výběru, text i barva se sanitizují
+  (XML-escape, fallback šeď). Přítomnost vodoznaku vynutí nativní exportní cestu
+  (html-to-docx WordArt neumí). `model-to-docx _watermarkChild` + `model.watermark`,
+  napojeno přes `delta-to-model`, `main.js export-docx-v2` a `exportToDocx`. Kryto
+  4 testy (WordArt v hlavičce, rotace/vystředění, escapování, pořadí vůči hlavičce).
+  Pozn.: obrázkový vodoznak (`applyImageWatermark`) zůstává zatím jen na obrazovce.
+- [ ] **In-editor česká kontrola pravopisu** (zbývá z původní položky „vodoznak +
+  pravopis") — potřebuje slovník/hunspell integraci, odloženo.
 
 ## Nutné u uživatele (ne kód)
 - [ ] `npm install` (přibylo `docx`, `jszip`).
 - [ ] Runtime smoke test: export do Wordu (revize/poznámky/komentáře/obsah/
   tabulka), „Srovnat" (redline vůči staršímu .docx), komentář Ctrl+Alt+M,
   a otevření wordovského dokumentu s revizemi/komentáři/tabulkou.
+- [ ] Runtime smoke test NOVÝCH AI funkcí: označit text → „Přepsat (revize)"
+  (pás Domů) / Ctrl+Alt+R / kontextové menu → ověřit, že se rozdíl vloží jako
+  sledované změny (přeškrtnuté + podtržené, autor „AI · …"), objeví se v recenzním
+  panelu a po exportu jsou v .docx `w:ins`/`w:del`. Dále kontextové menu „LexisAI:
+  Poznámka pod čarou" a „LexisAI: Komentář k pasáži" → export do
+  `footnotes.xml`/`comments.xml`. (Kód ověřen proti Quill 1.3.6: vkládání přes
+  clipboard zachovává bloty ins/del i autora; zbývá jen vizuální kontrola v editoru.)
+- [ ] Runtime smoke test VODOZNAKU: nastav vodoznak (KONCEPT) → export do Wordu →
+  otevřít v MS Wordu a ověřit úhlopříčný šedý nápis za textem na každé stránce.

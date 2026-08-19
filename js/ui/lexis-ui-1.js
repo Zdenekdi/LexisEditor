@@ -471,9 +471,10 @@ Object.assign(LexisUI.prototype, {
                 wrapper.insertBefore(wmLayer, wrapper.firstChild);
             }
             
-            // data-atributy umožní exportu (PDF) přečíst a vykreslit vodoznak.
+            // data-atributy umožní exportu (PDF/DOCX) přečíst a vykreslit vodoznak.
             wmLayer.setAttribute('data-watermark-type', 'text');
             wmLayer.setAttribute('data-watermark-text', text);
+            wmLayer.setAttribute('data-watermark-color', color);
             wmLayer.innerHTML = eIco(`<div style="transform: rotate(-45deg); font-size: 150px; font-weight: 800; color: ${color}; opacity: 0.3; white-space: nowrap; user-select: none;">${window.escapeHTML(text)}</div>`);
         });
     },

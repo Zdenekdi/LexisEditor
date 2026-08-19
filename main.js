@@ -429,7 +429,7 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
 // Pro běžné dokumenty i při jakékoli chybě padá zpět na osvědčený html-to-docx.
 ipcMain.handle('export-docx-v2', async (event, payload) => {
     payload = payload || {};
-    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, title } = payload;
+    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, title, watermark } = payload;
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Uložit dokument',
@@ -438,11 +438,13 @@ ipcMain.handle('export-docx-v2', async (event, payload) => {
         });
         if (!filePath) return { success: false, canceled: true };
 
+        // Vodoznak umí jen nativní cesta (html-to-docx WordArt neumí) → vynutí ji.
+        const hasWatermark = !!(watermark && watermark.type === 'text' && String(watermark.text || '').trim());
         let useNative = false;
         try {
             const { needsNativeExport } = require('./js/export/delta-to-model');
-            useNative = !!(deltaOps && needsNativeExport({ ops: deltaOps }));
-        } catch (e) { useNative = false; }
+            useNative = hasWatermark || !!(deltaOps && needsNativeExport({ ops: deltaOps }));
+        } catch (e) { useNative = hasWatermark; }
 
         let buffer;
         let usedNative = false;
@@ -450,7 +452,7 @@ ipcMain.handle('export-docx-v2', async (event, payload) => {
             try {
                 const { deltaToModel } = require('./js/export/delta-to-model');
                 const { modelToDocxBuffer } = require('./js/export/model-to-docx');
-                const model = deltaToModel({ ops: deltaOps }, { title, headerLines, footerLines });
+                const model = deltaToModel({ ops: deltaOps || [] }, { title, headerLines, footerLines, watermark: hasWatermark ? watermark : null });
                 buffer = await modelToDocxBuffer(model);
                 usedNative = true;
             } catch (e) {
