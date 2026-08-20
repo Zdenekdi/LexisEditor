@@ -206,6 +206,15 @@
             }
         }
 
+        // Označení AI (EU AI Act, čl. 50): volitelná viditelná doložka na konec dokumentu.
+        if (spec.aiDisclosure) {
+            const txt = (typeof spec.aiDisclosure === 'string' && spec.aiDisclosure.trim())
+                ? _str(spec.aiDisclosure)
+                : 'Tento dokument byl vytvořen s asistencí umělé inteligence; obsah prošel kontrolou a redakční odpovědnost nese advokát.';
+            _pushText(ops, txt, { italic: true });
+            _pushNewline(ops, {});
+        }
+
         // Quill vyžaduje, aby dokument končil \n a nebyl prázdný.
         if (ops.length === 0) ops.push({ insert: '\n' });
         else {
@@ -277,7 +286,14 @@
             }
         }
 
-        return { blocks: Array.isArray(spec.blocks) ? spec.blocks.length : 0, header, watermark, opCount: built.ops.length };
+        // Strojově čitelné označení AI původu (EU AI Act, čl. 50) — export může přečíst.
+        let aiMarked = false;
+        if (spec && spec.aiDisclosure && doc) {
+            const wrap = doc.getElementById('editor-wrapper');
+            if (wrap) { wrap.setAttribute('data-ai-assisted', 'true'); aiMarked = true; }
+        }
+
+        return { blocks: Array.isArray(spec.blocks) ? spec.blocks.length : 0, header, watermark, aiMarked, opCount: built.ops.length };
     }
 
     // ===== READ API: Delta → spec (inverzní k buildDelta) =====

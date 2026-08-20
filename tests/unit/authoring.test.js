@@ -314,3 +314,27 @@ describe('křížové odkazy a číslování nadpisů', () => {
         expect(findText(ops, '?')).toBeDefined();
     });
 });
+
+describe('AI provenance označení (EU AI Act, čl. 50)', () => {
+    const findText = (ops, s) => ops.find(o => o.insert === s);
+    test('aiDisclosure:true → výchozí doložka na konci', () => {
+        const ops = A.buildDelta({ aiDisclosure: true, blocks: [{ type: 'paragraph', text: 'Text.' }] }).ops;
+        expect(ops.some(o => typeof o.insert === 'string' && /asistenc.* umělé inteligence/i.test(o.insert))).toBe(true);
+    });
+    test('aiDisclosure jako vlastní text', () => {
+        const ops = A.buildDelta({ aiDisclosure: 'Koncept generovala AI.', blocks: [] }).ops;
+        expect(findText(ops, 'Koncept generovala AI.')).toBeDefined();
+    });
+    test('bez aiDisclosure se doložka nepřidá', () => {
+        const ops = A.buildDelta({ blocks: [{ type: 'paragraph', text: 'X' }] }).ops;
+        expect(ops.some(o => typeof o.insert === 'string' && /umělé inteligence/i.test(o.insert))).toBe(false);
+    });
+    test('apply nastaví strojově čitelný marker data-ai-assisted', () => {
+        document.body.innerHTML = '<div id="editor-wrapper"></div>';
+        const quill = { setContents: () => {} };
+        function Delta(ops) { this.ops = ops; }
+        const res = A.apply({ aiDisclosure: true, blocks: [] }, { quill, Delta, document });
+        expect(document.getElementById('editor-wrapper').getAttribute('data-ai-assisted')).toBe('true');
+        expect(res.aiMarked).toBe(true);
+    });
+});

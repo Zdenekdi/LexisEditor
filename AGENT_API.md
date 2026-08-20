@@ -27,6 +27,7 @@ a `window.LexisCitations.{extractCitations, buildAuthorities}`.
     "logo": "data:image/png;base64,…"   // pouze data: URL (bezpečnost)
   } },
   "watermark": { "text": "KONCEPT", "color": "#e0dbd3" },  // volitelně
+  "aiDisclosure": true,                 // EU AI Act čl. 50: doložka + strojový marker (true nebo vlastní text)
   "blocks": [ /* … bloky v pořadí … */ ]
 }
 ```
