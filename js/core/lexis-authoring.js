@@ -69,6 +69,33 @@
         return [{ text: _str(block.text) }];
     }
 
+    // Římská číslice (1. úroveň nadpisů).
+    function _roman(n) {
+        const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+        let r = ''; n = Math.max(0, Math.floor(n));
+        for (const pair of map) { while (n >= pair[0]) { r += pair[1]; n -= pair[0]; } }
+        return r || '0';
+    }
+    // Očísluje nadpisy: 1. úroveň římsky (I, II…), hlubší arabsky (II.1, II.1.1).
+    // Vrací { byBlock: Map(blockObj→number), byId: { id→{number,text} } }.
+    function _numberHeadings(blocks) {
+        const counters = [0, 0, 0, 0, 0, 0];
+        const byBlock = new Map();
+        const byId = {};
+        for (const b of blocks) {
+            if (!b || b.type !== 'heading') continue;
+            let L = parseInt(b.level, 10); if (!(L >= 1 && L <= 6)) L = 1;
+            counters[L - 1]++;
+            for (let l = L; l < 6; l++) counters[l] = 0;
+            const parts = [];
+            for (let l = 1; l <= L; l++) parts.push(l === 1 ? _roman(counters[0]) : String(counters[l - 1]));
+            const number = parts.join('.');
+            byBlock.set(b, number);
+            if (b.id) byId[b.id] = { number: number, text: _str(b.text) };
+        }
+        return { byBlock: byBlock, byId: byId };
+    }
+
     // Zdroj rozpoznávání citací (Node: require; prohlížeč: window.LexisCitations).
     function _citations() {
         if (typeof require === 'function') { try { return require('./lexis-citations'); } catch (e) { /* ignore */ } }
@@ -107,17 +134,29 @@
         }
 
         const blocks = Array.isArray(spec.blocks) ? spec.blocks : [];
+        const numbering = _numberHeadings(blocks);
+        const numberOn = !!spec.numberHeadings;
         for (const block of blocks) {
             if (!block || typeof block !== 'object') continue;
             const type = block.type || 'paragraph';
 
             if (type === 'heading') {
                 let lvl = parseInt(block.level, 10); if (!(lvl >= 1 && lvl <= 6)) lvl = 1;
-                _pushText(ops, _str(block.text));
+                const num = numbering.byBlock.get(block);
+                const prefix = (numberOn && num) ? (num + (lvl === 1 ? '. ' : ' ')) : '';
+                _pushText(ops, prefix + _str(block.text));
                 _pushNewline(ops, { header: lvl });
 
             } else if (type === 'paragraph') {
-                for (const run of _runsOf(block)) _pushText(ops, _str(run.text), _inlineAttrs(run));
+                for (const run of _runsOf(block)) {
+                    if (run && run.ref) {
+                        const target = numbering.byId[run.ref];
+                        const val = target ? (run.as === 'title' ? target.text : target.number) : '?';
+                        _pushText(ops, _str(val), _inlineAttrs(run));
+                    } else {
+                        _pushText(ops, _str(run.text), _inlineAttrs(run));
+                    }
+                }
                 if (block.footnote != null && _str(block.footnote).trim() !== '') {
                     ops.push({ insert: { footnote: { id: 'fn-' + (++fnCounter), text: _str(block.footnote), number: '?' } } });
                 }
@@ -241,5 +280,166 @@
         return { blocks: Array.isArray(spec.blocks) ? spec.blocks.length : 0, header, watermark, opCount: built.ops.length };
     }
 
-    return { buildDelta, buildHeaderFooter, apply, MAX_TABLE_ROWS, MAX_TABLE_COLS };
+    // ===== READ API: Delta → spec (inverzní k buildDelta) =====
+    function _run(text, attrs) {
+        const r = { text };
+        if (attrs.bold) r.bold = true;
+        if (attrs.italic) r.italic = true;
+        if (attrs.underline) r.underline = true;
+        if (attrs.link) r.link = _str(attrs.link);
+        return r;
+    }
+    function _joinText(runs) { return runs.map(r => r.text).join(''); }
+    function _makeParagraph(runs, align) {
+        const block = { type: 'paragraph' };
+        const formatted = runs.some(r => r.bold || r.italic || r.underline || r.link);
+        if (runs.length <= 1 && !formatted) block.text = _joinText(runs);
+        else block.runs = runs;
+        if (align && align !== 'left') block.align = align;
+        return block;
+    }
+
+    // Zrekonstruuje spec.blocks z Quill Delta ops. Prázdné odstavce (jen mezery)
+    // vynechá; hlavička/patička a vodoznak se čtou zvlášť v readSpec z DOM.
+    function deltaToSpec(ops) {
+        ops = Array.isArray(ops) ? ops : [];
+        const blocks = [];
+        let lineRuns = [];
+        let pendingFootnote = null;
+        let listBuffer = null;
+
+        function flushList() { if (listBuffer) { blocks.push({ type: 'list', ordered: listBuffer.ordered, items: listBuffer.items }); listBuffer = null; } }
+
+        function endLine(battrs) {
+            battrs = battrs || {};
+            if (battrs.header) {
+                flushList();
+                blocks.push({ type: 'heading', level: battrs.header, text: _joinText(lineRuns) });
+            } else if (battrs.list) {
+                const ordered = battrs.list === 'ordered';
+                const item = _joinText(lineRuns);
+                if (listBuffer && listBuffer.ordered === ordered) listBuffer.items.push(item);
+                else { flushList(); listBuffer = { ordered, items: [item] }; }
+                lineRuns = [];
+                return;
+            } else {
+                flushList();
+                const pp = _makeParagraph(lineRuns, battrs.align);
+                const empty = !(pp.runs && pp.runs.length) && (pp.text === '' || pp.text == null);
+                if (pendingFootnote != null) { pp.footnote = pendingFootnote; pendingFootnote = null; blocks.push(pp); }
+                else if (!empty) blocks.push(pp);
+            }
+            lineRuns = [];
+        }
+
+        for (const op of ops) {
+            const ins = op.insert;
+            const attrs = op.attributes || {};
+            if (ins && typeof ins === 'object') {
+                if (ins.table) { flushList(); blocks.push({ type: 'table', cells: ins.table.rows }); }
+                else if (ins.toc) { flushList(); blocks.push({ type: 'toc' }); }
+                else if (ins['page-break']) { flushList(); blocks.push({ type: 'pageBreak' }); }
+                else if (ins.footnote) { pendingFootnote = ins.footnote.text; }
+                continue;
+            }
+            const segs = _str(ins).split('\n');
+            for (let i = 0; i < segs.length; i++) {
+                if (i < segs.length - 1) {
+                    if (segs[i] !== '') lineRuns.push(_run(segs[i], attrs));
+                    endLine(attrs);
+                } else {
+                    if (segs[i] !== '') lineRuns.push(_run(segs[i], attrs));
+                }
+            }
+        }
+        flushList();
+        return { blocks };
+    }
+
+    // Runtime: přečte AKTUÁLNÍ dokument z editoru do spec (round-trip pro agenty).
+    function readSpec(ctx) {
+        ctx = ctx || {};
+        const quill = ctx.quill || (typeof window !== 'undefined' ? window.quill : null);
+        const doc = ctx.document || (typeof document !== 'undefined' ? document : null);
+        if (!quill || typeof quill.getContents !== 'function') throw new Error('readSpec: chybí quill.getContents v kontextu.');
+        const contents = quill.getContents() || { ops: [] };
+        const spec = deltaToSpec(contents.ops || []);
+        if (doc) {
+            const h = doc.getElementById('header-area');
+            const f = doc.getElementById('footer-area');
+            const hHtml = h ? _str(h.innerHTML).trim() : '';
+            const fHtml = f ? _str(f.innerHTML).trim() : '';
+            if (hHtml || fHtml) spec.letterheadHtml = { headerHtml: hHtml, footerHtml: fHtml };
+            const wm = doc.getElementById('watermark-layer');
+            if (wm && wm.getAttribute('data-watermark-text')) {
+                spec.watermark = { text: wm.getAttribute('data-watermark-text') };
+                const col = wm.getAttribute('data-watermark-color');
+                if (col) spec.watermark.color = col;
+            }
+        }
+        return spec;
+    }
+
+    // ===== Programová editace tabulek (nad blokem { type:'table', cells:[[...]] }) =====
+    // Čisté operace pro agenta: přečti dokument (readSpec) → uprav tabulku → applyDocumentSpec.
+    function _ensureCells(block) {
+        if (!block || block.type !== 'table') throw new Error('tableOps: blok není tabulka.');
+        if (!Array.isArray(block.cells)) block.cells = [];
+        return block;
+    }
+    function _width(cells) { return cells.reduce((w, row) => Math.max(w, Array.isArray(row) ? row.length : 0), 0); }
+    function _rectangularize(cells) {
+        const w = _width(cells) || 1;
+        for (let i = 0; i < cells.length; i++) {
+            if (!Array.isArray(cells[i])) cells[i] = [];
+            while (cells[i].length < w) cells[i].push('');
+        }
+        return cells;
+    }
+    const tableOps = {
+        setCell(block, r, c, value) {
+            _ensureCells(block);
+            while (block.cells.length <= r) block.cells.push([]);
+            const w = Math.max(_width(block.cells), c + 1);
+            _rectangularize(block.cells);
+            while (block.cells[r].length <= c) block.cells[r].push('');
+            block.cells[r][c] = _str(value);
+            _rectangularize(block.cells);
+            return block;
+        },
+        addRow(block, atIndex, rowValues) {
+            _ensureCells(block);
+            const w = Math.max(_width(block.cells), Array.isArray(rowValues) ? rowValues.length : 0, 1);
+            const row = Array.from({ length: w }, (_, j) => _str(rowValues && rowValues[j] != null ? rowValues[j] : ''));
+            const idx = (atIndex == null || atIndex > block.cells.length) ? block.cells.length : Math.max(0, atIndex);
+            block.cells.splice(idx, 0, row);
+            _rectangularize(block.cells);
+            return block;
+        },
+        removeRow(block, index) {
+            _ensureCells(block);
+            if (index >= 0 && index < block.cells.length) block.cells.splice(index, 1);
+            return block;
+        },
+        addColumn(block, atIndex, colValues) {
+            _ensureCells(block);
+            _rectangularize(block.cells);
+            const w = _width(block.cells);
+            const idx = (atIndex == null || atIndex > w) ? w : Math.max(0, atIndex);
+            block.cells.forEach((row, i) => row.splice(idx, 0, _str(colValues && colValues[i] != null ? colValues[i] : '')));
+            return block;
+        },
+        removeColumn(block, index) {
+            _ensureCells(block);
+            _rectangularize(block.cells);
+            block.cells.forEach(row => { if (index >= 0 && index < row.length) row.splice(index, 1); });
+            return block;
+        },
+        dimensions(block) {
+            _ensureCells(block);
+            return { rows: block.cells.length, cols: _width(block.cells) };
+        }
+    };
+
+    return { buildDelta, buildHeaderFooter, apply, deltaToSpec, readSpec, tableOps, MAX_TABLE_ROWS, MAX_TABLE_COLS };
 });

@@ -47,9 +47,14 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   Buňky jsou `contenteditable`, ale plné napojení na Quill model (výběry, undo,
   přidat/ubrat řádek/sloupec) chce runtime doladění, případně tabulkový modul.
 - [ ] **Endnoty** (poznámky na konci) — dnes jen poznámky pod čarou.
-- [~] **Pole nad rámec TOC:** křížové odkazy a popisky/číslování obrázků zbývají;
-  „table of authorities" = **seznam citované judikatury HOTOVO** (blok `authorities`
-  + `lexis-citations.js`, kryto testy `tests/unit/citations.test.js`).
+- [~] **Pole nad rámec TOC:** **seznam citované judikatury HOTOVO** (blok `authorities`
+  + `lexis-citations.js`); **křížové odkazy + číslování nadpisů HOTOVO** (`numberHeadings`,
+  nadpis `id`, běh `{ref}`, římské I/II + hlubší II.1). Zbývá už jen číslování/popisky obrázků.
+- [x] **HOTOVO — READ API `getDocumentSpec` (round-trip) + programová editace tabulek.**
+  `deltaToSpec` (Quill Delta → spec, inverze k `buildDelta`), runtime `readSpec`/`window.getDocumentSpec`
+  (agent přečte hotový dokument a edituje). `tableOps` (setCell/addRow/removeRow/addColumn/
+  removeColumn/dimensions) — plná editace buněk přes spec bez runtime vázání na Quill.
+  Dokumentace API v `AGENT_API.md`. Kryto testy (`tests/unit/authoring.test.js`, 45).
 - [x] **HOTOVO — Bohatší hlavička/patička.** Nativní export dosud bral hlavičku/patičku
   jen jako prostý text (innerText). Nově se HTML hlavičky/patičky převede na model
   odstavců zachovávající **tučné/kurzívu/podtržení**, **zarovnání** (vlevo/střed/vpravo/

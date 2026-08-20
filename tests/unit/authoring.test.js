@@ -167,3 +167,150 @@ describe('apply — runtime nad jsdom dokumentem', () => {
         expect(() => A.apply({ blocks: [] }, { document: null, quill: null })).toThrow();
     });
 });
+
+describe('deltaToSpec + round-trip (READ API)', () => {
+    test('heading/paragraph/list/table/footnote se zrekonstruují', () => {
+        const ops = [
+            { insert: 'Nadpis' }, { insert: '\n', attributes: { header: 1 } },
+            { insert: 'Text ' }, { insert: 'tučně', attributes: { bold: true } },
+            { insert: { footnote: { id: 'fn-1', text: 'Srov. 21 Cdo 1/2019.', number: '?' } } },
+            { insert: '\n', attributes: { align: 'justify' } },
+            { insert: 'a' }, { insert: '\n', attributes: { list: 'ordered' } },
+            { insert: 'b' }, { insert: '\n', attributes: { list: 'ordered' } },
+            { insert: { table: { rows: [['X', 'Y']] } } }, { insert: '\n' },
+            { insert: '\n' }
+        ];
+        const spec = A.deltaToSpec(ops);
+        expect(spec.blocks.map(b => b.type)).toEqual(['heading', 'paragraph', 'list', 'table']);
+        expect(spec.blocks[0]).toEqual({ type: 'heading', level: 1, text: 'Nadpis' });
+        expect(spec.blocks[1].align).toBe('justify');
+        expect(spec.blocks[1].footnote).toBe('Srov. 21 Cdo 1/2019.');
+        expect(spec.blocks[1].runs.find(r => r.bold).text).toBe('tučně');
+        expect(spec.blocks[2]).toEqual({ type: 'list', ordered: true, items: ['a', 'b'] });
+        expect(spec.blocks[3]).toEqual({ type: 'table', cells: [['X', 'Y']] });
+    });
+
+    test('prázdné odstavce (jen mezery) se vynechají', () => {
+        const ops = [{ insert: 'A' }, { insert: '\n' }, { insert: '\n' }, { insert: '\n' }, { insert: 'B' }, { insert: '\n' }];
+        const spec = A.deltaToSpec(ops);
+        expect(spec.blocks.map(b => b.text)).toEqual(['A', 'B']);
+    });
+
+    test('round-trip: buildDelta → deltaToSpec zachová strukturu', () => {
+        const original = { blocks: [
+            { type: 'heading', level: 2, text: 'Článek I' },
+            { type: 'paragraph', runs: [{ text: 'Viz ' }, { text: 'odkaz', link: 'https://justice.cz' }], align: 'justify' },
+            { type: 'list', ordered: false, items: ['jedna', 'dva'] },
+            { type: 'table', cells: [['a', 'b'], ['c', 'd']] }
+        ] };
+        const round = A.deltaToSpec(A.buildDelta(original).ops);
+        expect(round.blocks).toEqual(original.blocks);
+    });
+
+    test('samostatná poznámka pod čarou přežije round-trip jako footnote', () => {
+        const ops = A.buildDelta({ blocks: [{ type: 'paragraph', text: 'Tvrzení', footnote: 'Pozn.' }] }).ops;
+        const round = A.deltaToSpec(ops);
+        expect(round.blocks[0].footnote).toBe('Pozn.');
+    });
+});
+
+describe('readSpec — runtime čtení dokumentu', () => {
+    test('přečte tělo + hlavičku + vodoznak z editoru', () => {
+        document.body.innerHTML = '<div id="header-area">HDR</div><div id="footer-area">FTR</div>';
+        const wm = document.createElement('div'); wm.id = 'watermark-layer';
+        wm.setAttribute('data-watermark-text', 'KONCEPT'); wm.setAttribute('data-watermark-color', '#ccc');
+        document.body.appendChild(wm);
+        const quill = { getContents: () => ({ ops: [{ insert: 'Ahoj' }, { insert: '\n' }] }) };
+        const spec = A.readSpec({ quill, document });
+        expect(spec.blocks[0]).toEqual({ type: 'paragraph', text: 'Ahoj' });
+        expect(spec.letterheadHtml).toEqual({ headerHtml: 'HDR', footerHtml: 'FTR' });
+        expect(spec.watermark).toEqual({ text: 'KONCEPT', color: '#ccc' });
+    });
+    test('bez quill.getContents → chyba', () => {
+        expect(() => A.readSpec({ quill: {}, document })).toThrow();
+    });
+});
+
+describe('tableOps — programová editace tabulek', () => {
+    const T = () => ({ type: 'table', cells: [['A', 'B'], ['C', 'D']] });
+    test('setCell nastaví buňku', () => {
+        const t = A.tableOps.setCell(T(), 1, 0, 'X');
+        expect(t.cells).toEqual([['A', 'B'], ['X', 'D']]);
+    });
+    test('setCell rozšíří tabulku a doplní prázdné buňky', () => {
+        const t = A.tableOps.setCell({ type: 'table', cells: [['A']] }, 2, 2, 'Z');
+        expect(A.tableOps.dimensions(t)).toEqual({ rows: 3, cols: 3 });
+        expect(t.cells[2][2]).toBe('Z');
+        expect(t.cells[0][1]).toBe('');
+    });
+    test('addRow na konec i na index', () => {
+        expect(A.tableOps.addRow(T(), null, ['E', 'F']).cells).toEqual([['A', 'B'], ['C', 'D'], ['E', 'F']]);
+        expect(A.tableOps.addRow(T(), 0, ['E', 'F']).cells).toEqual([['E', 'F'], ['A', 'B'], ['C', 'D']]);
+    });
+    test('addRow bez hodnot doplní prázdný řádek správné šířky', () => {
+        const t = A.tableOps.addRow(T());
+        expect(t.cells[2]).toEqual(['', '']);
+    });
+    test('removeRow odebere řádek', () => {
+        expect(A.tableOps.removeRow(T(), 0).cells).toEqual([['C', 'D']]);
+    });
+    test('addColumn vloží sloupec', () => {
+        expect(A.tableOps.addColumn(T(), 1, ['x', 'y']).cells).toEqual([['A', 'x', 'B'], ['C', 'y', 'D']]);
+    });
+    test('removeColumn odebere sloupec', () => {
+        expect(A.tableOps.removeColumn(T(), 0).cells).toEqual([['B'], ['D']]);
+    });
+    test('dimensions vrací rozměry', () => {
+        expect(A.tableOps.dimensions(T())).toEqual({ rows: 2, cols: 2 });
+    });
+    test('nad neexistující tabulkou vyhodí chybu', () => {
+        expect(() => A.tableOps.setCell({ type: 'paragraph' }, 0, 0, 'x')).toThrow();
+    });
+    test('celý workflow: číst → upravit tabulku → zapsat (round-trip)', () => {
+        const spec = A.deltaToSpec(A.buildDelta({ blocks: [{ type: 'table', cells: [['Faktura', 'Částka']] }] }).ops);
+        A.tableOps.addRow(spec.blocks[0], null, ['2025/001', '50 000 Kč']);
+        const ops = A.buildDelta(spec).ops;
+        const t = ops.find(o => o.insert && o.insert.table);
+        expect(t.insert.table.rows).toEqual([['Faktura', 'Částka'], ['2025/001', '50 000 Kč']]);
+    });
+});
+
+describe('křížové odkazy a číslování nadpisů', () => {
+    const findText = (ops, s) => ops.find(o => o.insert === s);
+    test('numberHeadings: 1. úroveň římsky, hlubší arabsky', () => {
+        const ops = A.buildDelta({ numberHeadings: true, blocks: [
+            { type: 'heading', level: 1, text: 'Úvod' },
+            { type: 'heading', level: 2, text: 'Detail' },
+            { type: 'heading', level: 1, text: 'Závěr' }
+        ] }).ops;
+        expect(findText(ops, 'I. Úvod')).toBeDefined();
+        expect(findText(ops, 'I.1 Detail')).toBeDefined();
+        expect(findText(ops, 'II. Závěr')).toBeDefined();
+    });
+    test('bez numberHeadings se nadpisy nečíslují', () => {
+        const ops = A.buildDelta({ blocks: [{ type: 'heading', level: 1, text: 'Úvod', id: 'u' }] }).ops;
+        expect(findText(ops, 'Úvod')).toBeDefined();
+        expect(findText(ops, 'I. Úvod')).toBeUndefined();
+    });
+    test('ref → číslo cílového nadpisu', () => {
+        const ops = A.buildDelta({ blocks: [
+            { type: 'heading', level: 1, text: 'Skutkový stav', id: 'skutek' },
+            { type: 'heading', level: 1, text: 'Právní posouzení' },
+            { type: 'paragraph', runs: [{ text: 'Jak plyne z čl. ' }, { ref: 'skutek' }, { text: ' výše.' }] }
+        ] }).ops;
+        // cíl je 1. nadpis → "I"
+        expect(findText(ops, 'I')).toBeDefined();
+        expect(findText(ops, 'Jak plyne z čl. ')).toBeDefined();
+    });
+    test('ref as:title → text nadpisu', () => {
+        const ops = A.buildDelta({ blocks: [
+            { type: 'heading', level: 1, text: 'Skutkový stav', id: 'skutek' },
+            { type: 'paragraph', runs: [{ ref: 'skutek', as: 'title' }] }
+        ] }).ops;
+        expect(findText(ops, 'Skutkový stav')).toBeDefined();
+    });
+    test('neznámý ref → ?', () => {
+        const ops = A.buildDelta({ blocks: [{ type: 'paragraph', runs: [{ ref: 'neexistuje' }] }] }).ops;
+        expect(findText(ops, '?')).toBeDefined();
+    });
+});

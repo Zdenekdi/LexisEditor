@@ -54,6 +54,11 @@
             if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
             return window.LexisAuthoring.buildDelta(spec);
         };
+        // READ API: přečte aktuální dokument zpět do JSON spec (round-trip → agent edituje).
+        window.getDocumentSpec = () => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.readSpec();
+        };
         window.switchTab = (tabId) => {
             if (lexisUI) lexisUI.switchTab(tabId);
         };
