@@ -69,6 +69,28 @@
         return [{ text: _str(block.text) }];
     }
 
+    // Zdroj rozpoznávání citací (Node: require; prohlížeč: window.LexisCitations).
+    function _citations() {
+        if (typeof require === 'function') { try { return require('./lexis-citations'); } catch (e) { /* ignore */ } }
+        return (typeof window !== 'undefined' ? window.LexisCitations : null);
+    }
+
+    // Posbírá veškerý text ze spec (pro seznam citované judikatury).
+    function _collectText(spec) {
+        const parts = [];
+        if (spec.title) parts.push(_str(spec.title));
+        const blocks = Array.isArray(spec.blocks) ? spec.blocks : [];
+        for (const b of blocks) {
+            if (!b || typeof b !== 'object') continue;
+            if (b.text) parts.push(_str(b.text));
+            if (Array.isArray(b.runs)) for (const r of b.runs) parts.push(_str(r && r.text));
+            if (b.footnote) parts.push(_str(b.footnote));
+            if (Array.isArray(b.items)) parts.push(b.items.map(_str).join(' '));
+            if (Array.isArray(b.cells)) for (const row of b.cells) if (Array.isArray(row)) parts.push(row.map(_str).join(' '));
+        }
+        return parts.join('\n');
+    }
+
     /**
      * Čistý převod spec → Quill Delta (pole ops). Testovatelný bez Quillu.
      * @returns {{ops: Array}}
@@ -125,6 +147,19 @@
             } else if (type === 'footnote') {
                 ops.push({ insert: { footnote: { id: 'fn-' + (++fnCounter), text: _str(block.text), number: '?' } } });
                 _pushNewline(ops, {});
+
+            } else if (type === 'authorities') {
+                const C = _citations();
+                const title = (block.title != null && _str(block.title).trim() !== '') ? _str(block.title) : 'Seznam citované judikatury';
+                _pushText(ops, title);
+                _pushNewline(ops, { header: 2 });
+                const list = C ? C.buildAuthorities(_collectText(spec)).items : [];
+                if (list.length === 0) {
+                    _pushText(ops, 'Žádná judikatura nebyla citována.');
+                    _pushNewline(ops, {});
+                } else {
+                    for (const item of list) { _pushText(ops, item); _pushNewline(ops, { list: 'bullet' }); }
+                }
 
             } else if (type === 'pageBreak') {
                 ops.push({ insert: { 'page-break': true } });

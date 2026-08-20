@@ -47,8 +47,9 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   Buňky jsou `contenteditable`, ale plné napojení na Quill model (výběry, undo,
   přidat/ubrat řádek/sloupec) chce runtime doladění, případně tabulkový modul.
 - [ ] **Endnoty** (poznámky na konci) — dnes jen poznámky pod čarou.
-- [ ] **Pole nad rámec TOC:** křížové odkazy, popisky/číslování obrázků,
-  rejstřík (u práva „table of authorities" = seznam citované judikatury).
+- [~] **Pole nad rámec TOC:** křížové odkazy a popisky/číslování obrázků zbývají;
+  „table of authorities" = **seznam citované judikatury HOTOVO** (blok `authorities`
+  + `lexis-citations.js`, kryto testy `tests/unit/citations.test.js`).
 - [x] **HOTOVO — Bohatší hlavička/patička.** Nativní export dosud bral hlavičku/patičku
   jen jako prostý text (innerText). Nově se HTML hlavičky/patičky převede na model
   odstavců zachovávající **tučné/kurzívu/podtržení**, **zarovnání** (vlevo/střed/vpravo/
