@@ -26,6 +26,18 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   `aiFootnoteForSelection` / `aiCommentForSelection`. Staví na již otestovaných
   blotech footnote/comment.
 
+- [x] **HOTOVO — Autorské API pro AI agenty (`applyDocumentSpec`).** Agent sestaví CELÝ
+  dokument z jednoho strukturovaného JSON popisu (spec) deterministicky, bez klikání v GUI
+  a bez ručního počítání pozic: nadpisy, formátovaný text (tučně/kurzíva/podtržení),
+  ODKAZY, seznamy (číslované/odrážky), TABULKY (z `cells` i z rozměrů), poznámky pod čarou,
+  TOC, zalomení stránky, a ŠABLONA se ZÁHLAVÍM/ZÁPATÍM z profilu (včetně LOGA přes
+  `LexisLetterhead`) + VODOZNAK. Jádrem je čistá funkce `LexisAuthoring.buildDelta(spec)`
+  (spec → Quill Delta, plně testovatelná bez Quillu) a runtime `apply(spec, ctx)`
+  (`quill.setContents` + hlavička/patička + vodoznak). Globály `window.applyDocumentSpec`
+  a `window.buildDocumentDelta`. Nový UMD modul `js/core/lexis-authoring.js`, kryto 22 testy
+  (`tests/unit/authoring.test.js`) + integračním smoke se skutečným letterhead modulem.
+  Tohle je klíčový krok k tomu, aby agent skládal podání sám a přesně.
+
 ## Zbývající mezery vůči Wordu (velké / vzácné)
 - [ ] **Sledování změn FORMÁTOVÁNÍ** (`w:rPrChange`) a **přesunů textu**
   (`w:moveFrom`/`w:moveTo`). Vyžaduje hluboké zachytávání operací v editoru,

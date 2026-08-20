@@ -42,6 +42,18 @@
         }
 
         // --- BRIDGE FUNCTIONS (Mapping Ribbon onclicks to SDK/UI) ---
+        // Autorské API pro AI agenty: sestaví CELÝ dokument z jednoho JSON popisu
+        // (nadpisy, formátovaný text, odkazy, seznamy, tabulky, poznámky, hlavička/
+        // patička z profilu vč. loga, vodoznak). Deterministické, bez klikání.
+        // Viz schéma v js/core/lexis-authoring.js.
+        window.applyDocumentSpec = (spec) => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.apply(spec);
+        };
+        window.buildDocumentDelta = (spec) => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.buildDelta(spec);
+        };
         window.switchTab = (tabId) => {
             if (lexisUI) lexisUI.switchTab(tabId);
         };
