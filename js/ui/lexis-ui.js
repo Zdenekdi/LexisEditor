@@ -1184,7 +1184,7 @@ class LexisUI {
             'autoLinkLaws': 'Automaticky převést odkazy na zákony na hypertextové odkazy.',
             'openISDS': 'Odeslat dokument přímo přes integrovanou datovou schránku.',
             'openPostDialog': 'Odeslat dokument jako fyzický dopis přes službu České pošty (Dopis Online).',
-            'signDigital': 'Digitálně podepsat dokument zaručeným podpisem.',
+            'signDigital': 'Vložit vizuální podpisovou doložku (POZOR: nejde o kvalifikovaný e-podpis; PAdES v přípravě).',
             'logTime': 'Zapsat čas strávený na tomto dokumentu do výkazu.',
             'exportTimesheet': 'Exportovat časový výkaz prací (timesheet).',
             'setMargins(\'normal\')': 'Nastavit standardní okraje stránky.',

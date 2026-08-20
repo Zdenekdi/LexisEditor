@@ -14,6 +14,7 @@ Testy spustíš `npm test`.
 | Kontrola pravopisu (Chromium) + jazyk/spisovnost | ✅ | 🟡 | ❌ | Electron runtime funkce; ověřeno proti typům, ne v běhu. |
 | ISDS / e-Gov (transport, inbox, ZFO, ARES, ISIR) | ✅ | 🟡 | ❌ | Data ISDS soudů ověřena proti registru; **reálné odeslání/příjem neověřeno v provozu**. |
 | Hlídání lhůt (§607 – víkend/svátek) | ✅ | 🟡 | ❌ | Logika testována. |
+| **Elektronický podpis PDF** | ❌ | ❌ | ❌ | **Zatím jen VIZUÁLNÍ doložka — NEpodepisuje kryptograficky, neověří se v Acrobatu.** Skutečný podpis vyžaduje kvalifikovaný certifikát + PAdES (v přípravě). |
 | Šifrování (SecureVault) | ✅ | 🟡 | ❌ | **Trvalé uložení klíčů vyžaduje desktopový build**; bez něj jen pro relaci. |
 
 ## Co je potřeba k „produkčně hotovo"

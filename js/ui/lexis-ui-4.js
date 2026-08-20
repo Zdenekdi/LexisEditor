@@ -986,7 +986,7 @@ Object.assign(LexisUI.prototype, {
     },
 
     async signDigital() {
-        this.checkEnterpriseFeature("Zaručený elektronický podpis PDF", async () => {
+        this.checkEnterpriseFeature("Podpisová doložka (vizuální)", async () => {
             const overlay = document.createElement('div');
             overlay.style = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);";
             
@@ -1003,8 +1003,8 @@ Object.assign(LexisUI.prototype, {
                 </div>
                 
                 <div style="background:#faf5ff; border:1px solid #e9d5ff; padding:15px; border-radius:8px; margin-bottom:20px; font-size:12px; line-height:1.4; color:#7e22ce;">
-                    <strong>ℹ️ Zaručený elektronický podpis:</strong><br>
-                    Tento modul vygeneruje na konec dokumentu oficiální podpisovou doložku advokáta a připojí kryptografické potvrzení k výslednému souboru PDF.
+                    <strong>⚠️ Vizuální podpisová doložka — NEJDE o kvalifikovaný e-podpis.</strong><br>
+                    Vloží na konec dokumentu podpisovou doložku advokáta. Dokument NENÍ kryptograficky podepsán podle eIDAS a doložka se NEOVĚŘÍ v Adobe Acrobatu. Skutečný elektronický podpis (PAdES) s certifikátem je v přípravě.
                 </div>
                 
                 <div style="margin-bottom:12px;">
@@ -1034,20 +1034,16 @@ Object.assign(LexisUI.prototype, {
             document.getElementById('isds-sign-cancel').onclick = () => document.body.removeChild(overlay);
             
             document.getElementById('isds-cert-browse').onclick = () => {
-                selectedCertPath = 'advokat_qualified.pfx';
-                document.getElementById('isds-cert-path').value = 'advokat_qualified.pfx';
+                // Skutečný výběr souboru; certifikát se ZATÍM k podpisu nepoužívá (PAdES v přípravě).
+                const fi = document.createElement('input'); fi.type = 'file'; fi.accept = '.pfx,.p12';
+                fi.onchange = () => { if (fi.files && fi.files[0]) { selectedCertPath = fi.files[0].name; document.getElementById('isds-cert-path').value = fi.files[0].name; } };
+                fi.click();
             };
             
             document.getElementById('isds-sign-confirm').onclick = async () => {
                 const pin = document.getElementById('isds-cert-pin').value;
                 
-                if (!selectedCertPath) {
-                    return this.customAlert("Prosím, vyberte soubor s advokátním certifikátem.");
-                }
-                
-                if (!pin) {
-                    return this.customAlert("Prosím, vyplňte heslo nebo PIN k certifikátu.");
-                }
+                // Poznámka: certifikát ani PIN se u vizuální doložky nepoužívají (PAdES v přípravě).
                 
                 document.getElementById('isds-sign-confirm').innerText = "Podepisuji...";
                 document.getElementById('isds-sign-confirm').disabled = true;
@@ -1057,10 +1053,10 @@ Object.assign(LexisUI.prototype, {
                 const sigHtml = `
                     <div style="${baseStyle}">
                         <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: #9a5b22;"></div>
-                        <p style="margin: 0; color: #9a5b22; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">🔐 ZARUČENÝ ELEKTRONICKÝ PODPIS ADVOKÁTA</p>
+                        <p style="margin: 0; color: #9a5b22; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">✒️ PODPISOVÁ DOLOŽKA ADVOKÁTA (vizuální — nejde o kvalifikovaný e-podpis)</p>
                         <p style="font-size: 15px; margin: 8px 0 4px; color: #2b2926;">Podepsal: <strong>${savedName}, advokát</strong></p>
                         <p style="margin: 4px 0 0; font-size: 12px; color: #5c574f;">Datum podpisu: <strong>${new Date().toLocaleString('cs-CZ')}</strong></p>
-                        <p style="margin: 4px 0 0; font-size: 11px; color: #a09a92; font-style: italic;">Certifikační autorita: PostSignum Qualified CA 4 (Sériové číslo: 8ab20cf19238e89f)</p>
+                        <p style="margin: 4px 0 0; font-size: 11px; color: #a09a92; font-style: italic;">Vizuální doložka bez kryptografického podpisu. Pro platný e-podpis podepište dokument kvalifikovaným certifikátem (PAdES).</p>
                     </div>
                     <p><br></p>
                 `;
@@ -1071,7 +1067,7 @@ Object.assign(LexisUI.prototype, {
                 
                 document.body.removeChild(overlay);
                 
-                this.customAlert("✅ <b>PDF bylo úspěšně podepsáno!</b><br><br>Do dokumentu byl vložen zaručený elektronický podpis advokáta a byl spuštěn export do formátu PDF.");
+                this.customAlert("✒️ <b>Vložena podpisová doložka.</b><br><br>UPOZORNĚNÍ: jde o VIZUÁLNÍ doložku, nikoli kvalifikovaný elektronický podpis — dokument není kryptograficky podepsán a doložka se neověří v Adobe Acrobatu. Pro platný e-podpis použijte kvalifikovaný certifikát (PAdES; funkce v přípravě).");
                 
                 if (typeof window.print === 'function') {
                     window.print();
