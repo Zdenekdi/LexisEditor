@@ -66,8 +66,97 @@ Object.assign(LexisUI.prototype, {
     applyAuditFix(resultIndex, index, length, fixText) {
         this.core.quill.deleteText(index, length);
         this.core.quill.insertText(index, fixText);
+        // Oprava změní délku textu → posuň offsety NÁSLEDUJÍCÍCH nálezů, jinak by po
+        // první opravě ukazovaly vedle (důležité u jazykové kontroly s více nálezy).
+        const delta = String(fixText).length - length;
         this.currentAuditResults.splice(resultIndex, 1);
+        if (delta !== 0) {
+            this.currentAuditResults.forEach(r => { if (r.index > index) r.index += delta; });
+        }
         this.renderAuditResults(this.currentAuditResults);
+    },
+
+    // Ošetří nálezy pro bezpečné vykreslení do audit panelu: HTML-escape zprávy a
+    // zahodí auto-opravu, jejíž text by rozbil inline onclick (uvozovky, zpětné lomítko).
+    _sanitizeAuditIssues(issues) {
+        const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return (issues || []).map(it => {
+            const o = Object.assign({}, it);
+            o.msg = esc(o.msg);
+            if (o.fix != null && /['"\\\n\r]/.test(String(o.fix))) delete o.fix;
+            return o;
+        });
+    },
+
+    // Sloučí nálezy z rychlého linteru a z AI; deduplikuje dle (index,length).
+    _mergeLanguageIssues(a, b) {
+        const all = [...(a || []), ...(b || [])].sort((x, y) => x.index - y.index);
+        const seen = new Set();
+        const out = [];
+        for (const it of all) {
+            const key = it.index + ':' + it.length;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(it);
+        }
+        return out;
+    },
+
+    // RYCHLÁ jazyková kontrola (offline linter spisovné češtiny): nespisovné/hovorové
+    // tvary + typografie → do audit panelu s opravou jedním klikem.
+    checkLanguage() {
+        if (typeof window.LexisCzechStyle === 'undefined' || !window.LexisCzechStyle.checkCzechStyle) {
+            this.customAlert('Modul jazykové kontroly (czech-style.js) není načten.');
+            return [];
+        }
+        const text = this.core.getText();
+        const results = this._sanitizeAuditIssues(window.LexisCzechStyle.checkCzechStyle(text));
+        this.renderAuditResults(results);
+        this.customAlert(results.length
+            ? `📝 <b>Jazyková kontrola:</b> nalezeno ${results.length} podnětů (nespisovné tvary + typografie) — projdi je v panelu <b>Kontrola</b> a oprav jedním klikem.<br><br>Pro gramatiku a sloh <b>v kontextu věty a celého dokumentu</b> spusť „Spisovnost (AI)".`
+            : '✅ Rychlá kontrola nenašla nespisovné tvary ani typografické chyby. Pro sloh a gramatiku v kontextu spusť „Spisovnost (AI)".');
+        return results;
+    },
+
+    // HLOUBKOVÁ jazyková a slohová kontrola v KONTEXTU (AI): pošle dokument lokálnímu
+    // modelu s pokynem na spisovnost/gramatiku/sloh, výsledky sloučí s rychlým linterem.
+    async checkLanguageAI() {
+        const text = this.core.getText();
+        if (!text || text.trim().length < 3) { this.customAlert('Dokument je prázdný.'); return; }
+
+        const base = (window.LexisCzechStyle && window.LexisCzechStyle.checkCzechStyle)
+            ? window.LexisCzechStyle.checkCzechStyle(text) : [];
+
+        const systemPrompt = 'Jsi pečlivý korektor SPISOVNÉ ČEŠTINY pro právní texty. Zkontroluj text po stránce '
+            + 'gramatiky, interpunkce, stylistiky a hlavně SPISOVNOSTI — žádné hovorové ani nespisovné tvary, '
+            + 'jednotný formální tón, správná shoda a vazby, v kontextu celé věty i dokumentu. '
+            + 'Vrať POUZE JSON pole nálezů, každý ve tvaru '
+            + '{"uryvek":"<DOSLOVNÝ problematický úsek zkopírovaný z textu>","problem":"<stručně co je špatně>","navrh":"<spisovná oprava>"}. '
+            + '„uryvek" musí být přesný výsek z textu (kvůli lokalizaci). Když je text v pořádku, vrať [].';
+        const clip = text.length > 6000 ? text.slice(0, 6000) : text;
+
+        const loader = document.getElementById('loader-overlay');
+        const loaderText = document.getElementById('loader-text');
+        if (loaderText) loaderText.innerText = 'AI kontroluje jazyk a sloh v kontextu…';
+        if (loader) loader.style.display = 'flex';
+
+        let resp;
+        try {
+            resp = await this.core.callAI(`Zkontroluj následující text:\n\n${clip}`, systemPrompt);
+        } catch (e) {
+            if (loader) loader.style.display = 'none';
+            this.customAlert('AI se nepodařilo oslovit: ' + (e && e.message || e));
+            return;
+        }
+        if (loader) loader.style.display = 'none';
+
+        const aiIssues = (window.LexisCzechStyle && window.LexisCzechStyle.parseAiLanguageIssues)
+            ? window.LexisCzechStyle.parseAiLanguageIssues(resp, text) : [];
+        const merged = this._sanitizeAuditIssues(this._mergeLanguageIssues(base, aiIssues));
+        this.renderAuditResults(merged);
+        this.customAlert(merged.length
+            ? `📝 <b>Jazyková a slohová kontrola (AI):</b> ${merged.length} podnětů (rychlá pravidla + AI v kontextu). Projdi je v panelu <b>Kontrola</b>; kde je návrh, oprav jedním klikem. Delší přeformulace ber jako doporučení.`
+            : '✅ AI nenašla žádné jazykové ani slohové problémy — text působí spisovně a jednotně.');
     },
 
     applyPaper(size) {

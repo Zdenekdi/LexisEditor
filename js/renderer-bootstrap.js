@@ -263,6 +263,9 @@
             lexisUI.renderAuditResults(r);
             lexisUI.customAlert(r.length ? `Kontrola pojmů: nalezeno ${r.length} upozornění (viz levý panel).` : '✅ Terminologie je jednotná.');
         };
+        // Jazyková kontrola: rychlý linter spisovné češtiny + hloubková AI kontrola v kontextu.
+        window.checkLanguage = () => lexisUI.checkLanguage();
+        window.checkLanguageAI = () => lexisUI.checkLanguageAI();
         window.openContacts = () => lexisUI.openContacts();
         window.toggleDictation = () => lexisUI.toggleDictation();
         window.openPostDialog = () => lexisUI.openPostDialog();

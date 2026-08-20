@@ -68,6 +68,15 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
   fallbackem na `replaceMisspelling`; k dispozici i „Přidat do slovníku". Čistá pomůcka
   `js/spellcheck-langs.js` (výběr jazyků) je kryta 6 testy; zbytek je Electron runtime
   (main IPC + preload most + `lexis-ui initContextMenu`), ověřeno proti typům Electronu 42.
+- [x] **HOTOVO — Jazyková a slohová kontrola (spisovná čeština, v kontextu).** Dvě vrstvy
+  nad rámec pravopisu: (1) rychlý OFFLINE linter `js/lang/czech-style.js` — nespisovné/
+  hovorové tvary (bysme→bychom, „aby jsme"→„abychom", seš→jsi…) + typografie (vícenásobná
+  mezera, mezera před interpunkcí, „…"); (2) HLOUBKOVÁ AI kontrola v kontextu věty i celého
+  dokumentu (`checkLanguageAI` → `core.callAI` se spisovnostním promptem, návrhy oprav se
+  lokalizují v textu). Obojí plní stávající audit panel (oprava jedním klikem). `applyAuditFix`
+  nově posouvá offsety následujících nálezů (více oprav po sobě sedí). Tlačítka „Jazyk" a
+  „Spisovnost AI" na pásu Kontrola + v audit panelu. Čisté funkce (`checkCzechStyle`,
+  `parseAiLanguageIssues`) kryté 13 testy (`tests/unit/czech-style.test.js`).
 
 ## Nutné u uživatele (ne kód)
 - [ ] `npm install` (přibylo `docx`, `jszip`).
@@ -91,3 +100,7 @@ hotové a otestované (`tests/unit/word-parity.test.js`).
 - [ ] Runtime smoke test HLAVIČKY/PATIČKY: do hlavičky dej tučný název kanceláře, logo
   a vpravo zarovnané datum → export do Wordu → ověř, že se formátování i logo zachovaly
   (dřív se přenášel jen holý text).
+- [ ] Runtime smoke test JAZYKOVÉ KONTROLY: napiš „Chtěli bysme aby jsme to podali..." →
+  tlačítko „Jazyk" → v panelu Kontrola se objeví nálezy (bysme→bychom, aby jsme→abychom,
+  …→…) → klik „Opravit" je aplikuje a offsety dalších sedí. Pak „Spisovnost AI" → AI doplní
+  gramatické/slohové nálezy v kontextu (běží lokální model).
