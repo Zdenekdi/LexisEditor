@@ -39,7 +39,7 @@ describe('Extrakce náležitostí — reálné formáty', () => {
         const e = extract(t);
         expect(e.spzn).toBe('45 EPR 789/2026');
         expect(e.ico).toBe('27232433');
-        expect(e.court).toContain('Praha');
+        expect(e.court).toContain('Prahu');
     });
 
     test('výzva § 114b: spisová značka Cm + krajský soud', () => {
@@ -70,8 +70,8 @@ describe('Join soud → registr (ISDS lookup)', () => {
         const gaps = COURT_PATTERNS
             .filter(p => { const r = registry.findCourtInRegistry(p.nazev); return !(r && r.isds); })
             .map(p => p.nazev);
-        // Jediná akceptovaná mezera: Městský soud Brno (v registru chybí — fail-safe null).
-        expect(gaps).toEqual(['Městský soud Brno']);
+        // Všechny detekované soudy mají ISDS v registru (dřív chyběl Městský soud Brno).
+        expect(gaps).toEqual([]);
     });
 
     test('pádové tvary se napojí na správný soud', () => {
@@ -133,9 +133,10 @@ describe('LexisReply.parseSpzn (strukturovaná spisová značka)', () => {
     });
 });
 
-// Bezpečnostní pojistka: appka NESMÍ automaticky odeslat do neověřené datové
-// schránky. Vestavěné ISDS soudů nejsou ověřené (ISDS_DATA_VERIFIED=false), takže
-// verified musí být VŽDY false — volající pak musí vyžádat ruční potvrzení.
+// Bezpečnostní pojistka: appka NESMÍ automaticky odeslat do neznámé/neplatné datové
+// schránky. ISDS soudů byly ověřeny proti oficiálnímu registru (commit 743d64a,
+// ISDS_DATA_VERIFIED=true). Klíčová pojistka nyní zní: neznámý soud → žádná schránka
+// (verified=false), a formát ISDS musí být vždy validních 7 znaků [a-z0-9].
 describe('Bezpečnost ISDS soudů (getCourtIsds)', () => {
     const registry = require('../../js/core/court-registry');
 
@@ -147,25 +148,26 @@ describe('Bezpečnost ISDS soudů (getCourtIsds)', () => {
         expect(registry.isValidIsdsFormat(null)).toBe(false);
     });
 
-    test('ISDS_DATA_VERIFIED je false (data nejsou ověřená proti registru)', () => {
-        expect(registry.ISDS_DATA_VERIFIED).toBe(false);
+    test('ISDS_DATA_VERIFIED je true (data ověřená proti oficiálnímu registru)', () => {
+        expect(registry.ISDS_DATA_VERIFIED).toBe(true);
     });
 
-    test('známý soud vrátí ISDS, ale verified=false (nutné ruční ověření)', () => {
+    test('známý ověřený soud vrátí platnou ISDS (verified=true)', () => {
         const r = registry.getCourtIsds('Krajský soud Brno');
         expect(r.isds).toMatch(/^[a-z0-9]{7}$/);
         expect(r.valid).toBe(true);
-        expect(r.verified).toBe(false); // klíčová pojistka: neodesílat automaticky
+        expect(r.verified).toBe(true); // data ověřená proti registru (743d64a)
     });
 
     test('neznámý soud → žádná schránka, nic k odeslání', () => {
         expect(registry.getCourtIsds('Vymyšlený soud')).toEqual({ isds: null, valid: false, verified: false });
     });
 
-    test('verified nikdy není true, dokud ISDS_DATA_VERIFIED=false', () => {
-        const anyVerified = registry.COURT_REGISTRY
-            .filter(c => c.isds)
-            .some(c => registry.getCourtIsds(c).verified === true);
-        expect(anyVerified).toBe(false);
+    test('neznámý soud nikdy nevrátí verified=true (fail-safe)', () => {
+        ['Vymyšlený soud Kdesi', 'Neexistující soud XYZ', ''].forEach(name => {
+            const r = registry.getCourtIsds(name);
+            expect(r.isds).toBeNull();
+            expect(r.verified).toBe(false);
+        });
     });
 });

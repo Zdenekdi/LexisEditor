@@ -37,6 +37,9 @@ function countText() { return document.getElementById('lfr-count').textContent; 
 
 describe('LexisFindReplace', () => {
     beforeAll(() => {
+        // eIco (injektor ikon) je runtime global z lexis-icons.js; v izolovaném testu ho stubneme.
+        global.eIco = (s) => s;
+        if (typeof window !== 'undefined') window.eIco = global.eIco;
         document.body.innerHTML = '<div id="app-container" style="display:flex"></div>';
         require('../../js/ui/lexis-find-replace');
     });

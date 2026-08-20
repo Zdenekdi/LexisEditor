@@ -136,15 +136,40 @@ function _paragraphToHtml(pXml, ctx) {
     return `<${tag}${styleAttr}>${body}</${tag}>`;
 }
 
+// Tabulka: <w:tbl> → HTML <table> (buňky mohou mít víc odstavců, i s revizemi).
+function _tableToHtml(tblXml, ctx) {
+    let out = '<table class="lexis-imported-table" style="border-collapse:collapse;width:100%;" border="1">';
+    const trRe = /<w:tr\b[^>]*>[\s\S]*?<\/w:tr>/g;
+    let tr;
+    while ((tr = trRe.exec(tblXml)) !== null) {
+        out += '<tr>';
+        const tcRe = /<w:tc\b[^>]*>([\s\S]*?)<\/w:tc>/g;
+        let tc;
+        while ((tc = tcRe.exec(tr[0])) !== null) {
+            let cellHtml = '';
+            const pRe = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+            let pm;
+            while ((pm = pRe.exec(tc[1])) !== null) cellHtml += _paragraphToHtml(pm[0], ctx);
+            out += '<td style="border:1px solid #999;padding:4px 8px;">' + (cellHtml || '') + '</td>';
+        }
+        out += '</tr>';
+    }
+    out += '</table>';
+    return out;
+}
+
 function ooxmlToHtml(docXml, fnXml, commentsXml) {
     const ctx = { footnotes: parseFootnotes(fnXml), comments: parseComments(commentsXml) };
     const bodyM = docXml.match(/<w:body\b[^>]*>([\s\S]*)<\/w:body>/);
     const body = bodyM ? bodyM[1] : docXml;
     let html = '';
-    const pre = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
-    let pm;
-    while ((pm = pre.exec(body)) !== null) {
-        html += _paragraphToHtml(pm[0], ctx);
+    // Odstavce i tabulky v pořadí (tabulka se spotřebuje celá, aby se její vnitřní
+    // <w:p> nebraly znovu jako samostatné odstavce).
+    const blockRe = /<w:tbl>[\s\S]*?<\/w:tbl>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+    let bm;
+    while ((bm = blockRe.exec(body)) !== null) {
+        const chunk = bm[0];
+        html += chunk.lastIndexOf('<w:tbl>', 0) === 0 ? _tableToHtml(chunk, ctx) : _paragraphToHtml(chunk, ctx);
     }
     return html || '<p><br></p>';
 }

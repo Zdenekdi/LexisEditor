@@ -59,9 +59,11 @@ describe('shouldUseCert / tlsOptions', () => {
 
 describe('endpointOverride', () => {
     test('host nebo basePath → override, jinak null', () => {
-        expect(T.endpointOverride({ host: 'h' })).toEqual({ host: 'h', basePath: undefined });
+        expect(T.endpointOverride({ host: 'ws1.mojedatovaschranka.cz' })).toEqual({ host: 'ws1.mojedatovaschranka.cz', basePath: undefined });
         expect(T.endpointOverride({ basePath: '/b' })).toEqual({ host: undefined, basePath: '/b' });
         expect(T.endpointOverride({})).toBeNull();
+        // bezpečnostní allowlist: nepovolený host → null (neodesílat na cizí endpoint)
+        expect(T.endpointOverride({ host: 'evil.example.com' })).toBeNull();
     });
 });
 

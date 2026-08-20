@@ -52,23 +52,23 @@ describe('IsdsOutbox.process', () => {
     test('chyba nechá položku "pending" a zastaví běh (backoff volajícímu)', async () => {
         const box = makeOutbox({ maxAttempts: 3 });
         box.enqueueBatch([{ dbID: 'a' }], {});
-        const r = await box.process(async () => ({ success: false, error: 'ISDS timeout' }));
+        const r = await box.process(async () => ({ success: false, retriable: true, error: 'ISDS timeout' }));
         expect(r.sent).toBe(0);
         expect(r.failed).toBe(0);
         const it = box.getAll()[0];
-        expect(it.status).toBe('pending'); // 1 pokus < maxAttempts
+        expect(it.status).toBe('pending'); // retriable, 1 pokus < maxAttempts
         expect(it.attempts).toBe(1);
         expect(it.lastError).toBe('ISDS timeout');
     });
 
-    test('po vyčerpání pokusů → failed', async () => {
+    test('po vyčerpání pokusů → review (ruční ověření, ne tiché selhání)', async () => {
         const box = makeOutbox({ maxAttempts: 3 });
         box.enqueueBatch([{ dbID: 'a' }], {});
-        await box.process(async () => ({ success: false }));
-        await box.process(async () => ({ success: false }));
-        const r3 = await box.process(async () => ({ success: false }));
+        await box.process(async () => ({ success: false, retriable: true }));
+        await box.process(async () => ({ success: false, retriable: true }));
+        const r3 = await box.process(async () => ({ success: false, retriable: true }));
         expect(r3.failed).toBe(1);
-        expect(box.getAll()[0].status).toBe('failed');
+        expect(box.getAll()[0].status).toBe('review');
         expect(box.getAll()[0].attempts).toBe(3);
     });
 
@@ -96,9 +96,9 @@ describe('IsdsOutbox.retry a applyStateChanges', () => {
     test('retry vrátí failed/review zpět na pending', async () => {
         const box = makeOutbox({ maxAttempts: 1 });
         box.enqueueBatch([{ dbID: 'a' }], {});
-        await box.process(async () => ({ success: false, error: 'x' })); // maxAttempts 1 → failed
+        await box.process(async () => ({ success: false, error: 'x' })); // maxAttempts 1, neretriable → review
         const it = box.getAll()[0];
-        expect(it.status).toBe('failed');
+        expect(it.status).toBe('review');
         box.retry(it.id);
         expect(box.getById(it.id).status).toBe('pending');
         expect(box.getById(it.id).lastError).toBeNull();
