@@ -458,7 +458,7 @@ ipcMain.handle('export-docx', async (event, htmlContent, headerHtml, footerHtml)
 // Pro běžné dokumenty i při jakékoli chybě padá zpět na osvědčený html-to-docx.
 ipcMain.handle('export-docx-v2', async (event, payload) => {
     payload = payload || {};
-    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, headerModel, footerModel, title, watermark } = payload;
+    const { deltaOps, html, headerHtml, footerHtml, headerLines, footerLines, headerModel, footerModel, title, watermark, spec } = payload;
     try {
         const { filePath } = await dialog.showSaveDialog(mainWindow, {
             title: 'Uložit dokument',
@@ -491,11 +491,31 @@ ipcMain.handle('export-docx-v2', async (event, payload) => {
         if (!buffer) {
             buffer = await HTMLToDOCX(html, headerHtml || null, buildDocxOptions(headerHtml, footerHtml), footerHtml || null);
         }
+        // Vnoření LexisEditor spec do .docx (Word ho ignoruje; Lexis/agent ho čte zpět).
+        // Zpětně kompatibilní — bez `spec` se nic nemění.
+        let embeddedSpec = false;
+        if (spec) {
+            try { const { embedSpec } = require('./js/export/spec-embed'); buffer = await embedSpec(buffer, spec); embeddedSpec = true; }
+            catch (e) { console.error('Vnoření spec do .docx selhalo (dokument uložen bez metadat):', e.message); }
+        }
         fs.writeFileSync(filePath, buffer);
-        return { success: true, path: filePath, native: usedNative };
+        return { success: true, path: filePath, native: usedNative, embeddedSpec };
     } catch (error) {
         console.error('Chyba při chytrém generování DOCX:', error);
         return { success: false, error: error.message };
+    }
+});
+
+// --- Čtení vnořeného LexisEditor spec z .docx (Word-kompatibilní úložiště dokumentů) ---
+ipcMain.handle('read-docx-spec', async (event, filePath) => {
+    try {
+        if (!filePath) return { success: false, error: 'Chybí cesta k souboru.' };
+        const buf = fs.readFileSync(filePath);
+        const { extractSpec } = require('./js/export/spec-embed');
+        const spec = await extractSpec(buf);
+        return { success: true, spec: spec, hasSpec: !!spec };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
 });
 
@@ -825,6 +845,84 @@ ipcMain.handle('export-bundle', async (event, htmlContent, cssContent, headerHtm
     } catch (error) {
         console.error('Chyba při generování Bundlu:', error);
         return { success: false, error: error.message };
+    }
+});
+
+// --- REÁLNÝ ELEKTRONICKÝ PODPIS PDF (PAdES) ---
+// Vygeneruje PDF z dokumentu (printToPDF) a podepíše certifikátem .p12/.pfx.
+// Lazy require, aby se appka spustila i bez nainstalovaných podpisových závislostí.
+ipcMain.handle('pick-certificate', async () => {
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+            title: 'Vyberte certifikát pro podpis',
+            properties: ['openFile'],
+            filters: [{ name: 'Certifikát (.p12/.pfx)', extensions: ['p12', 'pfx'] }]
+        });
+        if (canceled || !filePaths || !filePaths.length) return { canceled: true };
+        return { path: filePaths[0] };
+    } catch (e) { return { error: e.message }; }
+});
+
+ipcMain.handle('sign-pdf', async (event, payload) => {
+    payload = payload || {};
+    let signPdfBuffer;
+    try {
+        ({ signPdfBuffer } = require('./js/core/pades-sign'));
+    } catch (e) {
+        return { success: false, error: 'Podpisové závislosti nejsou nainstalované. Spusťte `npm install` (@signpdf/*, pdf-lib, node-forge).' };
+    }
+    const { htmlContent = '', cssContent = '', headerHtml = '', footerHtml = '', watermarkHtml = '', p12Path, password, meta } = payload;
+    if (!p12Path) return { success: false, error: 'Chybí cesta k certifikátu (.p12/.pfx).' };
+
+    let printWindow = null;
+    try {
+        // 1) Vygeneruj PDF z dokumentu (stejný postup jako export-bundle)
+        printWindow = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+        const fullHtml = `
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+                ${cssContent}
+                body { margin: 0; padding: 0; background: white; }
+                @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+            </style></head><body>
+                <div id="editor-wrapper" style="position:relative; border:none; box-shadow:none; width:auto; min-height:auto; display:flex; flex-direction:column;">
+                    ${watermarkHtml ? `<div class="page-watermark" style="position:absolute; inset:0; z-index:0; pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden;">${watermarkHtml}</div>` : ''}
+                    ${headerHtml ? `<div class="page-header" id="header-area" style="padding: 10mm 40mm 5mm 40mm !important;">${headerHtml}</div>` : ''}
+                    <div class="ql-container ql-snow" style="border:none; flex-grow:1;"><div class="ql-editor">${htmlContent}</div></div>
+                    ${footerHtml ? `<div class="page-footer" id="footer-area" style="padding: 5mm 40mm 10mm 40mm !important; margin-top: auto;">${footerHtml}</div>` : ''}
+                </div>
+            </body></html>`;
+        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(fullHtml)}`);
+        const pdfBuffer = await printWindow.webContents.printToPDF({
+            margins: { marginType: 'none' }, pageSize: 'A4', printBackground: true, landscape: false
+        });
+
+        // 2) Načti certifikát a podepiš
+        let p12Buffer;
+        try { p12Buffer = fs.readFileSync(p12Path); }
+        catch (e) { return { success: false, error: `Nelze načíst certifikát: ${e.message}` }; }
+
+        let signed;
+        try {
+            signed = await signPdfBuffer(pdfBuffer, p12Buffer, password || '', meta || {});
+        } catch (e) {
+            // Nejčastěji špatné heslo k .p12 nebo poškozený certifikát.
+            return { success: false, error: `Podpis selhal: ${e.message} (zkontrolujte heslo k certifikátu).` };
+        }
+
+        // 3) Ulož podepsané PDF
+        const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+            title: 'Uložit podepsané PDF',
+            defaultPath: 'Dokument_podepsany.pdf',
+            filters: [{ name: 'PDF', extensions: ['pdf'] }]
+        });
+        if (canceled || !filePath) return { success: false, canceled: true };
+        fs.writeFileSync(filePath, signed);
+        return { success: true, filePath };
+    } catch (error) {
+        console.error('Chyba při podpisu PDF:', error);
+        return { success: false, error: error.message };
+    } finally {
+        if (printWindow && !printWindow.isDestroyed()) printWindow.destroy();
     }
 });
 
