@@ -246,7 +246,15 @@ Object.assign(LexisUI.prototype, {
                         // Setup event listeners safely
                         const prepBtn = card.querySelector(`[id="prepare-reply-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}"]`);
                         const doneBtn = card.querySelector(`[id="mark-done-${doc.caseNumber.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '')}"]`);
-                        if (prepBtn) prepBtn.onclick = () => this.prepareReply(doc);
+                        if (doc.hasLexisSpec) {
+                            const badge = document.createElement('div');
+                            badge.style = 'font-size:9px; font-weight:800; color:#5a8a4a; background:#eaf3e6; border:1px solid #cfe3c6; border-radius:4px; padding:2px 6px; align-self:flex-start;';
+                            badge.textContent = 'LexisEditor koncept — otevře se bez ztráty formátu';
+                            card.insertBefore(badge, card.firstChild);
+                            if (prepBtn) { prepBtn.textContent = '📄 Otevřít v editoru'; prepBtn.style.background = '#5a8a4a'; prepBtn.onclick = () => this.openLexisDraft(doc); }
+                        } else {
+                            if (prepBtn) prepBtn.onclick = () => this.prepareReply(doc);
+                        }
                         if (doneBtn) doneBtn.onclick = () => this.markInboxRead(doc.fileName);
                         card.querySelectorAll('.review-dl-btn').forEach(btn => {
                             btn.onclick = () => this.promptAddDeadlineDate(
@@ -298,6 +306,31 @@ Object.assign(LexisUI.prototype, {
         }
     },
 
+    async openLexisDraft(doc) {
+        this.showLoader("Otevírám koncept z LexisEditoru...", async () => {
+            try {
+                if (!doc || !doc.lexisSpec || !window.applyDocumentSpec) {
+                    this.customAlert("Tento dokument neobsahuje vnořená LexisEditor data.");
+                    return;
+                }
+                const startScreen = document.getElementById('start-screen');
+                const appContainer = document.getElementById('app-container');
+                if (startScreen && appContainer) { startScreen.style.display = 'none'; appContainer.style.display = 'flex'; }
+                this.currentDocumentId = 'doc_' + Date.now();
+                // Bezeztrátová obnova (nadpisy, tabulky, hlavička/patička, vodoznak).
+                window.applyDocumentSpec(doc.lexisSpec);
+                this.currentDocumentTitle = (doc.lexisSpec && doc.lexisSpec.title) || doc.fileName || 'Koncept';
+                this.updateDocTitleDOM();
+                this.setDocumentStatus(null, true);
+                await this.saveActiveDocumentState();
+                if (typeof this.updateDocumentOutline === 'function') this.updateDocumentOutline();
+                await this.markInboxRead(doc.relativePath || doc.fileName);
+            } catch (e) {
+                console.error("Chyba při otevírání konceptu z LexisLocalu:", e);
+                this.customAlert("Nepodařilo se otevřít koncept z LexisLocalu.");
+            }
+        });
+    },
     async prepareReply(doc) {
         this.showLoader("Zakládání spisu a generování odpovědi...", async () => {
             try {

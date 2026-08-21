@@ -466,8 +466,28 @@ class LexisUI {
         // 2. Receive automated/manual import of external document JSON
         window.electronAPI.onLexisConnectImport((data) => {
             console.log(`[LexisUI] PŘIJAT IMPORT DOKUMENTU:`, data);
-            if (data && data.html) {
+            if (!data) return;
+            // Bezeztrátová cesta: nese-li ingest vnořený LexisEditor spec (např. z
+            // .docx upuštěného do sledované složky LexisLocalu), obnovíme dokument přes
+            // applyDocumentSpec — se strukturou (nadpisy, tabulky, hlavička, vodoznak).
+            // Fallback: prosté HTML.
+            try {
+                if (data.spec && window.applyDocumentSpec) {
+                    window.applyDocumentSpec(data.spec);
+                    if (data.spec.title || data.title) {
+                        this.currentDocumentTitle = data.spec.title || data.title;
+                        this.updateDocTitleDOM();
+                    }
+                    this.setDocumentStatus(null, true);
+                    this.saveActiveDocumentState();
+                    if (typeof this.updateDocumentOutline === 'function') this.updateDocumentOutline();
+                    this.customAlert(`📥 <b>Import dokončen!</b><br><br>Dokument byl bezeztrátově načten ze sledované složky (LexisLocal).`);
+                    return;
+                }
+            } catch (e) { console.error('Bezeztrátový import selhal, fallback na HTML:', e); }
+            if (data.html) {
                 this.core.setContent(data.html);
+                if (data.title) { this.currentDocumentTitle = data.title; this.updateDocTitleDOM(); }
                 this.customAlert(`📥 <b>Import dokončen!</b><br><br>Dokument byl importován ze vzdálené integrační služby.`);
             }
         });
