@@ -961,35 +961,38 @@ Object.assign(LexisUI.prototype, {
                     }
                 });
             } else {
-                // Lokální simulace, pokud jsme v prohlížeči (pro demo účely)
-                this.showLoader("Simuluji lustraci v ARES (prohlížeč)...", () => {
-                    const results = {
-                        "27082440": { obchodniJmeno: "Alza.cz a.s.", ico: "27082440", dic: "CZ27082440", sidlo: "Jankovcova 1522/53, Holešovice, 170 00 Praha 7", pravniForma: "Akciová společnost" },
-                        "25107354": { obchodniJmeno: "Seznam.cz, a.s.", ico: "25107354", dic: "CZ25107354", sidlo: "Radlická 3294/10, Smíchov, 150 00 Praha 5", pravniForma: "Akciová společnost" }
-                    };
-                    const d = results[cleanIco];
-                    if (d) {
+                // Prohlížečová verze: REÁLNÝ dotaz na veřejné ARES v3 REST API (CORS povolen).
+                // Žádná simulace — při chybě čestné hlášení, nic se nevymýšlí.
+                (async () => {
+                    try {
+                        const resp = await fetch(`https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/${encodeURIComponent(cleanIco)}`, { headers: { 'Accept': 'application/json' } });
+                        if (!resp.ok) {
+                            throw new Error(resp.status === 404 ? 'Subjekt s tímto IČO nebyl v ARES nalezen.' : `ARES vrátil stav ${resp.status}.`);
+                        }
+                        const j = await resp.json();
+                        const sidlo = (j.sidlo && (j.sidlo.textovaAdresa || j.sidlo.nazevObce)) || 'Adresa nezjištěna';
+                        const esc = (v) => window.escapeHTML(String(v == null ? '' : v));
                         const baseStyle = "border: 1px solid #e0dbd3; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #faf9f7;";
                         const html = `
                             <div style="${baseStyle}">
                                 <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: linear-gradient(to bottom, #9a5b22, #8a5320);"></div>
-                                <p style="margin-bottom: 8px; color: #9a5b22; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES (Simulace): Právnická osoba</p>
-                                <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>${d.obchodniJmeno}</strong></p>
+                                <p style="margin-bottom: 8px; color: #9a5b22; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">Ověřeno v ARES: Ekonomický subjekt</p>
+                                <p style="font-size: 18px; margin: 0; color: #2b2926;"><strong>${esc(j.obchodniJmeno || 'Neuvedeno')}</strong></p>
                                 <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #5c574f;">
-                                    <div><strong>IČO:</strong> ${d.ico}</div>
-                                    <div><strong>DIČ:</strong> ${d.dic}</div>
-                                    <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${d.sidlo}</div>
-                                    <div style="grid-column: span 2; font-size: 11px; color: #a09a92; font-style: italic;">Simulovaná data pro prohlížeč (${d.pravniForma})</div>
+                                    <div><strong>IČO:</strong> ${esc(j.ico || cleanIco)}</div>
+                                    <div><strong>DIČ:</strong> ${esc(j.dic || 'Neuvedeno')}</div>
+                                    <div style="grid-column: span 2;"><strong>Sídlo:</strong> ${esc(sidlo)}</div>
+                                    <div style="grid-column: span 2; font-size: 11px; color: #a09a92; font-style: italic;">Staženo z ARES (ares.gov.cz)</div>
                                 </div>
                             </div>
                             <p><br></p>
                         `;
                         const range = this.core.quill.getSelection(true);
                         this.core.safePasteHTML(range.index, html);
-                    } else {
-                        this.customAlert("Subjekt nebyl v simulátoru ARES nalezen (použijte IČO: 27082440). Hledání v reálném registru vyžaduje spuštění v Electronu.");
+                    } catch (e) {
+                        this.customAlert(`Lustrace v ARES se nezdařila: ${e.message}`);
                     }
-                });
+                })();
             }
         });
     },
