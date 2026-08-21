@@ -697,7 +697,7 @@ class LexisUI {
                 document.getElementById('isds-demo-btn').onclick = () => renderInbox(true);
             };
             
-            const renderInbox = (isDemo = false) => {
+            const renderInbox = async (isDemo = false) => {
                 bodyContainer.innerHTML = eIco(`
                     <div style="width: 350px; background: white; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; min-height: 0;">
                         <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
@@ -725,7 +725,9 @@ class LexisUI {
                     renderLogin();
                 };
                 
-                const messages = [
+                // Ukázkové zprávy POUZE pro Demo režim (simulátor). V reálném režimu se níže
+                // načtou skutečné datové zprávy přes electronAPI.isdsInboxList().
+                const _sampleMessages = [
                     {
                         id: "isds_msg_001",
                         senderName: "Městský soud v Praze",
@@ -774,8 +776,26 @@ class LexisUI {
                     }
                 ];
                 
+                let messages = isDemo ? _sampleMessages : [];
+                if (!isDemo && window.electronAPI && window.electronAPI.isdsInboxList) {
+                    try {
+                        const _r = await window.electronAPI.isdsInboxList();
+                        messages = ((_r && _r.items) || []).map(it => ({
+                            id: it.dmID,
+                            senderName: it.sender || 'Neznámý odesílatel',
+                            senderId: it.senderId || '',
+                            subject: it.annotation || '(bez předmětu)',
+                            receivedDate: it.deliveryTime ? new Date(it.deliveryTime).toLocaleDateString('cs-CZ') : '',
+                            deadlineDays: null,
+                            body: `<p><b>${it.sender || ''}</b></p><p>${it.annotation || ''}</p><p style="color:#94a3b8;font-size:12px;">Obsah a přílohy stáhněte v modulu „Datová schránka".</p>`,
+                            attachments: (it.files || []).map(f => ({ name: f.name, type: 'file' }))
+                        }));
+                    } catch (e) { messages = []; }
+                }
+
                 const listContainer = document.getElementById('isds-msg-list');
-                listContainer.innerHTML = eIco(messages.map(msg => {
+                const _emptyNote = '<div style="padding:22px 14px; text-align:center; color:#94a3b8; font-size:12px; line-height:1.5;">Žádné zprávy k zobrazení.<br>Reálné zprávy načtěte v modulu <b>Datová schránka</b> (Obnovit), nebo si funkci vyzkoušejte v <b>Demo režimu</b>.</div>';
+                listContainer.innerHTML = messages.length === 0 ? _emptyNote : eIco(messages.map(msg => {
                     const dueHtml = msg.deadlineDays > 0 
                         ? `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5;">Lhůta ${msg.deadlineDays} dní</span>`
                         : `<span style="padding: 2px 6px; font-size: 9px; font-weight: 700; border-radius: 9999px; background: #f1f5f9; color: #64748b;">Bez lhůty</span>`;
@@ -909,27 +929,33 @@ class LexisUI {
                         const m = messages.find(x => x.id === mId);
                         if (m) {
                             const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
+                            // Sp. zn. a soud se ODVOZUJÍ ze skutečné zprávy — nic se nedosazuje napevno.
+                            const _plain = String(m.body || '').replace(/<[^>]+>/g, ' ');
+                            const _ex = (window.LexisReply && window.LexisReply.extract) ? window.LexisReply.extract((m.subject || '') + ' ' + _plain) : {};
+                            const _spzn = (_ex && _ex.spzn) ? _ex.spzn : '[doplňte sp. zn.]';
+                            const _court = m.senderName || '[soud / úřad]';
+                            const _esc = (v) => window.escapeHTML(String(v == null ? '' : v));
                             const html = `
-                                <h2>REAKCE NA USNESENÍ SOUDU / VÝZVU</h2>
-                                <p><b>Městskému soudu v Praze</b><br>Datová schránka ID: <b>${m.senderId}</b></p>
-                                <p>K spisové značce: <b>15 Co 123/2026</b></p>
+                                <h2>REAKCE NA VÝZVU / USNESENÍ</h2>
+                                <p><b>${_esc(_court)}</b><br>Datová schránka ID: <b>${_esc(m.senderId)}</b></p>
+                                <p>K spisové značce: <b>${_esc(_spzn)}</b></p>
                                 <p><br></p>
-                                <p>K výzvě soudu ze dne ${m.receivedDate} ve věci žalobce proti žalovanému o zaplacení částky 250.000,- Kč sděluje žalovaný prostřednictvím svého právního zástupce následující:</p>
+                                <p>K výzvě ze dne ${_esc(m.receivedDate)} sděluje adresát prostřednictvím svého právního zástupce následující:</p>
                                 <p>[Sem doplňte text Vašeho vyjádření]</p>
                                 <p><br></p>
-                                <p>${savedName}, advokát</p>
+                                <p>${_esc(savedName)}, advokát</p>
                             `;
                             
                             const due = new Date();
-                            due.setDate(due.getDate() + m.deadlineDays);
+                            due.setDate(due.getDate() + (Number.isFinite(m.deadlineDays) ? m.deadlineDays : 15));
                             const dueDateStr = due.toISOString().split('T')[0];
                             
                             // Initialize fresh document state and metadata
                             this.currentDocumentId = 'doc_' + Date.now();
                             this.currentDocumentTitle = `Odpověď: ${m.subject}`;
-                            this.currentDocumentCj = '15 Co 123/2026';
+                            this.currentDocumentCj = _spzn;
                             this.currentDocumentDeadline = {
-                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
+                                title: `Vyjádření k výzvě sp. zn. ${_spzn}`,
                                 dueDate: dueDateStr
                             };
                             
@@ -939,7 +965,7 @@ class LexisUI {
                             // Track in activeDeadlines
                             this.activeDeadlines.push({
                                 id: 'dl_' + Date.now(),
-                                title: `Vyjádření k soudní výzvě sp. zn. 15 Co 123/2026`,
+                                title: `Vyjádření k výzvě sp. zn. ${_spzn}`,
                                 dueDate: dueDateStr
                             });
                             this.core.storage.set('settings', { key: 'active-deadlines', value: this.activeDeadlines });
@@ -958,7 +984,7 @@ class LexisUI {
                             }
                             
                             document.body.removeChild(overlay);
-                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. 15 Co 123/2026, aktivováno sledování lhůty a načteno do editoru.`);
+                            this.customAlert(`✅ Vygenerována odpovědní šablona k sp. zn. ${_spzn}, aktivováno sledování lhůty a načteno do editoru.`);
                         }
                     };
                 };

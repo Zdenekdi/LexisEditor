@@ -1,4 +1,7 @@
 /**
+ * @jest-environment node
+ */
+/**
  * Test vnoření LexisEditor spec do .docx (custom XML part). Ověřuje, že se spec
  * uloží a přečte identicky a že plain .docx bez spec vrací null. Word část ignoruje.
  */

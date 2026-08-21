@@ -1045,32 +1045,40 @@ Object.assign(LexisUI.prototype, {
                 
                 // Poznámka: certifikát ani PIN se u vizuální doložky nepoužívají (PAdES v přípravě).
                 
-                document.getElementById('isds-sign-confirm').innerText = "Podepisuji...";
-                document.getElementById('isds-sign-confirm').disabled = true;
-                
-                const savedName = await this.core.storage.get('settings', 'lawyer-name') || "[JMÉNO ADVOKÁTA]";
-                const baseStyle = "border: 2px solid #9a5b22; padding: 16px; border-radius: 8px; margin-top: 30px; font-family: 'Inter', sans-serif; position: relative; overflow: hidden; background: #faf6ec; margin-bottom: 20px;";
-                const sigHtml = `
-                    <div style="${baseStyle}">
-                        <div style="position: absolute; top: 0; left: 0; width: 6px; height: 100%; background: #9a5b22;"></div>
-                        <p style="margin: 0; color: #9a5b22; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">✒️ PODPISOVÁ DOLOŽKA ADVOKÁTA (vizuální — nejde o kvalifikovaný e-podpis)</p>
-                        <p style="font-size: 15px; margin: 8px 0 4px; color: #2b2926;">Podepsal: <strong>${savedName}, advokát</strong></p>
-                        <p style="margin: 4px 0 0; font-size: 12px; color: #5c574f;">Datum podpisu: <strong>${new Date().toLocaleString('cs-CZ')}</strong></p>
-                        <p style="margin: 4px 0 0; font-size: 11px; color: #a09a92; font-style: italic;">Vizuální doložka bez kryptografického podpisu. Pro platný e-podpis podepište dokument kvalifikovaným certifikátem (PAdES).</p>
-                    </div>
-                    <p><br></p>
-                `;
-                
-                const range = this.core.quill.getLength() - 1;
-                this.core.safePasteHTML(range, sigHtml);
-                this.setDocumentStatus('final', true);
-                
-                document.body.removeChild(overlay);
-                
-                this.customAlert("✒️ <b>Vložena podpisová doložka.</b><br><br>UPOZORNĚNÍ: jde o VIZUÁLNÍ doložku, nikoli kvalifikovaný elektronický podpis — dokument není kryptograficky podepsán a doložka se neověří v Adobe Acrobatu. Pro platný e-podpis použijte kvalifikovaný certifikát (PAdES; funkce v přípravě).");
-                
-                if (typeof window.print === 'function') {
-                    window.print();
+                                if (!(window.electronAPI && window.electronAPI.signPdf)) {
+                    return this.customAlert("Reálný podpis PDF je dostupný jen v desktopové verzi.");
+                }
+                const _btn = document.getElementById('isds-sign-confirm');
+                _btn.innerText = "Podepisuji..."; _btn.disabled = true;
+
+                const savedName = await this.core.storage.get('settings', 'lawyer-name') || "";
+                let _css = '';
+                try { for (const sh of document.styleSheets) { try { for (const r of sh.cssRules) _css += r.cssText + String.fromCharCode(10); } catch (e) {} } } catch (e) {}
+                const _html = (this.core.getContent ? this.core.getContent() : ((document.querySelector('.ql-editor') || {}).innerHTML)) || '';
+                const _h = document.getElementById('header-area');
+                const _f = document.getElementById('footer-area');
+                const _wm = document.getElementById('watermark-layer');
+                const _payload = {
+                    htmlContent: _html, cssContent: _css,
+                    headerHtml: _h ? _h.innerHTML : '',
+                    footerHtml: _f ? _f.innerHTML : '',
+                    watermarkHtml: _wm ? _wm.innerHTML : '',
+                    p12Path: selectedCertPath, password: pin,
+                    meta: { name: savedName, reason: 'Podpis dokumentu advokatem', location: '' }
+                };
+                let _res;
+                try { _res = await window.electronAPI.signPdf(_payload); }
+                catch (e) { _res = { success: false, error: e.message }; }
+
+                _btn.innerText = "Podepsat a Exportovat"; _btn.disabled = false;
+                if (_res && _res.success) {
+                    this.setDocumentStatus('final', true);
+                    document.body.removeChild(overlay);
+                    this.customAlert("✅ <b>PDF bylo kryptograficky podepsano</b> Vasim certifikatem a ulozeno:<br><code>" + window.escapeHTML(_res.filePath) + "</code><br><br>Platnost overite v Adobe Acrobatu (panel Podpisy). Podpis je platny, pokud se certifikat retezi k duveryhodne autorite.");
+                } else if (_res && _res.canceled) {
+                    /* zruseno */
+                } else {
+                    this.customAlert("❌ Podpis se nezdaril: " + window.escapeHTML((_res && _res.error) || 'neznama chyba'));
                 }
             };
         });

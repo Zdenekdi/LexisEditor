@@ -59,8 +59,12 @@
         if (text === '') return;
         ops.push(attrs ? { insert: text, attributes: attrs } : { insert: text });
     }
-    function _pushNewline(ops, attrs) {
-        ops.push(attrs && Object.keys(attrs).length ? { insert: '\n', attributes: attrs } : { insert: '\n' });
+    let _idSeq = 0;
+    function _genId() { return 'b' + (++_idSeq).toString(36); }
+    function _pushNewline(ops, attrs, bid) {
+        const a = Object.assign({}, attrs || {});
+        if (bid) a.blockId = bid;
+        ops.push(Object.keys(a).length ? { insert: '\n', attributes: a } : { insert: '\n' });
     }
 
     // Normalizace odstavce: buď `runs`, nebo prosté `text`.
@@ -139,13 +143,14 @@
         for (const block of blocks) {
             if (!block || typeof block !== 'object') continue;
             const type = block.type || 'paragraph';
+            const _bid = block.id || _genId();
 
             if (type === 'heading') {
                 let lvl = parseInt(block.level, 10); if (!(lvl >= 1 && lvl <= 6)) lvl = 1;
                 const num = numbering.byBlock.get(block);
                 const prefix = (numberOn && num) ? (num + (lvl === 1 ? '. ' : ' ')) : '';
                 _pushText(ops, prefix + _str(block.text));
-                _pushNewline(ops, { header: lvl });
+                _pushNewline(ops, { header: lvl }, _bid);
 
             } else if (type === 'paragraph') {
                 for (const run of _runsOf(block)) {
@@ -160,14 +165,14 @@
                 if (block.footnote != null && _str(block.footnote).trim() !== '') {
                     ops.push({ insert: { footnote: { id: 'fn-' + (++fnCounter), text: _str(block.footnote), number: '?' } } });
                 }
-                _pushNewline(ops, _blockAttrs(block));
+                _pushNewline(ops, _blockAttrs(block), _bid);
 
             } else if (type === 'list') {
                 const ordered = !!block.ordered;
                 const items = Array.isArray(block.items) ? block.items : [];
                 for (const it of items) {
                     _pushText(ops, _str(it));
-                    _pushNewline(ops, { list: ordered ? 'ordered' : 'bullet' });
+                    _pushNewline(ops, { list: ordered ? 'ordered' : 'bullet' }, _bid);
                 }
 
             } else if (type === 'table') {
@@ -177,21 +182,21 @@
                 const grid = Array.from({ length: r }, (_, i) =>
                     Array.from({ length: c }, (_, j) => _str(cells && cells[i] ? cells[i][j] : '')));
                 ops.push({ insert: { table: { rows: grid } } });
-                _pushNewline(ops, {});
+                _pushNewline(ops, {}, _bid);
 
             } else if (type === 'toc') {
                 ops.push({ insert: { toc: true } });
-                _pushNewline(ops, {});
+                _pushNewline(ops, {}, _bid);
 
             } else if (type === 'footnote') {
                 ops.push({ insert: { footnote: { id: 'fn-' + (++fnCounter), text: _str(block.text), number: '?' } } });
-                _pushNewline(ops, {});
+                _pushNewline(ops, {}, _bid);
 
             } else if (type === 'authorities') {
                 const C = _citations();
                 const title = (block.title != null && _str(block.title).trim() !== '') ? _str(block.title) : 'Seznam citované judikatury';
                 _pushText(ops, title);
-                _pushNewline(ops, { header: 2 });
+                _pushNewline(ops, { header: 2 }, _bid);
                 const list = C ? C.buildAuthorities(_collectText(spec)).items : [];
                 if (list.length === 0) {
                     _pushText(ops, 'Žádná judikatura nebyla citována.');
@@ -202,7 +207,7 @@
 
             } else if (type === 'pageBreak') {
                 ops.push({ insert: { 'page-break': true } });
-                _pushNewline(ops, {});
+                _pushNewline(ops, {}, _bid);
             }
         }
 
@@ -324,26 +329,37 @@
         let pendingFootnote = null;
         let listBuffer = null;
 
-        function flushList() { if (listBuffer) { blocks.push({ type: 'list', ordered: listBuffer.ordered, items: listBuffer.items }); listBuffer = null; } }
+        function flushList() { if (listBuffer) { const lb = { type: 'list', ordered: listBuffer.ordered, items: listBuffer.items }; if (listBuffer.id) lb.id = listBuffer.id; blocks.push(lb); listBuffer = null; } }
 
         function endLine(battrs) {
             battrs = battrs || {};
             if (battrs.header) {
                 flushList();
-                blocks.push({ type: 'heading', level: battrs.header, text: _joinText(lineRuns) });
+                const hb = { type: 'heading', level: battrs.header, text: _joinText(lineRuns) };
+                if (battrs.blockId) hb.id = battrs.blockId;
+                blocks.push(hb);
             } else if (battrs.list) {
                 const ordered = battrs.list === 'ordered';
                 const item = _joinText(lineRuns);
-                if (listBuffer && listBuffer.ordered === ordered) listBuffer.items.push(item);
-                else { flushList(); listBuffer = { ordered, items: [item] }; }
+                const _bid = battrs.blockId;
+                if (listBuffer && listBuffer.ordered === ordered && listBuffer.id === _bid) listBuffer.items.push(item);
+                else { flushList(); listBuffer = { ordered, id: _bid, items: [item] }; }
                 lineRuns = [];
                 return;
             } else {
+                const empty0 = lineRuns.length === 0;
+                // Koncový \n za embedem (tabulka/toc/pageBreak) nese blockId → připni ho embedu.
+                if (empty0 && battrs.blockId && pendingFootnote == null && blocks.length) {
+                    const lb = blocks[blocks.length - 1];
+                    if (lb && !lb.id && (lb.type === 'table' || lb.type === 'toc' || lb.type === 'pageBreak')) {
+                        lb.id = battrs.blockId; lineRuns = []; return;
+                    }
+                }
                 flushList();
                 const pp = _makeParagraph(lineRuns, battrs.align);
                 const empty = !(pp.runs && pp.runs.length) && (pp.text === '' || pp.text == null);
-                if (pendingFootnote != null) { pp.footnote = pendingFootnote; pendingFootnote = null; blocks.push(pp); }
-                else if (!empty) blocks.push(pp);
+                if (pendingFootnote != null) { pp.footnote = pendingFootnote; if (battrs.blockId) pp.id = battrs.blockId; pendingFootnote = null; blocks.push(pp); }
+                else if (!empty) { if (battrs.blockId) pp.id = battrs.blockId; blocks.push(pp); }
             }
             lineRuns = [];
         }
@@ -457,5 +473,75 @@
         }
     };
 
-    return { buildDelta, buildHeaderFooter, apply, deltaToSpec, readSpec, tableOps, MAX_TABLE_ROWS, MAX_TABLE_COLS };
+    // ===== VALIDÁTOR dokumentu (agent si po zápisu ověří sám sebe) =====
+    // Vrací { valid, errors:[{blockId?, index, severity:'error'|'warning', code, message}] }.
+    function _blockText(b) {
+        const parts = [];
+        if (b.text) parts.push(_str(b.text));
+        if (Array.isArray(b.runs)) for (const r of b.runs) parts.push(_str(r && r.text));
+        if (b.footnote) parts.push(_str(b.footnote));
+        if (Array.isArray(b.items)) parts.push(b.items.map(_str).join(' '));
+        if (Array.isArray(b.cells)) for (const row of b.cells) if (Array.isArray(row)) parts.push(row.map(_str).join(' '));
+        return parts.join(' ');
+    }
+    const KNOWN_TYPES = { heading: 1, paragraph: 1, list: 1, table: 1, toc: 1, footnote: 1, pageBreak: 1, authorities: 1 };
+    function validate(spec) {
+        const errors = [];
+        const add = (severity, code, message, i, blockId) => errors.push({ severity, code, message, index: i, blockId: blockId || null });
+        if (!spec || typeof spec !== 'object') { add('error', 'spec', 'Spec musí být objekt.', -1); return { valid: false, errors }; }
+        const blocks = Array.isArray(spec.blocks) ? spec.blocks : [];
+        const seenIds = new Set();
+
+        blocks.forEach((b, i) => {
+            if (!b || typeof b !== 'object') { add('error', 'block', 'Blok není objekt.', i); return; }
+            const type = b.type || 'paragraph';
+            const bid = b.id || null;
+            if (!KNOWN_TYPES[type]) add('error', 'unknown-type', `Neznámý typ bloku „${type}".`, i, bid);
+            if (bid) { if (seenIds.has(bid)) add('error', 'dup-id', `Duplicitní id bloku „${bid}".`, i, bid); seenIds.add(bid); }
+
+            // Strukturní kontroly
+            if (type === 'heading') {
+                const lvl = parseInt(b.level, 10);
+                if (!(lvl >= 1 && lvl <= 6)) add('error', 'heading-level', 'Úroveň nadpisu musí být 1–6.', i, bid);
+                if (!_str(b.text).trim()) add('warning', 'empty-heading', 'Prázdný nadpis.', i, bid);
+            }
+            if (type === 'list' && !(Array.isArray(b.items) && b.items.length)) add('error', 'list-items', 'Seznam nemá položky (items).', i, bid);
+            if (type === 'table') {
+                if (!Array.isArray(b.cells) || !b.cells.length) add('error', 'table-cells', 'Tabulka nemá buňky (cells).', i, bid);
+                else {
+                    const w = b.cells[0].length;
+                    if (b.cells.some(r => !Array.isArray(r) || r.length !== w)) add('error', 'table-shape', 'Řádky tabulky mají různý počet sloupců.', i, bid);
+                }
+            }
+            // Bezpečnost odkazů
+            if (Array.isArray(b.runs)) b.runs.forEach(r => {
+                if (r && r.link && !/^(https?:|mailto:)/i.test(_str(r.link))) add('error', 'link-scheme', `Nepovolený odkaz „${_str(r.link).slice(0, 40)}" (jen http/https/mailto).`, i, bid);
+            });
+
+            // Právní „lint" (třída korupce, kterou popsal agent)
+            const t = _blockText(b);
+            if (/\[[^\]]*(doplňte|SPISOVÁ ZNAČKA|JMÉNO ADVOKÁTA|Sem doplňte|doplnit)/i.test(t))
+                add('warning', 'placeholder', 'Nevyplněný zástupný text (placeholder).', i, bid);
+            if (/(odst|písm|čl)\.\d/i.test(t))
+                add('warning', 'glued-odst', 'Slepené „odst./písm./čl." s číslem bez mezery (možná koroze).', i, bid);
+            if (/§\s*(?=[^\d\s]|$)/.test(t) && !/§\s*\d/.test(t) && /§/.test(t))
+                add('warning', 'para-no-number', '„§" bez následujícího čísla.', i, bid);
+        });
+
+        return { valid: !errors.some(e => e.severity === 'error'), errors };
+    }
+
+    // ===== Inkrementální čtení (osnova → sekce) — levné pro agenta =====
+    // Osnova = jen nadpisy [{id, level, text}]. Agent načte pár tokenů místo celého dokumentu.
+    function outline(spec) {
+        const blocks = (spec && Array.isArray(spec.blocks)) ? spec.blocks : [];
+        return blocks.filter(b => b && b.type === 'heading').map(b => ({ id: b.id || null, level: b.level, text: _str(b.text) }));
+    }
+    // Jeden blok podle id (čtení konkrétní sekce bez načítání zbytku).
+    function getBlockById(spec, id) {
+        const blocks = (spec && Array.isArray(spec.blocks)) ? spec.blocks : [];
+        return blocks.find(b => b && b.id === id) || null;
+    }
+
+    return { buildDelta, buildHeaderFooter, apply, deltaToSpec, readSpec, tableOps, validate, outline, getBlockById, MAX_TABLE_ROWS, MAX_TABLE_COLS };
 });

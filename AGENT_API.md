@@ -11,6 +11,9 @@ pozic. Vše je vystaveno jako globální funkce v rendereru.
 | `applyDocumentSpec(spec)` | Sestaví CELÝ dokument z `spec` (vloží do editoru). Vrací souhrn `{ blocks, header, watermark, opCount }`. |
 | `getDocumentSpec()` | Přečte AKTUÁLNÍ dokument zpět do `spec` (round-trip → agent může editovat). |
 | `buildDocumentDelta(spec)` | Jen sestaví Quill Delta z `spec` (bez vložení) — pro náhled/testy. |
+| `getDocumentOutline()` | Levné: vrátí jen nadpisy `[{id, level, text}]` — agent načte osnovu za pár tokenů. |
+| `getBlock(id)` | Vrátí JEDEN blok podle `id` (čtení konkrétní sekce bez zbytku). |
+| `validateDocument(spec?)` | Ověří dokument: `{ valid, errors:[{blockId, code, severity, message}] }`. Bez `spec` validuje aktuální dokument. |
 
 Nízkoúrovňově též `window.LexisAuthoring.{buildDelta, deltaToSpec, apply, readSpec}`
 a `window.LexisCitations.{extractCitations, buildAuthorities}`.
@@ -150,6 +153,10 @@ applyDocumentSpec(spec);                         // zapíše zpět
 ```
 
 ## Poznámky
+
+- **Stabilní ID bloků.** Každý blok má `id`, které přežije editaci okolí (uloží se do dokumentu). Agent adresuje `id`, ne hledáním textu: `const s = getDocumentSpec(); s.blocks.find(b=>b.id==="…").text = "…"; applyDocumentSpec(s);`.
+- **Editace tabulek programově:** `LexisAuthoring.tableOps.{setCell,addRow,removeRow,addColumn,removeColumn,dimensions}` nad blokem `{type:"table"}`.
+- **CLI validátor:** `node scripts/validate-doc.js dokument.json` (exit 1 = chyby). Agent si po zápisu ověří sám sebe.
 
 - **Pozice se neřeší.** Agent popisuje strukturu; API deterministicky sestaví Delta a vloží.
 - **Bezpečnost:** logo jen `data:` URL; HTML hlavičky/patičky se sanitizuje (DOMPurify);

@@ -59,6 +59,20 @@
             if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
             return window.LexisAuthoring.readSpec();
         };
+        // Validace dokumentu (agent si ověří sám sebe): { valid, errors }.
+        window.validateDocument = (spec) => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.validate(spec || window.LexisAuthoring.readSpec());
+        };
+        // Inkrementální čtení: osnova (jen nadpisy) a jeden blok podle id.
+        window.getDocumentOutline = () => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.outline(window.LexisAuthoring.readSpec());
+        };
+        window.getBlock = (id) => {
+            if (!window.LexisAuthoring) throw new Error('LexisAuthoring není načteno.');
+            return window.LexisAuthoring.getBlockById(window.LexisAuthoring.readSpec(), id);
+        };
         window.switchTab = (tabId) => {
             if (lexisUI) lexisUI.switchTab(tabId);
         };
