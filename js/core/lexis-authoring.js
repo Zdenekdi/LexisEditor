@@ -267,6 +267,13 @@
             const f = doc.getElementById('footer-area');
             if (h) { h.innerHTML = sanitize(hf.headerHtml); header = true; }
             if (f) { f.innerHTML = sanitize(hf.footerHtml); }
+        } else if (spec && spec.letterheadHtml && doc) {
+            // Round-trip .docx: obnov PŘESNĚ zachycenou hlavičku/patičku (readSpec →
+            // letterheadHtml), aby se uložením do .docx a opětovným otevřením neztratila.
+            const h = doc.getElementById('header-area');
+            const f = doc.getElementById('footer-area');
+            if (h && spec.letterheadHtml.headerHtml != null) { h.innerHTML = sanitize(spec.letterheadHtml.headerHtml); header = true; }
+            if (f && spec.letterheadHtml.footerHtml != null) { f.innerHTML = sanitize(spec.letterheadHtml.footerHtml); }
         }
 
         // Vodoznak (data-atributy čte export do PDF/DOCX).

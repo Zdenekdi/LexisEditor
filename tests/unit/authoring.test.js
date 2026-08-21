@@ -155,6 +155,13 @@ describe('apply — runtime nad jsdom dokumentem', () => {
         expect(document.getElementById('footer-area').innerHTML).toBe('FTR:99');
         expect(res.header).toBe(true);
     });
+    test('round-trip .docx: obnoví hlavičku/patičku z letterheadHtml (bez profilu)', () => {
+        const f = ctxFactory();
+        const res = A.apply({ letterheadHtml: { headerHtml: '<b>Moje AK</b>', footerHtml: 'strana 1' }, blocks: [] }, f.ctx);
+        expect(document.getElementById('header-area').innerHTML).toBe('<b>Moje AK</b>');
+        expect(document.getElementById('footer-area').innerHTML).toBe('strana 1');
+        expect(res.header).toBe(true);
+    });
     test('nastaví vodoznak s data-atributy', () => {
         const f = ctxFactory();
         const res = A.apply({ watermark: { text: 'KONCEPT', color: '#ccc' }, blocks: [] }, f.ctx);
@@ -204,7 +211,8 @@ describe('deltaToSpec + round-trip (READ API)', () => {
             { type: 'table', cells: [['a', 'b'], ['c', 'd']] }
         ] };
         const round = A.deltaToSpec(A.buildDelta(original).ops);
-        expect(round.blocks).toEqual(original.blocks);
+        const strip = (b) => { const c = Object.assign({}, b); delete c.id; return c; };
+        expect(round.blocks.map(strip)).toEqual(original.blocks);
     });
 
     test('samostatná poznámka pod čarou přežije round-trip jako footnote', () => {
@@ -336,5 +344,104 @@ describe('AI provenance označení (EU AI Act, čl. 50)', () => {
         const res = A.apply({ aiDisclosure: true, blocks: [] }, { quill, Delta, document });
         expect(document.getElementById('editor-wrapper').getAttribute('data-ai-assisted')).toBe('true');
         expect(res.aiMarked).toBe(true);
+    });
+});
+
+describe('Stabilní ID bloků (adresování pro agenty)', () => {
+    test('explicitní id přežije round-trip (buildDelta → deltaToSpec)', () => {
+        const spec = { blocks: [
+            { type: 'heading', level: 1, id: 'h-uvod', text: 'Úvod' },
+            { type: 'paragraph', id: 'p-1', text: 'Tvrzení.' },
+            { type: 'list', id: 'l-body', ordered: true, items: ['a', 'b'] },
+            { type: 'table', id: 't-1', cells: [['x', 'y']] }
+        ] };
+        const round = A.deltaToSpec(A.buildDelta(spec).ops);
+        expect(round.blocks.map(b => b.id)).toEqual(['h-uvod', 'p-1', 'l-body', 't-1']);
+    });
+    test('bloky bez id dostanou vygenerované a unikátní id', () => {
+        const spec = { blocks: [
+            { type: 'paragraph', text: 'A' },
+            { type: 'paragraph', text: 'B' },
+            { type: 'heading', level: 2, text: 'C' }
+        ] };
+        const round = A.deltaToSpec(A.buildDelta(spec).ops);
+        const ids = round.blocks.map(b => b.id);
+        expect(ids.every(x => typeof x === 'string' && x.length)).toBe(true);
+        expect(new Set(ids).size).toBe(ids.length); // unikátní
+    });
+    test('agent workflow: přečti → uprav blok podle id → zapiš', () => {
+        const spec = { blocks: [
+            { type: 'paragraph', id: 'cil', text: 'Původní.' },
+            { type: 'paragraph', id: 'jiny', text: 'Beze změny.' }
+        ] };
+        const doc = A.deltaToSpec(A.buildDelta(spec).ops);
+        const target = doc.blocks.find(b => b.id === 'cil');
+        target.text = 'Upravené.';
+        const round2 = A.deltaToSpec(A.buildDelta(doc).ops);
+        expect(round2.blocks.find(b => b.id === 'cil').text).toBe('Upravené.');
+        expect(round2.blocks.find(b => b.id === 'jiny').text).toBe('Beze změny.');
+    });
+});
+
+describe('validate — validátor dokumentu', () => {
+    test('čistý dokument je platný', () => {
+        const r = A.validate({ blocks: [{ type: 'heading', level: 1, text: 'Nadpis' }, { type: 'paragraph', text: 'Text.' }] });
+        expect(r.valid).toBe(true);
+        expect(r.errors).toEqual([]);
+    });
+    test('chytí strukturní chyby (level, nerektangulární tabulka, dup id, list bez items)', () => {
+        const r = A.validate({ blocks: [
+            { type: 'heading', level: 9, id: 'x', text: 'A' },
+            { type: 'table', id: 'x', cells: [['a', 'b'], ['c']] },
+            { type: 'list', items: [] }
+        ] });
+        const codes = r.errors.filter(e => e.severity === 'error').map(e => e.code);
+        expect(codes).toContain('heading-level');
+        expect(codes).toContain('table-shape');
+        expect(codes).toContain('dup-id');
+        expect(codes).toContain('list-items');
+        expect(r.valid).toBe(false);
+    });
+    test('bezpečnost odkazu: javascript: je chyba', () => {
+        const r = A.validate({ blocks: [{ type: 'paragraph', runs: [{ text: 'zlo', link: 'javascript:alert(1)' }] }] });
+        expect(r.errors.some(e => e.code === 'link-scheme')).toBe(true);
+        expect(r.valid).toBe(false);
+    });
+    test('právní lint: placeholder a slepené odst.1 → varování (ne chyba)', () => {
+        const r = A.validate({ blocks: [
+            { type: 'paragraph', text: 'Viz § 2079 odst.1 zákona.' },
+            { type: 'paragraph', text: 'Dle [doplňte sp. zn.].' }
+        ] });
+        const w = r.errors.filter(e => e.severity === 'warning').map(e => e.code);
+        expect(w).toContain('glued-odst');
+        expect(w).toContain('placeholder');
+        expect(r.valid).toBe(true); // jen varování → pořád platné
+    });
+});
+
+describe('outline + getBlockById (inkrementální čtení)', () => {
+    const spec = { blocks: [
+        { type: 'heading', level: 1, id: 'h1', text: 'I. Úvod' },
+        { type: 'paragraph', id: 'p1', text: 'Text úvodu.' },
+        { type: 'heading', level: 2, id: 'h2', text: 'I.1 Detail' },
+        { type: 'paragraph', id: 'p2', text: 'Text detailu.' }
+    ] };
+    test('outline vrátí jen nadpisy s id/level/text', () => {
+        expect(A.outline(spec)).toEqual([
+            { id: 'h1', level: 1, text: 'I. Úvod' },
+            { id: 'h2', level: 2, text: 'I.1 Detail' }
+        ]);
+    });
+    test('getBlockById vrátí konkrétní blok, jinak null', () => {
+        expect(A.getBlockById(spec, 'p2').text).toBe('Text detailu.');
+        expect(A.getBlockById(spec, 'neexistuje')).toBeNull();
+    });
+    test('osnova z reálně sestaveného dokumentu (přes id z buildDelta)', () => {
+        const doc = A.deltaToSpec(A.buildDelta(spec).ops);
+        const out = A.outline(doc);
+        expect(out.map(h => h.text)).toEqual(['I. Úvod', 'I.1 Detail']);
+        expect(out.every(h => h.id)).toBe(true);
+        // agent pak čte jen jednu sekci podle id z osnovy:
+        expect(A.getBlockById(doc, out[1].id).text).toBe('I.1 Detail');
     });
 });

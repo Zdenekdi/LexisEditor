@@ -227,6 +227,22 @@ Object.assign(LexisUI.prototype, {
             if (file.name.endsWith('.docx')) {
                 reader.onload = async (re) => {
                     const arrayBuffer = re.target.result;
+                    // .docx s vnořeným LexisEditor spec (uložené naším exportem) obnovíme
+                    // BEZ ZTRÁTY struktury (nadpisy, tabulky, hlavička/patička, vodoznak)
+                    // přes applyDocumentSpec. Cizí .docx z Wordu spec nemají → fallback níže.
+                    try {
+                        if (file.path && window.electronAPI && window.electronAPI.readDocxSpec && window.applyDocumentSpec) {
+                            const sp = await window.electronAPI.readDocxSpec(file.path);
+                            if (sp && sp.success && sp.hasSpec && sp.spec) {
+                                window.applyDocumentSpec(sp.spec);
+                                if (sp.spec.title) { this.currentDocumentTitle = sp.spec.title; this.updateDocTitleDOM(); }
+                                this.setDocumentStatus(null, true);
+                                await this.saveActiveDocumentState();
+                                if (typeof this.updateDocumentOutline === 'function') this.updateDocumentOutline();
+                                return;
+                            }
+                        }
+                    } catch (e) { /* fallback na nativní/mammoth import níže */ }
                     // Word-parita: má-li dokument sledované změny / poznámky pod čarou,
                     // použij nativní OOXML import (mammoth by je zahodil). Ostatní
                     // dokumenty (tabulky, obrázky, seznamy) jdou přes mammoth.

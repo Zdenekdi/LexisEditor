@@ -856,6 +856,15 @@ Object.assign(LexisUI.prototype, {
                     footerModel = window.LexisHeaderModel.htmlToHeaderModel(footerHtml, document);
                 } catch (e) { headerModel = null; footerModel = null; }
             }
+            // .docx jako kanonický formát: do souboru vnoříme editovatelný LexisEditor
+            // spec (Word ho ignoruje, LexisEditor/agent ho čte zpět bez ztráty struktury).
+            let docSpec = null;
+            try {
+                if (window.LexisAuthoring && window.LexisAuthoring.readSpec) {
+                    docSpec = window.LexisAuthoring.readSpec({ quill: quill, document: document });
+                    if (docSpec) docSpec.title = title;
+                }
+            } catch (e) { docSpec = null; }
             try {
                 let result;
                 if (window.electronAPI.exportDocxV2) {
@@ -866,7 +875,8 @@ Object.assign(LexisUI.prototype, {
                         headerHtml: headerHtml, footerHtml: footerHtml,
                         headerLines: linesOf(headerArea), footerLines: linesOf(footerArea),
                         headerModel: headerModel, footerModel: footerModel,
-                        title: title, watermark: watermark
+                        title: title, watermark: watermark,
+                        spec: docSpec
                     });
                 } else {
                     result = await window.electronAPI.exportDocx(html, headerHtml, footerHtml);
