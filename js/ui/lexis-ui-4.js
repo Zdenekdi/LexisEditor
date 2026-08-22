@@ -306,6 +306,58 @@ Object.assign(LexisUI.prototype, {
         }
     },
 
+    // Dialog výběru spisu → uloží aktuální dokument jako koncept do zvoleného spisu.
+    // Bez window.prompt (v Electronu blokovaný) — vlastní DOM modal; výběr přes data-idx
+    // (žádná injekce), zobrazená data escapována. Server je fail-closed (neznámý spis → _Nezařazeno).
+    async openSaveDraftToSpisDialog() {
+        const conn = this.getLexisLocalConnection ? this.getLexisLocalConnection() : null;
+        if (!conn || !conn.baseUrl) { this.customAlert('LexisLocal není připojen — nelze uložit koncept do spisu.'); return; }
+        let spisy = [];
+        try {
+            const res = await fetch(conn.baseUrl + '/api/spisy', { headers: conn.headers || {} });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            spisy = (data && data.spisy) || [];
+        } catch (e) { this.customAlert('Nepodařilo se načíst spisy z LexisLocalu: ' + e.message); return; }
+        if (!spisy.length) { this.customAlert('V LexisLocalu zatím nejsou žádné spisy. Nejdřív spis založ nebo synchronizuj z inboxu.'); return; }
+        const esc = (typeof window !== 'undefined' && window.escapeHTML) ? window.escapeHTML : function (x) { return String(x == null ? '' : x); };
+        const overlay = document.createElement('div');
+        overlay.style = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+        const modal = document.createElement('div');
+        modal.style = "background:#fff;padding:24px;border-radius:12px;width:460px;max-width:92vw;box-shadow:0 15px 30px rgba(0,0,0,0.15);font-family:'Inter',sans-serif;";
+        const rows = spisy.map(function (sp, i) {
+            const label = esc(sp.spisZn || sp.nazev || '(bez značky)') + (sp.klient ? ' — ' + esc(sp.klient) : '');
+            return '<div class=\"lx-spis-row\" data-idx=\"' + i + '\" style=\"padding:9px 12px;border:1px solid #edeae4;border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;color:#2b2926;\">' + label + '</div>';
+        }).join('');
+        modal.innerHTML = '<h3 style=\"margin:0 0 12px 0;font-size:15px;color:#2b2926;font-weight:600;\">Uložit koncept do spisu</h3>'
+            + '<input id=\"lx-spis-search\" type=\"text\" placeholder=\"Hledat spis…\" style=\"width:100%;padding:9px;border:1px solid #ddd6cb;border-radius:6px;margin-bottom:12px;box-sizing:border-box;font-size:13px;outline:none;\">'
+            + '<div id=\"lx-spis-list\" style=\"max-height:320px;overflow:auto;margin-bottom:16px;\">' + rows + '</div>'
+            + '<div style=\"display:flex;justify-content:flex-end;gap:10px;\"><button id=\"lx-spis-cancel\" style=\"padding:8px 16px;background:#edeae4;color:#5c574f;font-weight:500;border:none;border-radius:6px;cursor:pointer;\">Zrušit</button></div>';
+        overlay.appendChild(modal); document.body.appendChild(overlay);
+        const self = this;
+        const close = function () { try { document.body.removeChild(overlay); } catch (e) {} };
+        modal.querySelector('#lx-spis-cancel').onclick = close;
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        const search = modal.querySelector('#lx-spis-search'); if (search) search.focus();
+        if (search) search.addEventListener('input', function () {
+            const q = search.value.toLowerCase();
+            modal.querySelectorAll('.lx-spis-row').forEach(function (row) {
+                const sp = spisy[+row.getAttribute('data-idx')];
+                const hay = ((sp.spisZn || '') + ' ' + (sp.nazev || '') + ' ' + (sp.klient || '')).toLowerCase();
+                row.style.display = hay.indexOf(q) !== -1 ? '' : 'none';
+            });
+        });
+        modal.querySelectorAll('.lx-spis-row').forEach(function (row) {
+            row.addEventListener('mouseenter', function () { row.style.background = '#f6f3ee'; });
+            row.addEventListener('mouseleave', function () { row.style.background = ''; });
+            row.addEventListener('click', function () {
+                const sp = spisy[+row.getAttribute('data-idx')];
+                close();
+                self.saveCurrentDraftToSpis(sp.id);
+            });
+        });
+    },
+
     // Česká typografie: pevné (nezalomitelné) mezery v aktuálním dokumentu — uvnitř
     // spisových značek/č.j., po jednopísmenných předložkách, u § a jednotek. Prochází
     // textové uzly (zachová formátování). Pak sladí Quill model a uloží.

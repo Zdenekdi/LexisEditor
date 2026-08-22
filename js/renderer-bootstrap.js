@@ -299,6 +299,8 @@
         window.checkLanguageAI = () => lexisUI.checkLanguageAI();
         // Typografie: pevné mezery (sp. zn./č.j., předložky, §, jednotky).
         window.applyTypography = () => lexisUI.applyTypographyToEditor();
+        // Uložit aktuální dokument jako koncept do vybraného spisu v LexisLocalu.
+        window.saveDraftToSpis = () => lexisUI.openSaveDraftToSpisDialog();
         window.openContacts = () => lexisUI.openContacts();
         window.toggleDictation = () => lexisUI.toggleDictation();
         window.openPostDialog = () => lexisUI.openPostDialog();
