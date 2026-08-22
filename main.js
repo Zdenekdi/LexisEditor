@@ -1226,6 +1226,10 @@ function ensureDeliveryPoller() {
 // recipients = [{ dbID, name? }], payload = { subject, files:[{name,mimeType,base64}] }
 ipcMain.handle('isds-outbox-enqueue', async (event, recipients, payload) => {
     try {
+        // SOUHLAS ADVOKÁTA pro celou dávku hromadného odeslání (fail-closed).
+        const _cnt = Array.isArray(recipients) ? recipients.length : 0;
+        const _ok = await confirmLawyerSend('Hromadné odeslání do ISDS: ' + _cnt + ' příjemců.');
+        if (!_ok) return { success: false, error: 'Hromadné odeslání zrušeno — chybí souhlas advokáta.', cancelled: true };
         const items = getOutbox().enqueueBatch(recipients, payload);
         runOutbox(); // nečekáme — běží na pozadí
         return { success: true, enqueued: items.length, items };
@@ -1499,11 +1503,32 @@ ipcMain.handle('isds-find-databox', async (event, creds, query) => {
 
 // Odeslání datové zprávy (CreateMessage).
 // message = { dbIDRecipient, annotation, files: [{ name, mimeType, base64 }] }
+// --- BEZPEČNOSTNÍ INVARIANT: nic se neodešle bez výslovného souhlasu advokáta ----
+// Nativní modal (OS dialog) nelze obejít rendererem ani AI agentem — vyžaduje
+// skutečné kliknutí advokáta. Volá se PŘED každým reálným odesláním do ISDS.
+async function confirmLawyerSend(detail) {
+    try {
+        const r = await dialog.showMessageBox(mainWindow, {
+            type: 'warning',
+            buttons: ['Odeslat', 'Zrušit'],
+            defaultId: 1,
+            cancelId: 1,
+            title: 'Potvrzení odeslání',
+            message: 'Opravdu odeslat datovou zprávu do ISDS?',
+            detail: String(detail || '') + '\n\nOdesláním potvrzujete jako advokát obsah i příjemce. Bez potvrzení se nic neodešle.'
+        });
+        return r && r.response === 0;
+    } catch (e) { return false; }
+}
+
 ipcMain.handle('isds-send-message', async (event, creds, message) => {
     try {
         if (!message || !message.dbIDRecipient) {
             return { success: false, error: 'Chybí ID schránky příjemce.' };
         }
+        // SOUHLAS ADVOKÁTA (fail-closed) — bez potvrzení se neodesílá.
+        const _ok = await confirmLawyerSend('Příjemce (ID schránky): ' + message.dbIDRecipient + (message.subject ? '\nVěc: ' + message.subject : ''));
+        if (!_ok) return { success: false, error: 'Odeslání zrušeno — chybí souhlas advokáta.', cancelled: true };
         const soapBody = isdsClient.buildCreateMessageRequest(message);
         const res = await isdsCall(creds, 'messages', 'CreateMessage', soapBody);
         const parsed = isdsClient.parseCreateMessageResponse(res.text);
