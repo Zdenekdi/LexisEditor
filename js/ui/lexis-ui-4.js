@@ -306,6 +306,32 @@ Object.assign(LexisUI.prototype, {
         }
     },
 
+    // Uloží AKTUÁLNÍ dokument jako koncept do složky spisu v LexisLocalu (03_Koncepty).
+    // Fail-closed na straně serveru: neznámý spis → _Nezařazeno (nikdy do cizí složky).
+    // Přijímá spisId; výběr spisu + tlačítko doplní UI (getLexisLocalConnection je zdroj spojení).
+    async saveCurrentDraftToSpis(spisId, fileName) {
+        const conn = this.getLexisLocalConnection ? this.getLexisLocalConnection() : null;
+        if (!conn || !conn.baseUrl) { this.customAlert('LexisLocal není připojen — nelze uložit koncept do spisu.'); return; }
+        if (!spisId) { this.customAlert('Chybí ID spisu, do kterého se má koncept uložit.'); return; }
+        try {
+            const html = (this.core && this.core.quill && this.core.quill.root) ? this.core.quill.root.innerHTML : '';
+            const title = (this.currentDocumentTitle || 'koncept');
+            const safe = String(fileName || title).replace(/[^\w\-. ]+/g, '_').trim() || 'koncept';
+            const res = await fetch(conn.baseUrl + '/api/spisy/' + encodeURIComponent(spisId) + '/draft', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, conn.headers || {}),
+                body: JSON.stringify({ fileName: safe + '.html', content: html })
+            });
+            const r = await res.json();
+            if (r && r.success && r.filed) this.customAlert('✅ Koncept uložen do spisu (03_Koncepty).');
+            else if (r && r.success && !r.filed) this.customAlert('⚠️ Koncept uložen do _Nezařazeno (spis nemá složku) — zařaďte ručně.');
+            else this.customAlert('Uložení konceptu se nepodařilo: ' + ((r && r.error) || 'neznámá chyba'));
+            return r;
+        } catch (e) {
+            this.customAlert('LexisLocal nedostupný: ' + e.message);
+        }
+    },
+
     async openLexisDraft(doc) {
         this.showLoader("Otevírám koncept z LexisEditoru...", async () => {
             try {

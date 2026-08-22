@@ -315,6 +315,7 @@ app.whenReady().then(() => {
     } catch (e) {}
     try { buildAppMenu(); } catch (e) {}
     createWindow();
+    setTimeout(() => { try { startLexisLocal(); } catch (e) {} }, 1000);
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -347,6 +348,67 @@ app.whenReady().then(() => {
 
 ipcMain.on('install-update', () => {
     if (autoUpdater) autoUpdater.quitAndInstall();
+});
+
+// --- Volitelné spuštění LexisLocal jako podprocesu (jeden instalovaný celek) ------
+// Guarded: když LexisLocal běží nebo se nenajde, je to no-op. Cesta přes
+// LEXISLOCAL_PATH, jinak zkusí kandidáty vedle appky. Spouští se přes Electronův
+// vestavěný Node (ELECTRON_RUN_AS_NODE), takže není potřeba samostatný node.
+let _lexisLocalChild = null;
+function _lexisLocalCandidates() {
+    const c = [];
+    if (process.env.LEXISLOCAL_PATH) c.push(process.env.LEXISLOCAL_PATH);
+    try { c.push(path.join(process.resourcesPath || '', 'LexisLocal')); } catch (e) {}
+    c.push(path.join(__dirname, '..', 'LexisLocal'));
+    c.push(path.join(__dirname, 'LexisLocal'));
+    return c;
+}
+function _findLexisLocalServer() {
+    for (const base of _lexisLocalCandidates()) {
+        if (!base) continue;
+        for (const p of [path.join(base, 'backend', 'server.js'), path.join(base, 'server.js')]) {
+            try { if (fs.existsSync(p)) return p; } catch (e) {}
+        }
+    }
+    return null;
+}
+function _lexisLocalUrl() { return process.env.LEXISLOCAL_URL || 'http://127.0.0.1:3000'; }
+function _isLexisLocalRunning() {
+    return new Promise((resolve) => {
+        try {
+            const http = require('http');
+            const req = http.get(_lexisLocalUrl() + '/', { timeout: 1200 }, (res) => { res.destroy(); resolve(true); });
+            req.on('timeout', () => { req.destroy(); resolve(false); });
+            req.on('error', () => resolve(false));
+        } catch (e) { resolve(false); }
+    });
+}
+async function startLexisLocal() {
+    if (_lexisLocalChild) return;
+    if (await _isLexisLocalRunning()) { console.log('LexisLocal už běží — nespouštím.'); return; }
+    const serverPath = _findLexisLocalServer();
+    if (!serverPath) { console.log('LexisLocal nenalezen (nastavte LEXISLOCAL_PATH) — přeskočeno.'); return; }
+    try {
+        const { spawn } = require('child_process');
+        _lexisLocalChild = spawn(process.execPath, [serverPath], {
+            cwd: path.dirname(serverPath),
+            env: Object.assign({}, process.env, { ELECTRON_RUN_AS_NODE: '1' }),
+            stdio: 'ignore', detached: false
+        });
+        _lexisLocalChild.on('exit', () => { _lexisLocalChild = null; });
+        console.log('LexisLocal spuštěn z: ' + serverPath);
+    } catch (e) { console.error('Spuštění LexisLocal selhalo:', e.message); _lexisLocalChild = null; }
+}
+function stopLexisLocal() { if (_lexisLocalChild) { try { _lexisLocalChild.kill(); } catch (e) {} _lexisLocalChild = null; } }
+app.on('will-quit', stopLexisLocal);
+
+// Nativní výběr složky (spisovna INGEST_DIR pro LexisLocal apod.)
+ipcMain.handle('select-directory', async () => {
+    try {
+        const r = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory', 'createDirectory'] });
+        if (r.canceled || !r.filePaths || !r.filePaths.length) return { canceled: true };
+        return { canceled: false, path: r.filePaths[0] };
+    } catch (e) { return { canceled: true, error: e.message }; }
 });
 
 // IPC Handler pro získání verze aplikace z package.json

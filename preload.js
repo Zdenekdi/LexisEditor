@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Zpřístupnění specifických systémových funkcí pro frontend (index.html)
 contextBridge.exposeInMainWorld('electronAPI', {
     exportDocx: (htmlContent, headerHtml, footerHtml) => ipcRenderer.invoke('export-docx', htmlContent, headerHtml, footerHtml),
+    selectDirectory: () => ipcRenderer.invoke('select-directory'),
     // Word-parita: chytrý export — pro dokumenty s poznámkami / sledovanými změnami /
     // obsahem použije nativní OOXML cestu (docx), jinak html-to-docx. Import z Wordu
     // se zachováním revizí a poznámek pod čarou.
