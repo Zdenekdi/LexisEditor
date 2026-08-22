@@ -306,6 +306,30 @@ Object.assign(LexisUI.prototype, {
         }
     },
 
+    // Ověření právních citací v aktuálním dokumentu proti podkladům i externím
+    // zdrojům (e-Sbírka, justice.cz) přes LexisLocal. Ukáže neověřené (fail-closed).
+    async verifyCitationsInEditor() {
+        const conn = this.getLexisLocalConnection ? this.getLexisLocalConnection() : null;
+        if (!conn || !conn.baseUrl) { this.customAlert('LexisLocal není připojen — ověření citací vyžaduje běžící LexisLocal.'); return; }
+        const text = (this.core && this.core.quill && this.core.quill.root) ? this.core.quill.root.innerText : '';
+        if (!text || !text.trim()) { this.customAlert('Dokument je prázdný.'); return; }
+        try {
+            const res = await fetch(conn.baseUrl + '/api/citations/verify', {
+                method: 'POST',
+                headers: Object.assign({ 'Content-Type': 'application/json' }, conn.headers || {}),
+                body: JSON.stringify({ text: text, useSources: true })
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const r = await res.json();
+            if (!r.total) { this.customAlert('V dokumentu nebyly nalezeny žádné právní citace (§, zákony, spisové značky).'); return; }
+            const okStates = { verified: 1, verified_by_source: 1, no_reference_context_ok: 1 };
+            const bad = (r.citations || []).filter(function (c) { return !okStates[c.status]; });
+            if (!bad.length) { this.customAlert('✅ Všechny citace (' + r.total + ') jsou ověřené' + (r.sourcesConsulted ? ' (včetně externích zdrojů)' : '') + '.'); return; }
+            const lines = bad.slice(0, 15).map(function (c) { return '• ' + (c.raw || '') + ' — ' + (c.reason || c.status); }).join('\n');
+            this.customAlert('⚠ Neověřené citace (' + bad.length + ' z ' + r.total + '):\n\n' + lines + (bad.length > 15 ? '\n… a další' : '') + '\n\nOvěřené jsou jen ty doložené v podkladech nebo v oficiálním zdroji.');
+        } catch (e) { this.customAlert('Ověření citací selhalo: ' + e.message); }
+    },
+
     // Dialog výběru spisu → uloží aktuální dokument jako koncept do zvoleného spisu.
     // Bez window.prompt (v Electronu blokovaný) — vlastní DOM modal; výběr přes data-idx
     // (žádná injekce), zobrazená data escapována. Server je fail-closed (neznámý spis → _Nezařazeno).

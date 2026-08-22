@@ -301,6 +301,8 @@
         window.applyTypography = () => lexisUI.applyTypographyToEditor();
         // Uložit aktuální dokument jako koncept do vybraného spisu v LexisLocalu.
         window.saveDraftToSpis = () => lexisUI.openSaveDraftToSpisDialog();
+        // Ověření právních citací v dokumentu (proti podkladům i externím zdrojům).
+        window.verifyDocCitations = () => lexisUI.verifyCitationsInEditor();
         window.openContacts = () => lexisUI.openContacts();
         window.toggleDictation = () => lexisUI.toggleDictation();
         window.openPostDialog = () => lexisUI.openPostDialog();
