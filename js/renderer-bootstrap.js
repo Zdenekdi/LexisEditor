@@ -297,6 +297,8 @@
         // Jazyková kontrola: rychlý linter spisovné češtiny + hloubková AI kontrola v kontextu.
         window.checkLanguage = () => lexisUI.checkLanguage();
         window.checkLanguageAI = () => lexisUI.checkLanguageAI();
+        // Typografie: pevné mezery (sp. zn./č.j., předložky, §, jednotky).
+        window.applyTypography = () => lexisUI.applyTypographyToEditor();
         window.openContacts = () => lexisUI.openContacts();
         window.toggleDictation = () => lexisUI.toggleDictation();
         window.openPostDialog = () => lexisUI.openPostDialog();

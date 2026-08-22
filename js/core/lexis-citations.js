@@ -27,6 +27,9 @@
     // Ústavní soud: „III. ÚS 1234/19", „Pl. ÚS 12/34", „I. ÚS 2/20".
     const RE_US = /\b((?:Pl\.|I{1,3}\.|IV\.)\s*ÚS)\s+(\d{1,5})\/(\d{2,4})\b/g;
 
+    // Číslo jednací: „č. j. 12345/2026-ABC", „čj. 999/2026" (zkratka + referenční token).
+    const RE_CJ = /(č\.\s?j\.|čj\.)\s*([0-9A-Za-zÁ-Žá-ž][\w./\-]{2,})/gi;
+
     function _norm2to4(year) {
         const y = String(year);
         if (y.length === 4) return y;
@@ -96,5 +99,24 @@
         return { items: cites.map(c => c.normalized), count: cites.length, byCourt };
     }
 
-    return { extractCitations, buildAuthorities };
+    /**
+     * Rozpozná VŠECHNY právní reference: spisové značky (přes extractCitations) i
+     * čísla jednací. Vrací [{ type:'spisova_znacka'|'cislo_jednaci', value, raw, court? }].
+     * Nešpiní buildAuthorities (to zůstává jen judikatura).
+     */
+    function extractReferences(text) {
+        const src = String(text == null ? '' : text);
+        const out = extractCitations(src).map(function (c) { return { type: 'spisova_znacka', value: c.normalized, raw: c.raw, court: c.court }; });
+        const seen = {};
+        out.forEach(function (o) { seen[o.value.toLowerCase()] = true; });
+        let m; RE_CJ.lastIndex = 0;
+        while ((m = RE_CJ.exec(src)) !== null) {
+            const val = (m[1].replace(/\s+/g, ' ').trim() + ' ' + m[2]).trim();
+            const key = val.toLowerCase();
+            if (!seen[key]) { seen[key] = true; out.push({ type: 'cislo_jednaci', value: val, raw: m[0].trim() }); }
+        }
+        return out;
+    }
+
+    return { extractCitations, buildAuthorities, extractReferences };
 });

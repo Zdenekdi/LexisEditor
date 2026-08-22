@@ -143,7 +143,33 @@
         return out;
     }
 
-    const api = { checkCzechStyle, parseAiLanguageIssues };
+    // --- Pevné (nezalomitelné) mezery — česká typografie ------------------------
+    // Vkládá U+00A0 tam, kde se v ČR nesmí zalomit řádek: jednopísmenné předložky/
+    // spojky (k s v z o u a i), § + číslo, číslo + jednotka, oddělovač tisíců, a
+    // UVNITŘ spisové značky / čísla jednacího (aby se reference nikdy nerozdělila).
+    // Čistý transform; U+00A0 se korektně přenese do .docx exportu.
+    var NBSP = '\u00A0';
+    function hardenTypography(text) {
+        var s = String(text == null ? '' : text);
+        // 1) uvnitř spisové značky: „15 C 123/2026", „30 Cdo 2/2019"
+        s = s.replace(/\b(\d{1,3}) ([A-Za-zÁ-Žá-ž]{1,5}) (\d{1,5}\/\d{2,4})\b/g, function (m, a, b, c) { return a + NBSP + b + NBSP + c; });
+        // 1b) Ústavní soud: „III. ÚS 12/20", „Pl. ÚS 5/19"
+        s = s.replace(/\b((?:Pl\.|I{1,3}\.|IV\.)) (ÚS) (\d{1,5}\/\d{2,4})\b/g, function (m, a, b, c) { return a + NBSP + b + NBSP + c; });
+        // 2) zkratky „sp. zn." a „č. j." / „čj." — spojit nezalomitelně
+        s = s.replace(/\bsp\. ?zn\. /gi, function (m) { return m.replace(/ /g, NBSP); });
+        s = s.replace(/(č\.\s?j\.|čj\.)\s+/gi, function (m) { return m.replace(/\s+/g, NBSP); });
+        // 3) § + číslo
+        s = s.replace(/§ +(?=\d)/g, '§' + NBSP);
+        // 4) jednopísmenné předložky/spojky + následující slovo
+        s = s.replace(/(^|[\s(„"'—–])([ksvzouaiKSVZOUAI]) +/g, function (m, pre, l) { return pre + l + NBSP; });
+        // 5) číslo + jednotka
+        s = s.replace(/(\d) +(Kč|%|Sb\.|dnů|dní|dny|den|měsíc\w*|rok\w*|roky|let|hod\w*|min\w*)/g, function (m, n, u) { return n + NBSP + u; });
+        // 6) oddělovač tisíců: „50 000" → pevná mezera (i opakovaně)
+        s = s.replace(/(\d) (?=\d{3}(\D|$))/g, '$1' + NBSP);
+        return s;
+    }
+
+    const api = { checkCzechStyle, parseAiLanguageIssues, hardenTypography };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.LexisCzechStyle = api;
 })(typeof window !== 'undefined' ? window : null);

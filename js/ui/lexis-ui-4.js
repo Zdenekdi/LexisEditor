@@ -306,6 +306,30 @@ Object.assign(LexisUI.prototype, {
         }
     },
 
+    // Česká typografie: pevné (nezalomitelné) mezery v aktuálním dokumentu — uvnitř
+    // spisových značek/č.j., po jednopísmenných předložkách, u § a jednotek. Prochází
+    // textové uzly (zachová formátování). Pak sladí Quill model a uloží.
+    applyTypographyToEditor() {
+        try {
+            const root = this.core && this.core.quill && this.core.quill.root;
+            const harden = (typeof window !== 'undefined' && window.LexisCzechStyle) ? window.LexisCzechStyle.hardenTypography : null;
+            if (!root || !harden) { if (this.customAlert) this.customAlert('Typografie není k dispozici.'); return 0; }
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+            const nodes = []; let n;
+            while ((n = walker.nextNode())) nodes.push(n);
+            let changed = 0;
+            nodes.forEach(function (tn) { const v = tn.nodeValue; const h = harden(v); if (h !== v) { tn.nodeValue = h; changed++; } });
+            // Sladit Quill model s upraveným DOM (aby se změny promítly do Delty/uložení).
+            try { if (this.core.quill.update) this.core.quill.update('user'); } catch (e) {}
+            try { if (typeof this.saveActiveDocumentState === 'function') this.saveActiveDocumentState(); } catch (e) {}
+            if (this.customAlert) this.customAlert('Typografie: pevné mezery doplněny (' + changed + ' úprav).');
+            return changed;
+        } catch (e) {
+            if (this.customAlert) this.customAlert('Typografie selhala: ' + e.message);
+            return 0;
+        }
+    },
+
     // Uloží AKTUÁLNÍ dokument jako koncept do složky spisu v LexisLocalu (03_Koncepty).
     // Fail-closed na straně serveru: neznámý spis → _Nezařazeno (nikdy do cizí složky).
     // Přijímá spisId; výběr spisu + tlačítko doplní UI (getLexisLocalConnection je zdroj spojení).
